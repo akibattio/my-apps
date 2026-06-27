@@ -217,6 +217,7 @@
   <div class="field" style="margin-left:auto;">
     <label> </label>
     <div class="row-actions">
+      <button class="btn-ghost btn-mini" id="demoBtn">デモ案件投入</button>
       <button class="btn-ghost btn-mini" id="csvBtn">CSV取込</button>
       <button class="btn-ghost btn-mini" id="exportBtn">バックアップ書出</button>
       <button class="btn-ghost btn-mini" id="importBtn">読込</button>
@@ -466,6 +467,42 @@ function bind(){
   $("#csvBtn").onclick = ()=>$("#csvFile").click();
   $("#csvBtn2").onclick = ()=>$("#csvFile").click();
   $("#csvFile").onchange = onCsvPicked;
+  $("#demoBtn").onclick = loadDemoDeals;
+}
+// デモ用：通常案件15件（うち受注9件）＋継続5件を選択中スタッフに投入
+function loadDemoDeals(){
+  if(!cur.staff){ return; }
+  if(!confirm("選択中のスタッフに、デモ案件（通常15件・うち受注9件／継続5件）を追加します。よろしいですか？")) return;
+  cur.biz="sales";
+  const sid=cur.staff, ym=cur.month;
+  const d=n=>ym+"-"+String(Math.min(28,n)).padStart(2,"0");
+  const clients=["アルファ商事","ベータ工業","ガンマ製作所","デルタ物産","イプシロン社","ゼータ建設","イータ電機","シータ運輸","イオタ食品","カッパ商会","ラムダ技研","ミュー化成","ニュー興業","クシー製薬","オミクロン社"];
+  const contents=["WEBサイト制作","LP制作","SNS運用","動画制作","広告運用","システム改修","採用サイト","SEO/LLMO対策","パンフレット","リニューアル"];
+  const gross=[1200,800,1500,600,2000,450,900,1100,700,1300,550,1000,650,1800,400];
+  const owners=["藤井","二宮","田嶋","藤井","二宮","藤井","田嶋","藤井","二宮"];
+  // 受注9件（確定）
+  for(let i=0;i<9;i++){
+    const g=gross[i];
+    db.pipeline.push({id:uid(),staffId:sid,dealType:"案件",attribute:i%2?"既存":"新規",
+      client:clients[i],content:contents[i%contents.length],owner:owners[i%owners.length],
+      yomi:"受注",grossTotal:g,personalGross:g,proposalDate:d(2+i),orderDate:d(4+i*2),
+      apoCount:1+(i%3),propStatus:"提案1",
+      activities:[{date:d(1+i),memo:"初回アポ"},{date:d(3+i),memo:"アポ（2回目）"}]});
+  }
+  // 見込み6件（A2/B2/C1/D1）
+  const yomis=["A","A","B","B","C","D"], pstat=["提案3","提案2","提案2","返答待","提案1","提案1"];
+  for(let i=0;i<6;i++){
+    const g=gross[9+i];
+    db.pipeline.push({id:uid(),staffId:sid,dealType:"案件",attribute:i%2?"既存":"新規",
+      client:clients[9+i],content:contents[i],owner:owners[i%owners.length],
+      yomi:yomis[i],grossTotal:g,personalGross:g,proposalDate:d(6+i),
+      apoCount:1+(i%4),propStatus:pstat[i],
+      activities:[{date:d(2+i),memo:"初回アポ"},{date:d(9+i),memo:"アポ（2回目）"}]});
+  }
+  // 継続5件
+  const recs=[["インフォコム","サイト保守",58],["明成建設","広告運用",100],["協和商事","SEO/LLMO",80],["メディナビ","SNS運用",60],["DTS","分析パック",40]];
+  recs.forEach(([cl,nm,mo])=>db.recurring.push({id:uid(),staffId:sid,client:cl,name:nm,monthly:mo,startMonth:"2025-10",endMonth:"",memo:"デモ"}));
+  save(); render();
 }
 function switchView(v){
   cur.view = v;
