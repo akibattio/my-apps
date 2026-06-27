@@ -1410,8 +1410,8 @@ function monthProgress(ym){
   const last=new Date(y,mo,0).getDate();
   return Math.min(1, now.getDate()/last);
 }
-// 着地見込み用のヨミ確度（A=100%/B=80%/C=30%/D=0%）
-const YOMI_LAND = {A:1.0, B:0.8, C:0.3, D:0};
+// 着地見込み用のヨミ確度（A=100%/B=80%/C=33%/D=0%）
+const YOMI_LAND = {A:1.0, B:0.8, C:0.33, D:0};
 // ヨミ別の案件額（個人粗利合計）と着地寄与
 function pipelineByYomi(staffId){
   const by={A:0,B:0,C:0,D:0};
@@ -1461,7 +1461,21 @@ function monthDashboardCard(m){
   else msg=`着地見込みは目標の ${rate}%。目標まで あと ${fmt(L.target-L.landing)} 千円の見込みが必要です。`;
   const sec=t=>`<div style="font-weight:700;color:var(--navy);font-size:13px;margin:18px 0 8px;border-top:1px solid var(--line);padding-top:14px;">${t}</div>`;
   const legend=(col,lab,amt)=>`<span style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;background:${col};border-radius:2px;vertical-align:middle;margin-right:4px;"></span>${lab} <b>${fmt(amt)}</b></span>`;
-  const PCT={A:100,B:80,C:30,D:0};
+  const PCT={A:100,B:80,C:33,D:0};
+  // 着地見込みのシナリオ：受注＋継続を土台に、A→B→Cの順で転換率込みで積み増す
+  const scA=L.confirmed+L.contrib.A, scB=scA+L.contrib.B, scC=scB+L.contrib.C;
+  const scenarios=[
+    {lab:"＋Aまで", note:"転換率100%", val:scA, col:YOMI_COLOR.A},
+    {lab:"＋Bまで", note:"転換率80%",  val:scB, col:YOMI_COLOR.B},
+    {lab:"＋Cまで", note:"転換率33%",  val:scC, col:YOMI_COLOR.C},
+  ];
+  const scenarioPanel=scenarios.map(s=>{
+    const r=rateOf(s.val,L.target);
+    return `<div class="kpi" style="border-left:4px solid ${s.col};">
+      <div class="name">${s.lab}<small style="color:var(--muted);">（${s.note}）</small></div>
+      <div class="val">${fmt(s.val)} <small>千円</small></div>
+      <div class="hint" style="margin-top:4px;">${L.target>0?`目標の <b style="color:${rateColor(r)};">${r}%</b>`:"目標未設定"}</div></div>`;
+  }).join("");
   const yomiPanel=["A","B","C","D"].map(y=>
     `<div class="kpi" style="border-left:4px solid ${YOMI_COLOR[y]};">
       <div class="name">ヨミ${y}<small style="color:var(--muted);">（確度${PCT[y]}%）</small></div>
@@ -1487,6 +1501,9 @@ function monthDashboardCard(m){
       <span style="color:var(--muted);">｜破線＝目標 ${fmt(L.target)}</span>
     </div>
     <div style="border-left:4px solid ${color};background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:14px;font-weight:600;">${msg}</div>
+
+    ${sec("着地見込みのシナリオ（受注＋継続を土台に積み増し）")}
+    <div class="month-summary">${scenarioPanel}</div>
 
     ${sec("ヨミ別の見込み（個人粗利）")}
     <div class="month-summary">${yomiPanel}</div>`;
