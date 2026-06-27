@@ -1,0 +1,1808 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>週次目標トラッカー</title>
+<style>
+  :root{
+    --navy:#1f2d4a;
+    --navy-2:#2c3e63;
+    --cyan:#1bb6c1;
+    --line:#dfe3ea;
+    --ink:#23272f;
+    --muted:#7b828e;
+    --bg:#f4f6f9;
+    --ok:#2e9e5b;
+    --warn:#d8a72a;
+    --bad:#c8513e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.6;
+  }
+  header{
+    background:var(--navy);color:#fff;padding:9px 20px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  }
+  header h1{font-size:16px;margin:0;font-weight:600;letter-spacing:.02em;}
+  header .sub{color:#aeb8cc;font-size:12px;}
+  .bar{
+    background:#fff;border-bottom:1px solid var(--line);
+    padding:8px 20px;display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;
+  }
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11px;color:var(--muted);font-weight:600;}
+  select,input,textarea{
+    font-family:inherit;font-size:14px;border:1px solid var(--line);
+    border-radius:6px;padding:7px 9px;background:#fff;color:var(--ink);
+  }
+  select:focus,input:focus,textarea:focus{outline:2px solid var(--cyan);outline-offset:-1px;}
+  button{
+    font-family:inherit;cursor:pointer;border:none;border-radius:6px;
+    padding:8px 14px;font-size:13px;font-weight:600;
+  }
+  .btn-primary{background:var(--cyan);color:#fff;}
+  .btn-ghost{background:#eef1f5;color:var(--navy);}
+  .btn-mini{padding:4px 9px;font-size:12px;background:#eef1f5;color:var(--navy);}
+  .btn-danger{background:#fff;color:var(--bad);border:1px solid var(--bad);}
+  main{padding:14px 20px;max-width:1600px;margin:0 auto;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px;}
+  .card h2{font-size:14px;margin:0 0 12px;color:var(--navy);display:flex;align-items:center;gap:8px;}
+  .card h2 .tag{font-size:10px;background:var(--navy);color:#fff;padding:2px 7px;border-radius:4px;font-weight:600;}
+
+  table{width:100%;border-collapse:collapse;}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-size:11px;color:var(--muted);font-weight:600;background:#fafbfc;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+
+  .goal-row td input{width:100%;}
+  .month-summary{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;}
+  .kpi{flex:1;min-width:150px;border:1px solid var(--line);border-radius:8px;padding:12px;}
+  .kpi .name{font-size:12px;color:var(--muted);}
+  .kpi .val{font-size:20px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums;}
+  .kpi .val small{font-size:12px;color:var(--muted);font-weight:500;}
+  .progress{height:8px;background:#eef1f5;border-radius:5px;overflow:hidden;margin-top:8px;}
+  .progress span{display:block;height:100%;background:var(--cyan);}
+
+  .week{border:1px solid var(--line);border-radius:9px;padding:14px;margin-bottom:12px;}
+  .week.done{border-color:#cfe6d6;background:#fafdfb;}
+  .week-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .week-head .wk{font-weight:700;color:var(--navy);}
+  .week-head .period{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .week-head .rate{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid2 .col h4{margin:0 0 6px;font-size:11px;color:var(--muted);}
+  .plan-col{background:#fbfcfe;}
+  .num-line{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .num-line label{font-size:12px;color:var(--muted);min-width:74px;}
+  .num-line input{width:110px;text-align:right;}
+  textarea{width:100%;min-height:54px;resize:vertical;}
+  .rate-pill{padding:2px 8px;border-radius:10px;font-size:12px;color:#fff;}
+  .feedback{margin-top:10px;}
+  .feedback h4{margin:0 0 4px;font-size:11px;color:var(--muted);}
+  .empty{color:var(--muted);text-align:center;padding:30px;}
+  .row-actions{display:flex;gap:8px;align-items:center;}
+  .hint{font-size:11px;color:var(--muted);}
+  .saved-flash{color:var(--ok);font-size:12px;font-weight:600;opacity:0;transition:opacity .2s;}
+  .saved-flash.show{opacity:1;}
+  footer{max-width:1600px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:11px;}
+
+  /* タブ */
+  .tabs{background:var(--navy-2);display:flex;gap:2px;padding:0 20px;}
+  .tabs button{background:transparent;color:#aeb8cc;border-radius:0;padding:11px 18px;font-weight:600;border-bottom:3px solid transparent;}
+  .tabs button.active{color:#fff;border-bottom-color:var(--cyan);}
+  .role-switch{display:flex;margin-left:auto;border:1px solid #41507a;border-radius:7px;overflow:hidden;}
+  .role-switch button{background:transparent;color:#aeb8cc;padding:6px 14px;border-radius:0;font-size:12px;}
+  .role-switch button.active{background:var(--cyan);color:#fff;}
+  .subtabs{display:flex;gap:8px;margin:0;flex-wrap:wrap;}
+  .subtabs button{background:#fff;border:1px solid var(--line);color:var(--muted);padding:8px 18px;border-radius:8px;font-weight:600;font-size:13px;}
+  .subtabs button.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .biz-switch{display:flex;gap:0;margin:0;border:1px solid var(--cyan);border-radius:9px;overflow:hidden;width:fit-content;}
+  .biz-switch button{background:#fff;color:var(--cyan);padding:9px 22px;border-radius:0;font-weight:700;font-size:13px;}
+  .biz-switch button.active{background:var(--cyan);color:#fff;}
+
+  /* サマリー */
+  .sum-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .sum-table th,.sum-table td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .sum-table th{font-size:11px;color:var(--muted);background:#fafbfc;text-align:right;}
+  .sum-table th.l,.sum-table td.l{text-align:left;}
+  .sum-table td{text-align:right;font-variant-numeric:tabular-nums;}
+  .sum-table tr.dept td{background:var(--navy);color:#fff;font-weight:700;text-align:left;font-size:12px;letter-spacing:.04em;}
+  .sum-table tr.total td{background:#f0f3f7;font-weight:700;}
+  .sum-table .nm{font-weight:600;color:var(--ink);}
+  .sum-table .mt{color:var(--muted);font-size:11px;}
+  .ratebadge{display:inline-block;min-width:42px;text-align:center;color:#fff;border-radius:10px;padding:1px 7px;font-size:12px;font-weight:600;}
+  .scroll-x{overflow-x:auto;}
+  .mini-cell{font-size:12px;}
+  .mini-cell small{display:block;color:var(--muted);font-size:10px;}
+
+  /* 月次KPI表（見やすさ強化） */
+  .kpi-month{width:100%;border-collapse:collapse;font-size:14px;}
+  .kpi-month th,.kpi-month td{padding:12px 16px;border-bottom:1px solid var(--line);text-align:right;}
+  .kpi-month thead th{background:#fafbfc;color:var(--muted);font-size:12px;font-weight:600;border-bottom:1px solid var(--line);}
+  .kpi-month th.l,.kpi-month td.l{text-align:left;}
+  .kpi-month td.l{font-weight:700;font-size:14px;color:var(--ink);}
+  .kpi-month td.l small{color:var(--muted);font-weight:400;font-size:11px;}
+  .kpi-month .sep{border-left:2px solid #e3e7ee;}
+  .kpi-month .g-sum{background:#eef9fb;}
+  .kpi-month thead .g-sumh{background:#dcf2f5;color:var(--navy);}
+  .kpi-month tbody tr:hover td{background:#fafdfe;}
+  .kpi-month tbody tr:hover td.g-sum{background:#e3f4f7;}
+  .kpi-month td.val{font-variant-numeric:tabular-nums;}
+  .kpi-month td.actual{font-weight:700;color:var(--navy);}
+
+  /* 案件一覧 */
+  .deal-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .deal-table th,.deal-table td{padding:7px 9px;border-bottom:1px solid var(--line);}
+  .deal-table th{font-size:11px;color:var(--muted);background:#fafbfc;text-align:left;}
+  .deal-table td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .status-chip{display:inline-block;font-size:11px;padding:1px 8px;border-radius:10px;background:#eef1f5;color:var(--navy);}
+  .status-chip.win{background:#e3f3e9;color:var(--ok);}
+  .status-chip.deliver{background:#e6eefb;color:var(--navy-2);}
+
+  /* モーダル */
+  .modal-bg{position:fixed;inset:0;background:rgba(20,28,48,.5);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto;}
+  .modal{background:#fff;border-radius:12px;max-width:820px;width:100%;padding:22px;}
+  .modal h3{margin:0 0 4px;color:var(--navy);font-size:16px;}
+  .modal .map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;}
+  .modal .map-grid .field{gap:4px;}
+  .modal select{width:100%;}
+  .prev-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;}
+  .prev-table th,.prev-table td{border:1px solid var(--line);padding:4px 7px;text-align:left;white-space:nowrap;}
+  .prev-table th{background:#fafbfc;color:var(--muted);}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;}
+  .warn-line{color:var(--warn);font-size:12px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>週次目標トラッカー</h1>
+  <span class="sub">月次目標を週に分けて、毎週ふりかえる</span>
+  <span class="saved-flash" id="flash">保存しました</span>
+  <div class="role-switch">
+    <button id="roleStaff" class="active">スタッフ</button>
+    <button id="roleAdmin">管理者</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button id="tabDetail" class="active">個別ページ</button>
+  <button id="tabSummary">サマリー</button>
+</div>
+
+<div class="bar" id="summaryBar" style="display:none;">
+  <div class="field">
+    <label>対象期</label>
+    <select id="fySel"></select>
+  </div>
+  <div class="field" style="margin-left:auto;">
+    <label> </label>
+    <div class="row-actions">
+      <button class="btn-ghost btn-mini" id="csvBtn2">CSV取込</button>
+      <button class="btn-ghost btn-mini" id="exportBtn2">バックアップ書出</button>
+    </div>
+  </div>
+</div>
+
+<div class="bar" id="detailBar">
+  <div class="field">
+    <label>スタッフ</label>
+    <select id="staffSel"></select>
+  </div>
+  <div class="field">
+    <label> </label>
+    <button class="btn-ghost" id="addStaff">＋ スタッフ追加</button>
+  </div>
+  <div class="field">
+    <label>対象月</label>
+    <input type="month" id="monthSel">
+  </div>
+  <div class="field" style="margin-left:auto;">
+    <label> </label>
+    <div class="row-actions">
+      <button class="btn-ghost btn-mini" id="csvBtn">CSV取込</button>
+      <button class="btn-ghost btn-mini" id="exportBtn">バックアップ書出</button>
+      <button class="btn-ghost btn-mini" id="importBtn">読込</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+    </div>
+  </div>
+</div>
+
+<main id="app"></main>
+<input type="file" id="csvFile" accept=".csv,text/csv" style="display:none;">
+<div id="modalRoot"></div>
+<footer>
+  データはこのブラウザ内（localStorage）にだけ保存されます。別PCと共有したいときは「バックアップ書出」でファイル化して渡してください。
+</footer>
+
+<script>
+const $ = (s,el=document)=>el.querySelector(s);
+const KEY = "wgt_data_v3";
+const WEEK_LABELS = ["第1週","第2週","第3週","第4週","第5週","第6週"];
+
+// 対象月を「月曜はじまり・日曜おわり・月をまたがない」で週に分割
+function weeksOfMonth(ym){
+  const [y,mo] = ym.split("-").map(Number);
+  const lastDay = new Date(y, mo, 0).getDate();
+  const out = [];
+  let start = 1;
+  while(start <= lastDay){
+    const dow = new Date(y, mo-1, start).getDay(); // 0=日,1=月…6=土
+    const toSun = (7 - dow) % 7;                    // その週の日曜まで
+    let end = start + toSun;
+    if(end > lastDay) end = lastDay;
+    out.push({ start, end });
+    start = end + 1;
+  }
+  return out; // 例）4〜6週
+}
+function periodLabel(p, ym){
+  const mo = Number(ym.split("-")[1]);
+  return `${mo}/${p.start}〜${mo}/${p.end}`;
+}
+
+// ---- 期（10月開始・翌9月締め）まわり ----
+const pad=n=>String(n).padStart(2,"0");
+function curFY(){ const d=new Date(); return (d.getMonth()+1)>=10 ? d.getFullYear() : d.getFullYear()-1; }
+function fyOfMonth(ym){ const [y,mo]=ym.split("-").map(Number); return mo>=10 ? y : y-1; }
+function prevMonth(ym){ const [y,mo]=ym.split("-").map(Number); const py=mo===1?y-1:y, pm=mo===1?12:mo-1; return `${py}-${pad(pm)}`; }
+const SALES_KPI_DEFAULT = [
+  {name:"粗利（新規）",unit:"千円",target:"",actual:""},
+  {name:"粗利（既存）",unit:"千円",target:"",actual:""},
+  {name:"案件化（新規）",unit:"件",target:"",actual:""},
+  {name:"案件化（既存）",unit:"件",target:"",actual:""},
+  {name:"アポ（新規）",unit:"件",target:"",actual:""},
+  {name:"アポ（既存）",unit:"件",target:"",actual:""},
+];
+// 粗利合計＝新規＋既存（集計・週次基準で使用）
+const GROSS_NAMES=["粗利（新規）","粗利（既存）"];
+const CASE_NAMES=["案件化（新規）","案件化（既存）"];
+const APO_NAMES=["アポ（新規）","アポ（既存）"];
+function kpiSum(kpi, names, field){ return (kpi||[]).filter(k=>names.includes(k.name)).reduce((s,k)=>s+(Number(k[field])||0),0); }
+function ensureSalesMonth(staffId, ym){
+  const k=staffId+"|sales|"+ym;
+  if(!db.months[k]) db.months[k]={goals:null,weeks:[],kpi:JSON.parse(JSON.stringify(SALES_KPI_DEFAULT)),channels:{}};
+  const m=db.months[k];
+  if(!m.kpi) m.kpi=JSON.parse(JSON.stringify(SALES_KPI_DEFAULT));
+  if(!m.channels) m.channels={};
+  return m;
+}
+// 目標値だけをコピー（実績はコピーしない）
+function copyTargetsBetween(srcM, dstM){
+  if(!srcM) return;
+  if(srcM.kpi){ srcM.kpi.forEach(sk=>{ let dk=dstM.kpi.find(x=>x.name===sk.name); if(!dk){ dk={name:sk.name,unit:sk.unit,target:"",actual:""}; dstM.kpi.push(dk); } dk.target=sk.target; }); }
+  if(srcM.channels){ Object.keys(srcM.channels).forEach(ch=>{ if(!dstM.channels[ch]) dstM.channels[ch]={}; dstM.channels[ch].caseT=srcM.channels[ch].caseT; dstM.channels[ch].apoT=srcM.channels[ch].apoT; }); }
+}
+// 上半期(H1)=10,11,12,1,2,3 / 下半期(H2)=4,5,6,7,8,9
+function halfMonths(fyStart, half){
+  if(half==="H2") return [4,5,6,7,8,9].map(m=>`${fyStart+1}-${pad(m)}`);
+  return [[fyStart,10],[fyStart,11],[fyStart,12],[fyStart+1,1],[fyStart+1,2],[fyStart+1,3]].map(([y,m])=>`${y}-${pad(m)}`);
+}
+function fyMonths(fyStart){ return [...halfMonths(fyStart,"H1"), ...halfMonths(fyStart,"H2")]; }
+// 副作用なしの読み取り（getMonthはテンプレ自動投入の副作用があるため集計には使わない）
+function readActual(staffId, ym){
+  const m = db.months[staffId+"|"+ym];
+  if(!m || !m.weeks) return 0;
+  const need = weeksOfMonth(ym).length;
+  return m.weeks.slice(0,need).reduce((s,w)=>s+(Number(w.actual)||0),0);
+}
+function staffMonthTarget(s, ym){
+  if(!s) return "";
+  if(s.targets && s.targets[ym]!=null && s.targets[ym]!=="") return s.targets[ym];
+  return s.monthlyTarget;
+}
+function readTarget(staffId, ym){
+  const m = db.months[staffId+"|"+ym];
+  if(m && m.goals && m.goals.length && m.goals[0].target!=="" ) return Number(m.goals[0].target)||0;
+  const s = db.staff.find(x=>x.id===staffId);
+  return Number(staffMonthTarget(s, ym))||0;
+}
+function sumHalf(staffId, fyStart, half){
+  let t=0,a=0;
+  halfMonths(fyStart,half).forEach(ym=>{ t+=readTarget(staffId,ym); a+=readActual(staffId,ym); });
+  return {target:t, actual:a};
+}
+
+let db = load();
+if(!db.deals) db.deals = [];   // CSV取込の案件データ（納品）
+if(!db.pipeline) db.pipeline = [];  // 営業の案件パイプライン（ヨミ管理）
+if(!db.recurring) db.recurring = [];  // 営業の継続案件（定期契約・期間で計上）
+if(!db.channels) db.channels = ["既存","WEB","紹介","交流会","レディクル","代理店","展示会","アイミツ","その他"];  // チャネルマスタ（管理者が編集）
+if(!db.members) db.members = db.staff.map(s=>s.name);  // メンバーマスタ（パス元の選択肢・管理者が編集）
+let cur = { staff:null, month:null, view:"detail", fyStart:curFY(), role:"staff", detailTab:"input", biz:"director", pipeKind:"all" };
+
+function load(){
+  try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d&&d.staff) return d; }catch(e){}
+  return seed();
+}
+function seed(){
+  const FY = curFY();                 // 2026-06時点なら 2025（2025年10月〜2026年9月期）
+  const fyMs = fyMonths(FY);           // ["2025-10",...,"2026-09"]（期=10月→9月の順）
+  // 納品（粗利）月次目標 — 期順の12か月（千円）
+  const NOUHIN = {
+    "田上智也":   [2500,2400,2400,2000,2000,2000,2300,2300,2300,2300,2300,2300],
+    "能島青也":   [600,700,700,700,800,800,1500,1500,1500,2000,2000,2000],
+    "今井紗也華": [600,700,700,700,800,800,750,700,800,800,800,800],
+    "土田清太郎": [2700,2700,2700,2700,2700,2700,2700,2700,2700,2700,2700,2700],
+    "須藤理代":   [2450,2450,2450,2450,2450,2450,2600,2600,2600,2600,2600,2600],
+    "古賀理一郎": [200,200,1000,1800,1800,1800,2250,2250,2250,1950,1950,1950],
+    "工藤心太":   [500,500,550,550,550,550,800,800,800,800,800,800],
+  };
+  // 受注担当の従来の月平均（受注の月次表が来たら同様に月別化）
+  const JUCHU_AVG = {"二宮":4050,"藤井":3150,"田嶋":2800};
+  // [事業部, 氏名, 指標, 注記]
+  const roster = [
+    ["DM","二宮","受注",""],
+    ["DM","田上智也","納品",""],
+    ["DM","能島青也","納品",""],
+    ["DM","今井紗也華","納品","6月途中から配置入れ替えで営業目標→納品目標に変更"],
+    ["CR","土田清太郎","納品",""],
+    ["CR","藤井","受注",""],
+    ["CR","須藤理代","納品",""],
+    ["CR","田嶋","受注",""],
+    ["CR","古賀理一郎","納品",""],
+    ["CR","工藤心太","納品",""],
+  ];
+  const staff = roster.map(([dept,name,metric,note])=>{
+    const o = { id:uid(), name, dept, metric, note, targets:{}, monthlyTarget:"" };
+    if(NOUHIN[name]){
+      const arr = NOUHIN[name];
+      fyMs.forEach((ym,i)=>{ o.targets[ym] = arr[i]; });
+      o.monthlyTarget = Math.round(arr.reduce((a,b)=>a+b,0)/12); // 期外月の目安
+    } else if(JUCHU_AVG[name]!=null){
+      o.monthlyTarget = JUCHU_AVG[name];
+    }
+    return o;
+  });
+  return { staff, months:{}, deals:[] };  // key: `${staffId}|${YYYY-MM}`
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(db)); flash(); }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function flash(){ const f=$("#flash"); f.classList.add("show"); setTimeout(()=>f.classList.remove("show"),900); }
+
+function curMonthStr(){
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+}
+// 納品（ディレクター）は従来キー、営業は別キー空間にして既存集計を壊さない
+function monthKey(){ return cur.biz==="sales" ? cur.staff+"|sales|"+cur.month : cur.staff+"|"+cur.month; }
+function getMonth(){
+  const k = monthKey();
+  if(!db.months[k]) db.months[k] = { goals:null, weeks:[] };
+  const m = db.months[k];
+  if(!m.weeks) m.weeks = [];
+  // その月の週数に合わせて入力枠を確保（既存の入力は保持）
+  const need = weeksOfMonth(cur.month).length;
+  while(m.weeks.length < need) m.weeks.push(weekObj());
+  if(cur.biz==="sales"){
+    if(!m.kpi) m.kpi = JSON.parse(JSON.stringify(SALES_KPI_DEFAULT));
+  } else if(m.goals==null){
+    // 初回はその月の目標テンプレを自動投入（以後は手動編集を尊重）
+    const s = db.staff.find(x=>x.id===cur.staff);
+    const tgt = staffMonthTarget(s, cur.month);
+    m.goals = (s && tgt!=="" && tgt!=null) ? [{name:s.metric+"数字", target:tgt, unit:"千円"}] : [];
+  }
+  return m;
+}
+function weekObj(){ return { planTarget:"", planAction:"", actual:"", doneAction:"", feedback:"" }; }
+
+/* ---------- 初期化 ---------- */
+function init(){
+  cur.month = curMonthStr();
+  $("#monthSel").value = cur.month;
+  cur.staff = db.staff[0].id;
+  renderStaff();
+  renderFY();
+  bind();
+  setRole("staff");
+}
+function setRole(r){
+  cur.role = r;
+  const admin = r==="admin";
+  $("#roleStaff").classList.toggle("active", !admin);
+  $("#roleAdmin").classList.toggle("active", admin);
+  // スタッフは個別ページのみ。管理者はサマリー（全員一覧）も見える
+  $("#tabSummary").style.display = admin ? "" : "none";
+  switchView(admin ? "summary" : "detail");
+}
+function renderFY(){
+  const sel = $("#fySel");
+  const base = curFY();
+  const opts = [];
+  for(let y=base-2; y<=base+1; y++) opts.push(`<option value="${y}">${y}年10月〜${y+1}年9月期</option>`);
+  sel.innerHTML = opts.join("");
+  sel.value = cur.fyStart;
+}
+function renderStaff(){
+  const sel = $("#staffSel");
+  const depts = [...new Set(db.staff.map(s=>s.dept||"その他"))];
+  sel.innerHTML = depts.map(d=>{
+    const opts = db.staff.filter(s=>(s.dept||"その他")===d)
+      .map(s=>`<option value="${s.id}">${esc(s.name)}（${esc(s.metric||"")}）</option>`).join("");
+    return `<optgroup label="${esc(d)}">${opts}</optgroup>`;
+  }).join("");
+  sel.value = cur.staff;
+}
+function bind(){
+  $("#staffSel").onchange = e=>{ cur.staff=e.target.value; render(); };
+  $("#monthSel").onchange = e=>{ cur.month=e.target.value||curMonthStr(); render(); };
+  $("#addStaff").onclick = ()=>{
+    const name = prompt("スタッフ名を入力してください");
+    if(!name) return;
+    const dept = (prompt("事業部（例：DM / CR）","")||"その他").trim();
+    const metric = (prompt("指標（受注 / 納品）","納品")||"").trim();
+    const t = prompt("月次目標（月平均・千円）","");
+    const monthlyTarget = t && !isNaN(Number(t)) ? Number(t) : "";
+    const id = uid();
+    db.staff.push({id,name:name.trim(),dept,metric,monthlyTarget,note:""});
+    cur.staff = id; save(); renderStaff(); render();
+  };
+  $("#exportBtn").onclick = exportData;
+  $("#exportBtn2").onclick = exportData;
+  $("#importBtn").onclick = ()=>$("#importFile").click();
+  $("#importFile").onchange = importData;
+  $("#tabDetail").onclick = ()=>switchView("detail");
+  $("#tabSummary").onclick = ()=>switchView("summary");
+  $("#roleStaff").onclick = ()=>setRole("staff");
+  $("#roleAdmin").onclick = ()=>setRole("admin");
+  $("#fySel").onchange = e=>{ cur.fyStart=Number(e.target.value); render(); };
+  $("#csvBtn").onclick = ()=>$("#csvFile").click();
+  $("#csvBtn2").onclick = ()=>$("#csvFile").click();
+  $("#csvFile").onchange = onCsvPicked;
+}
+function switchView(v){
+  cur.view = v;
+  $("#tabDetail").classList.toggle("active", v==="detail");
+  $("#tabSummary").classList.toggle("active", v==="summary");
+  $("#detailBar").style.display = v==="detail" ? "" : "none";
+  $("#summaryBar").style.display = v==="summary" ? "flex" : "none";
+  render();
+}
+
+/* ---------- 描画 ---------- */
+function render(){
+  const app = $("#app");
+  app.innerHTML = "";
+  if(cur.view==="summary"){ renderSummaryView(app); return; }
+  renderStaff();
+  const m = getMonth();
+  const navRow=document.createElement("div");
+  navRow.style.cssText="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px;";
+  navRow.appendChild(bizSwitch());
+  navRow.appendChild(detailSubtabs());
+  app.appendChild(navRow);
+  if(cur.biz==="sales"){
+    if(cur.detailTab==="target"){
+      app.appendChild(targetCard(m));
+    }else if(cur.detailTab==="analysis"){
+      app.appendChild(salesAnalysisCard());
+    }else if(cur.detailTab==="pipeline"){
+      app.appendChild(pipelineCard());
+    }else if(cur.detailTab==="recurring"){
+      app.appendChild(recurringCard());
+    }else if(cur.detailTab==="weekly"){
+      app.appendChild(weeksCard(m));
+    }else{
+      app.appendChild(salesGoalCard(m));
+      app.appendChild(salesReviewCard(m));
+    }
+  }else{
+    if(cur.detailTab==="analysis"){
+      app.appendChild(summaryCard(m));
+      app.appendChild(analysisCard());
+      app.appendChild(dealsCard(m));
+    }else if(cur.detailTab==="recurring"){
+      app.appendChild(recurringCard());
+    }else{
+      app.appendChild(goalCard(m));
+      app.appendChild(weeksCard(m));
+      app.appendChild(reviewCard(m));
+    }
+  }
+}
+function bizSwitch(){
+  const d=document.createElement("div"); d.className="biz-switch";
+  d.innerHTML=`<button data-b="sales" class="${cur.biz==="sales"?"active":""}">営業（受注）</button>
+    <button data-b="director" class="${cur.biz==="director"?"active":""}">ディレクター（納品）</button>`;
+  d.querySelectorAll("button").forEach(b=>b.onclick=()=>{ cur.biz=b.dataset.b; cur.detailTab="input"; render(); });
+  return d;
+}
+function detailSubtabs(){
+  const tabs = cur.biz==="sales"
+    ? [["target","目標"],["input","月次"],["weekly","週次"],["pipeline","案件（ヨミ）"],["recurring","案件（継続）"],["analysis","分析"]]
+    : [["input","入力"],["recurring","案件（継続）"],["analysis","分析"]];
+  const d=document.createElement("div"); d.className="subtabs";
+  d.innerHTML=tabs.map(([t,l])=>`<button data-t="${t}" class="${cur.detailTab===t?"active":""}">${l}</button>`).join("");
+  d.querySelectorAll("button").forEach(b=>b.onclick=()=>{ cur.detailTab=b.dataset.t; render(); });
+  return d;
+}
+
+/* ---------- サマリービュー ---------- */
+function ratebadge(rate){
+  return `<span class="ratebadge" style="background:${rateColor(rate)}">${rate}%</span>`;
+}
+function rateOf(actual,target){ return target>0 ? Math.round(actual/target*100) : 0; }
+
+function renderSummaryView(app){
+  const fy = cur.fyStart;
+  const depts = [...new Set(db.staff.map(s=>s.dept||"その他"))];
+
+  // 1) 半期サマリー
+  const c1 = card("半期サマリー（上半期 10〜3月 / 下半期 4〜9月）","HALF");
+  // 受注と納品は別物なので合算せず、指標ごとに小計する
+  const newBucket=()=>({h1t:0,h1a:0,h2t:0,h2a:0});
+  const add=(b,h1,h2)=>{ b.h1t+=h1.target;b.h1a+=h1.actual;b.h2t+=h2.target;b.h2a+=h2.actual; };
+  const totalByMetric={};   // 全社の指標別
+  const totalRow=(label,b)=>`<tr class="total">
+      <td class="l">${esc(label)}</td><td></td><td>${fmt(b.h1t+b.h2t)}</td>
+      <td>${fmt(b.h1t)}</td><td>${fmt(b.h1a)}</td><td>${ratebadge(rateOf(b.h1a,b.h1t))}</td>
+      <td>${fmt(b.h2t)}</td><td>${fmt(b.h2a)}</td><td>${ratebadge(rateOf(b.h2a,b.h2t))}</td>
+      <td>${fmt(b.h1a+b.h2a)}</td><td>${ratebadge(rateOf(b.h1a+b.h2a,b.h1t+b.h2t))}</td></tr>`;
+  let rows = `<tr>
+      <th class="l">スタッフ</th><th class="l">指標</th><th>通期目標</th>
+      <th>上半期 目標</th><th>上半期 実績</th><th>達成</th>
+      <th>下半期 目標</th><th>下半期 実績</th><th>達成</th>
+      <th>通期 実績</th><th>達成</th></tr>`;
+  depts.forEach(d=>{
+    rows += `<tr class="dept"><td colspan="11">${esc(d)}</td></tr>`;
+    const members = db.staff.filter(s=>(s.dept||"その他")===d);
+    const dtByMetric={};   // 事業部内の指標別
+    members.forEach(s=>{
+      const h1=sumHalf(s.id,fy,"H1"), h2=sumHalf(s.id,fy,"H2");
+      const yt=h1.target+h2.target, ya=h1.actual+h2.actual;
+      rows += `<tr>
+        <td class="l nm">${esc(s.name)}</td>
+        <td class="l mt">${esc(s.metric||"")}</td>
+        <td>${fmt(yt)}</td>
+        <td>${fmt(h1.target)}</td><td>${fmt(h1.actual)}</td><td>${ratebadge(rateOf(h1.actual,h1.target))}</td>
+        <td>${fmt(h2.target)}</td><td>${fmt(h2.actual)}</td><td>${ratebadge(rateOf(h2.actual,h2.target))}</td>
+        <td>${fmt(ya)}</td><td>${ratebadge(rateOf(ya,yt))}</td></tr>`;
+      const mk=s.metric||"その他";
+      add(dtByMetric[mk]||(dtByMetric[mk]=newBucket()), h1, h2);
+      add(totalByMetric[mk]||(totalByMetric[mk]=newBucket()), h1, h2);
+    });
+    Object.keys(dtByMetric).forEach(mk=>{ rows += totalRow(`${d} ${mk} 計`, dtByMetric[mk]); });
+  });
+  Object.keys(totalByMetric).forEach(mk=>{ rows += totalRow(`全社 ${mk} 計`, totalByMetric[mk]); });
+  const wrap1=document.createElement("div"); wrap1.className="scroll-x";
+  wrap1.innerHTML=`<table class="sum-table">${rows}</table>
+    <div class="hint" style="margin-top:8px;">数値はすべて千円。受注と納品は別指標のため合算せず、指標ごとに小計します。達成バッジは実績÷目標（緑100%以上・黄70%以上・赤それ未満）。</div>`;
+  c1.appendChild(wrap1);
+  app.appendChild(c1);
+
+  // 2) 月別実績グリッド
+  const months = fyMonths(fy);
+  const c2 = card("月別の実績（達成率）","MONTHLY");
+  let head = `<tr><th class="l">スタッフ</th>` +
+    months.map(ym=>`<th>${Number(ym.split("-")[1])}月</th>`).join("") + `</tr>`;
+  let body = "";
+  depts.forEach(d=>{
+    body += `<tr class="dept"><td colspan="${months.length+1}">${esc(d)}</td></tr>`;
+    db.staff.filter(s=>(s.dept||"その他")===d).forEach(s=>{
+      body += `<tr><td class="l nm">${esc(s.name)}</td>` + months.map(ym=>{
+        const a=readActual(s.id,ym), t=readTarget(s.id,ym);
+        if(a===0) return `<td class="mini-cell mt">–</td>`;
+        return `<td class="mini-cell">${fmt(a)}<small>${ratebadge(rateOf(a,t))}</small></td>`;
+      }).join("") + `</tr>`;
+    });
+  });
+  const wrap2=document.createElement("div"); wrap2.className="scroll-x";
+  wrap2.innerHTML=`<table class="sum-table">${head}${body}</table>
+    <div class="hint" style="margin-top:8px;">実績の入っていない月は「–」。各セルは実績（千円）と達成率。</div>`;
+  c2.appendChild(wrap2);
+  app.appendChild(c2);
+
+  // 3) メンバー管理（パス元の選択肢マスタ）
+  app.appendChild(memberCard());
+}
+function memberCard(){
+  const c = card("メンバー管理（パス元の選択肢）","MEMBERS");
+  const list=document.createElement("div");
+  const draw=()=>{
+    list.innerHTML = (db.members||[]).map((nm,i)=>
+      `<span style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:14px;padding:4px 10px;margin:0 6px 6px 0;font-size:13px;">
+        ${esc(nm)}<button class="btn-mini" data-del="${i}" style="color:var(--bad);padding:0 2px;">×</button></span>`).join("")
+      || `<span class="hint">メンバーがいません。</span>`;
+    list.querySelectorAll("button[data-del]").forEach(b=>b.onclick=()=>{ db.members.splice(+b.dataset.del,1); save(); draw(); });
+  };
+  c.appendChild(list);
+  const add=document.createElement("div"); add.style.cssText="margin-top:10px;display:flex;gap:8px;align-items:center;";
+  add.innerHTML=`<input id="memNew" placeholder="メンバー名を追加" style="width:220px;"><button class="btn-mini" id="memAdd">＋ 追加</button>
+    <span class="hint">パス元（紹介・引き継ぎ元）で選べる人の一覧です。</span>`;
+  c.appendChild(add);
+  draw();
+  $("#memAdd",add).onclick=()=>{ const v=$("#memNew",add).value.trim(); if(!v) return; if(!db.members.includes(v)) db.members.push(v); $("#memNew",add).value=""; save(); draw(); };
+  return c;
+}
+
+/* 月次目標 */
+function goalCard(m){
+  const c = card("月次目標","MONTH");
+  const s = db.staff.find(x=>x.id===cur.staff);
+  if(s && s.note){
+    const note=document.createElement("div");
+    note.style.cssText="border:1px solid var(--warn);background:#fffaf0;color:#8a6d1f;border-radius:7px;padding:8px 11px;margin-bottom:12px;font-size:12px;";
+    note.textContent="注記: "+s.note;
+    c.appendChild(note);
+  }
+  const theme = document.createElement("div");
+  theme.style.cssText="margin-bottom:16px;";
+  theme.innerHTML=`<label style="font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;">今月の重要テーマ</label>
+    <textarea id="themeBox" placeholder="今月いちばん大事にすること・注力テーマを書く" style="min-height:46px;">${esc(m.theme||"")}</textarea>`;
+  theme.querySelector("#themeBox").oninput=e=>{ m.theme=e.target.value; save(); };
+  c.appendChild(theme);
+  const body = document.createElement("div");
+  body.innerHTML = `
+    <table>
+      <thead><tr><th style="width:42%">指標</th><th style="width:28%">目標値</th><th style="width:22%">単位</th><th></th></tr></thead>
+      <tbody id="goalBody"></tbody>
+    </table>
+    <div style="margin-top:10px;"><button class="btn-mini" id="addGoal">＋ 指標を追加</button>
+    <span class="hint" style="margin-left:8px;">例）受注件数・売上・アポ数・提案数 など</span></div>`;
+  c.appendChild(body);
+  setTimeout(()=>{
+    const tb = $("#goalBody",body);
+    const draw = ()=>{
+      tb.innerHTML="";
+      m.goals.forEach((g,i)=>{
+        const tr=document.createElement("tr"); tr.className="goal-row";
+        tr.innerHTML=`
+          <td><input value="${esc(g.name)}" placeholder="指標名"></td>
+          <td class="num"><input type="number" value="${g.target??""}" placeholder="0" style="text-align:right;"></td>
+          <td><input value="${esc(g.unit)}" placeholder="件 / 万円 など"></td>
+          <td class="num"><button class="btn-mini btn-danger" style="border:1px solid var(--bad)">削除</button></td>`;
+        const[n,t,u]=tr.querySelectorAll("input");
+        n.oninput=e=>{g.name=e.target.value;save();updateSummary(m);};
+        t.oninput=e=>{g.target=e.target.value===""?"":Number(e.target.value);save();updateSummary(m);updateWeekCheck(m);};
+        u.oninput=e=>{g.unit=e.target.value;save();};
+        tr.querySelector("button").onclick=()=>{m.goals.splice(i,1);save();draw();updateSummary(m);};
+        tb.appendChild(tr);
+      });
+      if(!m.goals.length) tb.innerHTML=`<tr><td colspan="4" class="hint">まだ指標がありません。「＋ 指標を追加」から登録してください。</td></tr>`;
+    };
+    draw();
+    $("#addGoal",body).onclick=()=>{ m.goals.push({name:"",target:"",unit:""}); save(); draw(); };
+  });
+  return c;
+}
+
+/* 月サマリー */
+function summaryCard(m){
+  const c = card("月次の進捗","SUMMARY");
+  const wrap=document.createElement("div");
+  wrap.className="month-summary"; wrap.id="summaryWrap";
+  c.appendChild(wrap);
+  setTimeout(()=>updateSummary(m));
+  return c;
+}
+function updateSummary(m){
+  const wrap=$("#summaryWrap"); if(!wrap) return;
+  if(!m.goals.length){ wrap.innerHTML=`<div class="hint">月次目標を登録すると、ここに達成状況が出ます。</div>`; return; }
+  wrap.innerHTML = m.goals.map((g)=>{
+    const activeWeeks = m.weeks.slice(0, weeksOfMonth(cur.month).length);
+    const actualSum = activeWeeks.reduce((s,w)=>s+(Number(w.actual)||0),0);
+    const target = Number(g.target)||0;
+    const rate = target>0 ? Math.round(actualSum/target*100) : 0;
+    // 指標が複数あっても actual は週共通の数値なので、先頭指標を主指標として扱う簡易版
+    return `<div class="kpi">
+        <div class="name">${esc(g.name)||"（指標名なし）"}</div>
+        <div class="val">${fmt(actualSum)} <small>/ ${fmt(target)} ${esc(g.unit)}</small></div>
+        <div class="progress"><span style="width:${Math.min(rate,100)}%;background:${rateColor(rate)}"></span></div>
+        <div class="hint" style="margin-top:4px;">達成率 ${rate}%</div>
+      </div>`;
+  }).join("");
+}
+
+/* 週次 */
+// 営業の週次目標は「粗利目標 − 継続案件の月額＝今月の獲得目標」
+function monthMainTarget(m){
+  if(cur.biz==="sales"){
+    const gross = kpiSum(m.kpi, GROSS_NAMES, "target");   // 粗利合計＝新規＋既存
+    const rec = recurringMonthlyTotal(cur.staff, cur.month);
+    return Math.max(0, gross - rec);
+  }
+  return (m.goals && m.goals[0]) ? Number(m.goals[0].target)||0 : 0;
+}
+function weekCheckHtml(m){
+  const need = weeksOfMonth(cur.month).length;
+  const sum = m.weeks.slice(0,need).reduce((s,w)=>s+(Number(w.planTarget)||0),0);
+  const mt = monthMainTarget(m);
+  const diff = sum - mt;
+  let color, msg;
+  if(mt===0){ color="var(--muted)"; msg="目標が未設定です"; }
+  else if(diff===0){ color="var(--ok)"; msg="週次の合計が獲得目標と一致しています"; }
+  else if(diff<0){ color="var(--warn)"; msg=`獲得目標まで あと ${fmt(-diff)}（週次の積み上げが不足）`; }
+  else { color="var(--bad)"; msg=`獲得目標を ${fmt(diff)} 超過`; }
+  if(cur.biz==="sales"){
+    const gross=kpiSum(m.kpi, GROSS_NAMES, "target");
+    const rec=recurringMonthlyTotal(cur.staff,cur.month);
+    return `<div style="border-left:4px solid ${color};background:#fafbfc;padding:9px 12px;border-radius:6px;margin-bottom:14px;font-size:13px;">
+       粗利目標 ${fmt(gross)} − 継続 ${fmt(rec)} ＝ <b>今月の獲得目標 ${fmt(mt)}</b> 千円　／　週次合計 ${fmt(sum)}
+       <span style="color:${color};font-weight:600;">${msg}</span></div>`;
+  }
+  return `<div style="border-left:4px solid ${color};background:#fafbfc;padding:9px 12px;border-radius:6px;margin-bottom:14px;font-size:13px;">
+     週次目標の合計 <b>${fmt(sum)}</b> ／ 月次目標 ${fmt(mt)} 千円
+     <span style="color:${color};font-weight:600;">${msg}</span></div>`;
+}
+function splitWeeklyEven(m){
+  const need = weeksOfMonth(cur.month).length;
+  const acq = monthMainTarget(m);   // 月次の獲得目標（粗利合計−継続）
+  if(acq<=0 || !need) return;
+  const per = Math.round(acq/need);
+  for(let i=0;i<need;i++){ m.weeks[i].planTarget = (i===need-1) ? acq-per*(need-1) : per; }
+  save();
+}
+function weeksCard(m){
+  const c = card("週次の目標と実績","WEEKLY");
+  const need = weeksOfMonth(cur.month).length;
+  // 初回（週次目標が全部空）は獲得目標を週数で仮分割
+  const allEmpty = m.weeks.slice(0,need).every(w=>w.planTarget===""||w.planTarget==null);
+  if(allEmpty && cur.biz==="sales") splitWeeklyEven(m);
+  const check=document.createElement("div"); check.id="weekSumCheck";
+  check.innerHTML=weekCheckHtml(m);
+  c.appendChild(check);
+  if(cur.biz==="sales"){
+    const splitBar=document.createElement("div"); splitBar.style.cssText="margin-bottom:12px;";
+    splitBar.innerHTML=`<button class="btn-ghost btn-mini" id="weekSplit">獲得目標を週で均等割り（上書き）</button>
+      <span class="hint" style="margin-left:8px;">仮の分割です。各週の目標値は手動で変えられます。</span>`;
+    c.appendChild(splitBar);
+    $("#weekSplit",splitBar).onclick=()=>{ splitWeeklyEven(m); render(); };
+  }
+  const periods = weeksOfMonth(cur.month);
+  periods.forEach((p,i)=>{
+    const w = m.weeks[i];
+    const target = Number(w.planTarget)||0;
+    const actual = Number(w.actual)||0;
+    const rate = target>0 ? Math.round(actual/target*100) : null;
+    const div=document.createElement("div");
+    div.className="week"+(w.actual!==""&&w.actual!=null?" done":"");
+    div.innerHTML=`
+      <div class="week-head">
+        <span class="wk">${WEEK_LABELS[i]}</span>
+        <span class="period">${periodLabel(p, cur.month)}</span>
+        ${rate!=null?`<span class="rate-pill" style="background:${rateColor(rate)}">達成 ${rate}%</span>`:`<span class="hint">未集計</span>`}
+        <span class="rate"></span>
+      </div>
+      <div class="grid2">
+        <div class="col plan-col" style="padding:10px;border-radius:7px;">
+          <h4>① 今週の目標（立てる）</h4>
+          <div class="num-line"><label>目標値</label><input type="number" class="i-pt" value="${w.planTarget}" placeholder="0"></div>
+          <h4>行動予定</h4>
+          <textarea class="i-pa" placeholder="今週やる行動を書く">${esc(w.planAction)}</textarea>
+        </div>
+        <div class="col" style="padding:10px;">
+          <h4>② 実績（ふりかえる）</h4>
+          <div class="num-line"><label>実績値</label><input type="number" class="i-ac" value="${w.actual}" placeholder="0"></div>
+          <h4>できた行動</h4>
+          <textarea class="i-da" placeholder="実際にやれたこと">${esc(w.doneAction)}</textarea>
+        </div>
+      </div>
+      <div class="feedback">
+        <h4>③ フィードバック（次週へ）</h4>
+        <textarea class="i-fb" placeholder="良かった点・課題・来週の打ち手">${esc(w.feedback)}</textarea>
+      </div>`;
+    const pt=$(".i-pt",div),pa=$(".i-pa",div),ac=$(".i-ac",div),da=$(".i-da",div),fb=$(".i-fb",div);
+    pt.oninput=e=>{w.planTarget=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);updateWeekCheck(m);};
+    pa.oninput=e=>{w.planAction=e.target.value;save();};
+    ac.oninput=e=>{w.actual=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);div.classList.toggle("done",e.target.value!=="");};
+    da.oninput=e=>{w.doneAction=e.target.value;save();};
+    fb.oninput=e=>{w.feedback=e.target.value;save();};
+    c.appendChild(div);
+  });
+  return c;
+}
+function updateWeekCheck(m){ const el=$("#weekSumCheck"); if(el) el.innerHTML=weekCheckHtml(m); }
+function refreshWeekRate(div,w){
+  const t=Number(w.planTarget)||0,a=Number(w.actual)||0;
+  const rate=t>0?Math.round(a/t*100):null;
+  const pill=$(".rate-pill",div), hint=$(".week-head .hint",div);
+  const head=$(".week-head",div);
+  let el=$(".rate-pill",div)||$(".week-head .hint",div);
+  if(rate!=null){
+    el.outerHTML=`<span class="rate-pill" style="background:${rateColor(rate)}">達成 ${rate}%</span>`;
+  }else{
+    el.outerHTML=`<span class="hint">未集計</span>`;
+  }
+}
+
+/* ---------- マイ分析（本人の通期分析） ---------- */
+function miniKpi(label,a,t){
+  const r=rateOf(a,t);
+  return `<div class="kpi">
+    <div class="name">${label}</div>
+    <div class="val">${fmt(a)} <small>/ ${fmt(t)} 千円</small></div>
+    <div class="progress"><span style="width:${Math.min(r,100)}%;background:${rateColor(r)}"></span></div>
+    <div class="hint" style="margin-top:4px;">達成率 ${r}%</div></div>`;
+}
+function barChartSVG(rows,maxV){
+  const W=720,H=210,padB=26,padT=14,chartH=H-padB-padT;
+  const n=rows.length, slot=W/n;
+  let bars="";
+  rows.forEach((r,i)=>{
+    const x=i*slot, bw=slot*0.3;
+    const th=r.t/maxV*chartH, ah=r.a/maxV*chartH;
+    const x1=x+slot/2-bw-2, x2=x+slot/2+2;
+    bars+=`<rect x="${x1.toFixed(1)}" y="${(padT+chartH-th).toFixed(1)}" width="${bw.toFixed(1)}" height="${th.toFixed(1)}" fill="#c8d0db"/>`;
+    if(r.a>0){ const col=rateColor(rateOf(r.a,r.t));
+      bars+=`<rect x="${x2.toFixed(1)}" y="${(padT+chartH-ah).toFixed(1)}" width="${bw.toFixed(1)}" height="${ah.toFixed(1)}" fill="${col}"/>`; }
+    bars+=`<text x="${(x+slot/2).toFixed(1)}" y="${H-8}" font-size="11" fill="#7b828e" text-anchor="middle">${r.mo}</text>`;
+  });
+  return `<div class="scroll-x"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:560px;height:auto;">
+      <line x1="0" y1="${padT+chartH}" x2="${W}" y2="${padT+chartH}" stroke="#e3e7ee"/>${bars}
+    </svg></div>
+    <div class="hint" style="margin:4px 0 12px;">
+      <span style="display:inline-block;width:10px;height:10px;background:#c8d0db;vertical-align:middle;margin-right:4px;"></span>目標
+      <span style="display:inline-block;width:10px;height:10px;background:var(--cyan);vertical-align:middle;margin:0 4px 0 12px;"></span>実績（バーの色は達成率）</div>`;
+}
+function analysisCard(){
+  const fy = fyOfMonth(cur.month);
+  const c = card(`マイ分析（${fy}年10月〜${fy+1}年9月期）`,"ANALYSIS");
+  const months = fyMonths(fy);
+  const rows = months.map(ym=>({
+    ym, mo:Number(ym.split("-")[1]),
+    t:readTarget(cur.staff,ym), a:readActual(cur.staff,ym)
+  }));
+  const h1=sumHalf(cur.staff,fy,"H1"), h2=sumHalf(cur.staff,fy,"H2");
+  const yt=h1.target+h2.target, ya=h1.actual+h2.actual;
+  const maxV=Math.max(1,...rows.map(r=>Math.max(r.t,r.a)));
+  const wrap=document.createElement("div");
+  wrap.innerHTML =
+    `<div class="month-summary" style="margin-bottom:14px;">
+       ${miniKpi("上半期",h1.actual,h1.target)}
+       ${miniKpi("下半期",h2.actual,h2.target)}
+       ${miniKpi("通期",ya,yt)}
+     </div>`
+    + barChartSVG(rows,maxV)
+    + `<div class="scroll-x"><table class="sum-table">
+        <tr><th class="l">月</th>${rows.map(r=>`<th>${r.mo}月</th>`).join("")}</tr>
+        <tr><td class="l">目標</td>${rows.map(r=>`<td>${fmt(r.t)}</td>`).join("")}</tr>
+        <tr><td class="l">実績</td>${rows.map(r=>`<td>${r.a?fmt(r.a):"–"}</td>`).join("")}</tr>
+        <tr><td class="l">達成</td>${rows.map(r=>`<td>${r.a?ratebadge(rateOf(r.a,r.t)):"–"}</td>`).join("")}</tr>
+      </table></div>
+      <div class="hint" style="margin-top:8px;">数値はすべて千円。実績ゼロの月は「–」。</div>`;
+  c.appendChild(wrap);
+  return c;
+}
+
+/* ---------- 案件一覧（CSV取込データ） ---------- */
+function statusClass(s){
+  s=(s||"");
+  if(/受注|成約/.test(s)) return "win";
+  if(/案件化|納品|完了|見積/.test(s)) return "deliver";
+  return "";
+}
+function yomiClass(y){
+  if(y==="受注"||y==="成功") return "win";
+  if(y==="A"||y==="B"||y==="C"||y==="D") return "deliver";
+  return "";   // 未（アポ）・ボツ・パス
+}
+function dealsCard(m){
+  const c = card("案件一覧（この月）","DEALS");
+  const list = db.deals.filter(d=>d.staffId===cur.staff && (d.date||"").startsWith(cur.month))
+                       .sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const body=document.createElement("div");
+  if(!list.length){
+    body.innerHTML=`<div class="hint">この月の案件はまだありません。上の「CSV取込」でCRMの書き出しファイルを読み込むと、担当者名で自動的にここへ振り分けられます。</div>`;
+    c.appendChild(body); return c;
+  }
+  const sum=list.reduce((s,d)=>s+(Number(d.amount)||0),0);
+  const mt=(m.goals&&m.goals[0])?Number(m.goals[0].target)||0:0;
+  const rate=rateOf(sum,mt);
+  body.innerHTML=`
+    <table class="deal-table">
+      <thead><tr><th>日付</th><th>案件名</th><th>ステータス</th><th style="text-align:right">金額(千円)</th></tr></thead>
+      <tbody>${list.map(d=>`<tr>
+        <td>${esc(d.date||"")}</td>
+        <td>${esc(d.name||"")}</td>
+        <td><span class="status-chip ${statusClass(d.status)}">${esc(d.status||"-")}</span></td>
+        <td class="num">${fmt(d.amount)}</td></tr>`).join("")}
+      </tbody>
+      <tfoot><tr>
+        <td colspan="3" style="text-align:right;font-weight:700;border-top:2px solid var(--line);">案件金額 合計</td>
+        <td class="num" style="font-weight:700;border-top:2px solid var(--line);">${fmt(sum)}</td>
+      </tr></tfoot>
+    </table>
+    <div class="hint" style="margin-top:8px;">案件金額の合計 ${fmt(sum)} 千円　/　月次目標 ${fmt(mt)} 千円　達成率 ${rate}%
+    <span style="color:${rateColor(rate)};font-weight:600;">${ratebadge(rate)}</span></div>`;
+  c.appendChild(body);
+  return c;
+}
+
+/* ---------- ふりかえり & 上司フィードバック（月次） ---------- */
+function reviewCard(m){
+  const c = card("ふりかえり ＆ 上司フィードバック（今月）","REVIEW");
+  const wrap=document.createElement("div");
+  wrap.className="grid2";
+  wrap.innerHTML=`
+    <div class="col">
+      <h4 style="margin:0 0 6px;font-size:11px;color:var(--muted);">本人のふりかえり</h4>
+      <textarea id="reviewBox" placeholder="今月できたこと・できなかったこと・気づき" style="min-height:90px;">${esc(m.review||"")}</textarea>
+    </div>
+    <div class="col">
+      <h4 style="margin:0 0 6px;font-size:11px;color:var(--muted);">上司フィードバック</h4>
+      <textarea id="bossBox" placeholder="評価・アドバイス・来月に向けて" style="min-height:90px;">${esc(m.bossFeedback||"")}</textarea>
+    </div>`;
+  c.appendChild(wrap);
+  wrap.querySelector("#reviewBox").oninput=e=>{ m.review=e.target.value; save(); };
+  wrap.querySelector("#bossBox").oninput=e=>{ m.bossFeedback=e.target.value; save(); };
+  return c;
+}
+
+/* ---------- 営業ビュー（受注） ---------- */
+// 目標入力（1年分を一括・売上/粗利/案件化/アポ数）
+const TARGET_INDICATORS = [["粗利（新規）","千円"],["粗利（既存）","千円"],["案件化（新規）","件"],["案件化（既存）","件"],["アポ（新規）","件"],["アポ（既存）","件"]];
+function targetCard(m){
+  const fy=fyOfMonth(cur.month);
+  const c = card(`目標入力（${fy}年10月〜${fy+1}年9月期・1年分）`,"TARGET");
+  const months=fyMonths(fy);
+  const moLabels=months.map(ym=>Number(ym.split("-")[1])+"月");
+  // 各月のkpiを確保し、4指標が揃っているようにする
+  const monthObjs=months.map(ym=>{
+    const mo=ensureSalesMonth(cur.staff,ym);
+    TARGET_INDICATORS.forEach(([nm,u])=>{ if(!mo.kpi.find(k=>k.name===nm)) mo.kpi.push({name:nm,unit:u,target:"",actual:""}); });
+    return mo;
+  });
+  const getK=(mo,nm)=>mo.kpi.find(k=>k.name===nm);
+
+  const note=document.createElement("div"); note.className="hint"; note.style.marginBottom="10px";
+  note.textContent="1年分の目標をまとめて入力できます。各行の「→右へ」で、先頭（10月）に入れた数字を残り月へ一括展開します（毎月同じ数字のとき便利）。";
+  c.appendChild(note);
+
+  const box=document.createElement("div"); box.className="scroll-x";
+  const head=`<tr><th class="l">指標</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th><th></th></tr>`;
+  box.innerHTML=`<table class="sum-table" style="min-width:1040px;"><thead>${head}</thead><tbody id="tgtGrid"></tbody></table>`;
+  c.appendChild(box);
+
+  const draw=()=>{
+    const tb=$("#tgtGrid",box); tb.innerHTML="";
+    TARGET_INDICATORS.forEach(([nm,u])=>{
+      const tr=document.createElement("tr"); tr.dataset.row=nm;
+      const cells=monthObjs.map((mo,i)=>`<td><input type="number" data-i="${i}" value="${getK(mo,nm).target??""}" placeholder="0" style="width:78px;text-align:right;"></td>`).join("");
+      const total=monthObjs.reduce((s,mo)=>s+(Number(getK(mo,nm).target)||0),0);
+      tr.innerHTML=`<td class="l nm">${nm}<small style="color:var(--muted);font-weight:400;">（${u}）</small></td>${cells}<td class="tot">${fmt(total)}</td><td class="num"><button class="btn-mini" data-copy="${nm}">→右へ</button></td>`;
+      tb.appendChild(tr);
+      tr.querySelectorAll("input").forEach(inp=>inp.oninput=e=>{
+        getK(monthObjs[+inp.dataset.i],nm).target = e.target.value===""?"":Number(e.target.value);
+        save();
+        const t=monthObjs.reduce((s,mo)=>s+(Number(getK(mo,nm).target)||0),0);
+        $('.tot',tr).textContent=fmt(t);
+      });
+      $('button[data-copy]',tr).onclick=()=>{ const v=getK(monthObjs[0],nm).target; monthObjs.forEach(mo=>getK(mo,nm).target=v); save(); draw(); };
+    });
+  };
+  draw();
+  return c;
+}
+// 案件（パイプライン）から月次実績を自動集計（粗利＝受注日／案件化＝提案日／アポ＝活動履歴の日付、新規・既存は属性で振り分け）
+function salesDealActual(staffId, ym){
+  const r={"粗利（新規）":0,"粗利（既存）":0,"案件化（新規）":0,"案件化（既存）":0,"アポ（新規）":0,"アポ（既存）":0};
+  const inMonth=d=>!!d && (""+d).startsWith(ym);
+  db.pipeline.filter(p=>p.staffId===staffId).forEach(p=>{
+    const sfx = p.attribute==="新規" ? "（新規）" : "（既存）";
+    if(inMonth(p.orderDate)) r["粗利"+sfx]+=dealGross(p);
+    if(inMonth(p.proposalDate)) r["案件化"+sfx]+=1;
+    (p.activities||[]).forEach(a=>{ if(inMonth(a.date)) r["アポ"+sfx]+=1; });
+  });
+  return r;
+}
+// 月次KPI（目標は目標タブ反映・実績は案件から自動集計）
+function salesGoalCard(m){
+  const c = card("今月の営業KPI（目標と実績）","SALES");
+  const A = salesDealActual(cur.staff, cur.month);   // 案件からの実績
+  // 重要テーマ
+  const theme=document.createElement("div");
+  theme.style.cssText="margin-bottom:16px;";
+  theme.innerHTML=`<label style="font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;">今月の重要テーマ</label>
+    <textarea id="sThemeBox" placeholder="今月の注力テーマ・狙い" style="min-height:46px;">${esc(m.theme||"")}</textarea>`;
+  theme.querySelector("#sThemeBox").oninput=e=>{ m.theme=e.target.value; save(); };
+  c.appendChild(theme);
+  const recNow=()=>recurringMonthlyTotal(cur.staff,cur.month);
+  const kpiTarget=nm=>{ const k=(m.kpi||[]).find(x=>x.name===nm); return k?Number(k.target)||0:0; };
+  const CATS=[
+    {label:"粗利", unit:"千円", nNew:"粗利（新規）", nExist:"粗利（既存）", cont:true},
+    {label:"案件化", unit:"件", nNew:"案件化（新規）", nExist:"案件化（既存）"},
+    {label:"アポ", unit:"件", nNew:"アポ（新規）", nExist:"アポ（既存）"},
+  ];
+  const body=document.createElement("div"); body.className="scroll-x";
+  let rows="";
+  CATS.forEach(cat=>{
+    const tN=kpiTarget(cat.nNew), tE=kpiTarget(cat.nExist), tS=tN+tE;
+    const aN=A[cat.nNew]||0, aE=A[cat.nExist]||0;
+    const cont=cat.cont?recNow():0;
+    const aS=aN+aE+cont;
+    const rate=rateOf(aS,tS);
+    rows+=`<tr>
+      <td class="l nm">${cat.label}<small>（${cat.unit}）</small></td>
+      <td class="val">${fmt(tN)}</td><td class="val actual">${fmt(aN)}</td>
+      <td class="val sep">${fmt(tE)}</td><td class="val actual">${fmt(aE)}${cont>0?` <small style="color:var(--muted);font-weight:400;">+継続${fmt(cont)}</small>`:""}</td>
+      <td class="val sep g-sum">${fmt(tS)}</td><td class="val actual g-sum">${fmt(aS)}</td>
+      <td class="sep">${tS>0?ratebadge(rate):"–"}</td></tr>`;
+  });
+  body.innerHTML=`
+    <table class="kpi-month" style="min-width:760px;">
+      <thead>
+        <tr><th class="l" rowspan="2">指標</th><th colspan="2">新規</th><th colspan="2" class="sep">既存</th><th colspan="2" class="sep g-sumh">合計</th><th rowspan="2" class="sep">達成率</th></tr>
+        <tr><th>目標</th><th>実績</th><th class="sep">目標</th><th>実績</th><th class="sep g-sumh">目標</th><th class="g-sumh">実績</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="hint" style="margin-top:8px;">目標は「目標」タブ、実績は「案件（ヨミ）」の登録内容から自動集計（粗利＝受注日／案件化＝提案日／アポ＝活動履歴の日付）。粗利の合計実績は継続込み。</div>`;
+  c.appendChild(body);
+  const residual=document.createElement("div"); residual.id="salesResidual"; residual.style.marginTop="14px";
+  c.appendChild(residual);
+  const drawResidual=()=>{
+    const gross=kpiSum(m.kpi, GROSS_NAMES, "target");   // 粗利合計目標（新規＋既存）
+    const rec=recNow();
+    const acq=Math.max(0,gross-rec);
+    const spot=(A["粗利（新規）"]||0)+(A["粗利（既存）"]||0);   // 案件からの粗利実績
+    const totalA=spot+rec;
+    const rate=rateOf(totalA,gross);
+    residual.innerHTML=`<div style="border-left:4px solid var(--cyan);background:#f0fbfc;padding:10px 13px;border-radius:6px;font-size:13px;line-height:1.9;">
+      <div>粗利合計目標 <b>${fmt(gross)}</b> − 今月の継続 <b>${fmt(rec)}</b> ＝ <b style="color:var(--cyan);">今月の獲得目標 ${fmt(acq)}</b> 千円 <span class="hint">（新規・スポットで取る額。週次目標の基準）</span></div>
+      <div>実績 案件 <b>${fmt(spot)}</b> ＋ 継続 <b>${fmt(rec)}</b> ＝ <b>合計 ${fmt(totalA)}</b> 千円　粗利達成 ${ratebadge(rate)}</div></div>`;
+  };
+  drawResidual();
+  return c;
+}
+// 振り返り日報（やること・Good/Bad・自己採点・上司FB）
+function salesReviewCard(m){
+  const c = card("今月の振り返り日報","DAILY");
+  const wrap=document.createElement("div");
+  wrap.innerHTML=`
+    <div style="margin-bottom:14px;">
+      <h4 style="margin:0 0 6px;font-size:11px;color:var(--muted);">今月やること（予定・注力点）</h4>
+      <textarea id="sTodo" placeholder="今月の打ち手・注力すること" style="min-height:64px;">${esc(m.todo||"")}</textarea>
+    </div>
+    <div class="grid2" style="margin-bottom:14px;">
+      <div class="col">
+        <h4 style="margin:0 0 6px;font-size:11px;color:var(--ok);">Good（できたこと）</h4>
+        <textarea id="sGood" placeholder="うまくいったこと" style="min-height:80px;">${esc(m.good||"")}</textarea>
+      </div>
+      <div class="col">
+        <h4 style="margin:0 0 6px;font-size:11px;color:var(--bad);">Bad（できなかったこと）</h4>
+        <textarea id="sBad" placeholder="課題・反省" style="min-height:80px;">${esc(m.bad||"")}</textarea>
+      </div>
+    </div>
+    <div class="num-line" style="margin-bottom:14px;">
+      <label style="min-width:74px;">自己採点</label>
+      <input type="number" id="sScore" min="0" max="100" value="${m.score??""}" placeholder="0〜100" style="width:90px;text-align:right;"> <span class="hint">点</span>
+    </div>
+    <div>
+      <h4 style="margin:0 0 6px;font-size:11px;color:var(--muted);">上司フィードバック</h4>
+      <textarea id="sBoss" placeholder="評価・アドバイス・来月へ" style="min-height:80px;">${esc(m.bossFeedback||"")}</textarea>
+    </div>`;
+  c.appendChild(wrap);
+  $("#sTodo",wrap).oninput=e=>{m.todo=e.target.value;save();};
+  $("#sGood",wrap).oninput=e=>{m.good=e.target.value;save();};
+  $("#sBad",wrap).oninput=e=>{m.bad=e.target.value;save();};
+  $("#sScore",wrap).oninput=e=>{m.score=e.target.value===""?"":Number(e.target.value);save();};
+  $("#sBoss",wrap).oninput=e=>{m.bossFeedback=e.target.value;save();};
+  return c;
+}
+// 営業の実績分析（月別 目標/実績/達成率/GAP）
+function readSalesMonth(staffId, ym){ return db.months[staffId+"|sales|"+ym] || null; }
+function salesAnalysisCard(){
+  const fy = fyOfMonth(cur.month);
+  const c = card(`営業 実績分析（${fy}年10月〜${fy+1}年9月期）`,"ANALYSIS");
+  const months = fyMonths(fy);
+  const moLabels = months.map(ym=>Number(ym.split("-")[1])+"月");
+  const sumA = arr=>arr.reduce((s,v)=>s+v,0);
+
+  // 目標＝目標タブ／実績＝案件から自動集計。粗利は継続込み
+  const gT=[], gA=[], caseT=[],caseA=[],apoT=[],apoA=[];
+  months.forEach(ym=>{
+    const mm=readSalesMonth(cur.staff,ym);
+    const kpi=mm&&mm.kpi?mm.kpi:[];
+    const A=salesDealActual(cur.staff,ym);
+    gT.push(kpiSum(kpi, GROSS_NAMES, "target"));
+    gA.push((A["粗利（新規）"]||0)+(A["粗利（既存）"]||0)+recurringMonthlyTotal(cur.staff,ym));
+    caseT.push(kpiSum(kpi, CASE_NAMES, "target")); caseA.push((A["案件化（新規）"]||0)+(A["案件化（既存）"]||0));
+    apoT.push(kpiSum(kpi, APO_NAMES, "target"));   apoA.push((A["アポ（新規）"]||0)+(A["アポ（既存）"]||0));
+  });
+
+  const header=`<tr><th class="l">　</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th></tr>`;
+  const gapCell=v=>`<td style="color:${v<0?'var(--bad)':(v>0?'var(--ok)':'var(--muted)')};font-weight:600;">${v>0?"+":""}${fmt(v)}</td>`;
+  const valRow=(label,vals)=>`<tr><td class="l">${label}</td>${vals.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td>${fmt(sumA(vals))}</td></tr>`;
+  const rateRow=(T,A)=>`<tr><td class="l">達成率</td>${T.map((t,i)=>`<td>${t>0?ratebadge(rateOf(A[i],t)):"–"}</td>`).join("")}<td>${sumA(T)>0?ratebadge(rateOf(sumA(A),sumA(T))):"–"}</td></tr>`;
+  const gapRow=(T,A)=>`<tr><td class="l">GAP</td>${T.map((t,i)=>gapCell(A[i]-t)).join("")}${gapCell(sumA(A)-sumA(T))}</tr>`;
+  const block=(title,T,A,extraRows="")=>`
+    <div style="font-weight:700;color:var(--navy);margin:14px 0 6px;">${title}</div>
+    <div class="scroll-x"><table class="sum-table" style="min-width:920px;">
+      ${header}
+      ${valRow("目標",T)}
+      ${valRow("実績",A)}
+      ${rateRow(T,A)}
+      ${gapRow(T,A)}
+      ${extraRows}
+    </table></div>`;
+
+  const wrap=document.createElement("div");
+  wrap.innerHTML =
+    block("粗利管理（千円・新規＋既存・実績は継続込み）", gT, gA)
+    + block("案件化（件・新規＋既存）", caseT, caseA)
+    + block("アポ（件・新規＋既存）", apoT, apoA)
+    + `<div class="hint" style="margin-top:10px;">粗利・案件化・アポ＝月次KPI（新規＋既存）から集計。粗利の実績は継続込み。新規/既存の内訳・ヨミABCDの月別推移・受注率は今後の対応予定です。</div>`;
+  c.appendChild(wrap);
+  return c;
+}
+
+/* ---------- チャネル別の計画（案件化・アポ） ---------- */
+function channelCard(m){
+  const c = card("チャネル別の計画（案件化・アポ）","CHANNEL");
+  if(!m.channels) m.channels = {};
+  const isAdmin = cur.role==="admin";
+  const body=document.createElement("div"); body.className="scroll-x";
+  body.innerHTML=`<table class="sum-table" style="min-width:720px;">
+    <thead><tr>
+      <th class="l">チャネル</th>
+      <th>案件化 目標</th><th>案件化 実績</th><th>達成</th>
+      <th>アポ 目標</th><th>アポ 実績</th><th>達成</th>
+      ${isAdmin?"<th></th>":""}</tr></thead>
+    <tbody id="chBody"></tbody>
+  </table>`;
+  c.appendChild(body);
+  const foot=document.createElement("div");
+  if(isAdmin){
+    foot.style.marginTop="10px";
+    foot.innerHTML=`<button class="btn-mini" id="addCh">＋ チャネルを追加</button>
+      <span class="hint" style="margin-left:8px;">チャネルの追加・削除は管理者のみ。スタッフは数値入力のみ。</span>`;
+  } else {
+    foot.innerHTML=`<div class="hint" style="margin-top:10px;">チャネルの追加・削除は管理者が行います。</div>`;
+  }
+  c.appendChild(foot);
+
+  const tb=$("#chBody",body);
+  const colspan=isAdmin?8:7;
+  const cellInput=(ch,key)=>`<input type="number" data-ch="${esc(ch)}" data-k="${key}" value="${m.channels[ch]&&m.channels[ch][key]!=null?m.channels[ch][key]:""}" placeholder="0" style="width:90px;text-align:right;">`;
+  const totalRow=()=>{
+    const tot={caseT:0,caseA:0,apoT:0,apoA:0};
+    db.channels.forEach(ch=>{ const d=m.channels[ch]||{}; tot.caseT+=Number(d.caseT)||0; tot.caseA+=Number(d.caseA)||0; tot.apoT+=Number(d.apoT)||0; tot.apoA+=Number(d.apoA)||0; });
+    return `<td class="l">合計</td>
+      <td>${fmt(tot.caseT)}</td><td>${fmt(tot.caseA)}</td><td>${tot.caseT>0?ratebadge(rateOf(tot.caseA,tot.caseT)):"–"}</td>
+      <td>${fmt(tot.apoT)}</td><td>${fmt(tot.apoA)}</td><td>${tot.apoT>0?ratebadge(rateOf(tot.apoA,tot.apoT)):"–"}</td>
+      ${isAdmin?"<td></td>":""}`;
+  };
+  const draw=()=>{
+    tb.innerHTML="";
+    db.channels.forEach(ch=>{
+      const d=m.channels[ch]||{};
+      const tr=document.createElement("tr");
+      tr.innerHTML=`
+        <td class="l nm">${esc(ch)}</td>
+        <td>${cellInput(ch,"caseT")}</td><td>${cellInput(ch,"caseA")}</td>
+        <td class="cr">${(Number(d.caseT)||0)>0?ratebadge(rateOf(Number(d.caseA)||0,Number(d.caseT)||0)):"–"}</td>
+        <td>${cellInput(ch,"apoT")}</td><td>${cellInput(ch,"apoA")}</td>
+        <td class="ar">${(Number(d.apoT)||0)>0?ratebadge(rateOf(Number(d.apoA)||0,Number(d.apoT)||0)):"–"}</td>
+        ${isAdmin?`<td class="num"><button class="btn-mini btn-danger" data-del="${esc(ch)}" style="border:1px solid var(--bad)">削除</button></td>`:""}`;
+      tb.appendChild(tr);
+    });
+    const trt=document.createElement("tr"); trt.className="total"; trt.id="chTotalRow"; trt.innerHTML=totalRow();
+    tb.appendChild(trt);
+    tb.querySelectorAll("input").forEach(inp=>{
+      inp.oninput=e=>{
+        const ch=inp.dataset.ch, key=inp.dataset.k;
+        if(!m.channels[ch]) m.channels[ch]={};
+        m.channels[ch][key]= e.target.value===""?"":Number(e.target.value);
+        save();
+        const d=m.channels[ch], row=inp.closest("tr");
+        row.querySelector(".cr").innerHTML=(Number(d.caseT)||0)>0?ratebadge(rateOf(Number(d.caseA)||0,Number(d.caseT)||0)):"–";
+        row.querySelector(".ar").innerHTML=(Number(d.apoT)||0)>0?ratebadge(rateOf(Number(d.apoA)||0,Number(d.apoT)||0)):"–";
+        $("#chTotalRow").innerHTML=totalRow();
+      };
+    });
+    if(isAdmin) tb.querySelectorAll("button[data-del]").forEach(b=>{
+      b.onclick=()=>{ if(confirm(`チャネル「${b.dataset.del}」を削除しますか？（全スタッフ共通）`)){ db.channels=db.channels.filter(x=>x!==b.dataset.del); save(); draw(); } };
+    });
+  };
+  draw();
+  if(isAdmin) $("#addCh",foot).onclick=()=>{
+    const name=prompt("追加するチャネル名"); if(!name) return;
+    if(db.channels.includes(name.trim())){ alert("同名のチャネルが既にあります"); return; }
+    db.channels.push(name.trim()); save(); draw();
+  };
+  return c;
+}
+
+/* ---------- 案件パイプライン（ヨミ管理） ---------- */
+const YOMI = ["A","B","C","D"];
+const YOMI_COEF = {A:0.9, B:0.6, C:0.3, D:0.1};   // 確度の目安（加重見込み用）
+// 案件のステージ（ライフサイクル）：アポイント→案件化(見積提出)→受注／失注・没
+const PIPE_STATUS = ["アポイント","案件化","受注","失注","没"];
+const PIPE_KINDS = ["見込み","既存","EXPO"];        // 案件管理の区分（営業シートに対応）
+// 集計に使う粗利：個人粗利優先（本人の取り分）→ 粗利合計 → 旧grossの順
+function dealGross(p){
+  if(p.personalGross!=="" && p.personalGross!=null) return Number(p.personalGross)||0;
+  if(p.grossTotal!=="" && p.grossTotal!=null) return Number(p.grossTotal)||0;
+  return Number(p.gross)||0;
+}
+function dealContent(p){ return p.content!=null ? p.content : (p.name||""); }
+function dealKind(p){ return p.dealType || (p.yomi ? "案件" : "アポ"); }   // アポ / 案件
+function pipelineCard(){
+  const c = card("案件管理","PIPELINE");
+  const sum = document.createElement("div");
+  sum.id = "pipeSum"; sum.className = "month-summary"; sum.style.marginBottom="14px";
+  c.appendChild(sum);
+  const body = document.createElement("div"); body.className="scroll-x";
+  body.innerHTML = `<table class="deal-table" style="min-width:1000px;">
+    <thead><tr>
+      <th style="width:9%">区分</th><th style="width:17%">クライアント</th><th style="width:24%">内容</th>
+      <th style="width:11%;text-align:right">粗利合計</th><th style="width:11%;text-align:right">個人粗利</th>
+      <th style="width:9%">ヨミ</th><th style="width:11%">次回A日</th><th></th></tr></thead>
+    <tbody id="pipeBody"></tbody>
+  </table>`;
+  c.appendChild(body);
+  const add = document.createElement("div");
+  add.style.marginTop="10px";
+  add.innerHTML=`<button class="btn-primary btn-mini" id="addApo">＋ アポ記録</button>
+    <button class="btn-mini" id="addPipe" style="margin-left:8px;">＋ 案件を追加（詳細）</button>
+    <span class="hint" style="margin-left:8px;">行をクリックで全項目を編集。見込み合計は個人粗利をヨミ係数で加重（A0.9/B0.6/C0.3/D0.1）。</span>`;
+  c.appendChild(add);
+
+  const mine = ()=>db.pipeline.filter(p=>p.staffId===cur.staff);
+  const visible = ()=>mine();
+
+  const drawSum = ()=>{
+    const all = mine();
+    const apoDeals = all.filter(p=>dealKind(p)==="アポ");
+    const caseDeals = all.filter(p=>dealKind(p)==="案件");
+    const apoTotal = all.reduce((s,p)=>s+(Number(p.apoCount)||0),0);        // 総アポ回数
+    const caseApoSum = caseDeals.reduce((s,p)=>s+(Number(p.apoCount)||0),0);
+    const avgApo = caseDeals.length ? (caseApoSum/caseDeals.length) : 0;     // 案件化までの平均アポ数
+    const caseRate = all.length ? Math.round(caseDeals.length/all.length*100) : 0;
+    // ヨミ見込みは案件のうち A〜D。個人粗利ベース
+    const by = {A:{n:0,g:0},B:{n:0,g:0},C:{n:0,g:0},D:{n:0,g:0}};
+    caseDeals.forEach(p=>{ if(!by[p.yomi]) return; by[p.yomi].n++; by[p.yomi].g+=dealGross(p); });
+    const total = YOMI.reduce((s,y)=>s+by[y].g,0);
+    const weighted = Math.round(YOMI.reduce((s,y)=>s+by[y].g*YOMI_COEF[y],0));
+    sum.innerHTML =
+      `<div class="kpi"><div class="name">アポ案件</div><div class="val">${apoDeals.length} <small>件</small></div></div>`
+      + `<div class="kpi"><div class="name">案件化</div><div class="val">${caseDeals.length} <small>件</small></div><div class="hint" style="margin-top:4px;">案件化率 ${caseRate}%</div></div>`
+      + `<div class="kpi"><div class="name">総アポ回数</div><div class="val">${apoTotal} <small>回</small></div></div>`
+      + `<div class="kpi" style="border-color:var(--cyan);"><div class="name">案件化までの平均アポ数</div><div class="val">${avgApo.toFixed(1)} <small>回/件</small></div></div>`
+      + YOMI.map(y=>`<div class="kpi"><div class="name">ヨミ${y}（${by[y].n}件）</div>
+        <div class="val">${fmt(by[y].g)} <small>千円</small></div></div>`).join("")
+      + `<div class="kpi" style="border-color:var(--cyan);">
+          <div class="name">案件化の見込み / 加重</div>
+          <div class="val">${fmt(total)} <small>千円</small></div>
+          <div class="hint" style="margin-top:4px;">加重 ${fmt(weighted)} 千円</div></div>`;
+  };
+  const tb = $("#pipeBody",body);
+  const draw = ()=>{
+    const list = visible();
+    tb.innerHTML="";
+    if(!list.length){ tb.innerHTML=`<tr><td colspan="8" class="hint">案件がありません。「＋ アポ記録」または「＋ 案件を追加」から登録してください。</td></tr>`; }
+    list.forEach(p=>{
+      const isMikomi=(p.kind||"見込み")==="見込み";
+      const tr=document.createElement("tr"); tr.style.cursor="pointer";
+      tr.innerHTML=`
+        <td>${esc(p.kind||"見込み")}</td>
+        <td class="nm">${esc(p.client)||'<span class="hint">（未入力）</span>'}</td>
+        <td>${esc(dealContent(p))}</td>
+        <td class="num">${(p.grossTotal!==""&&p.grossTotal!=null)?fmt(p.grossTotal):((p.gross!==""&&p.gross!=null)?fmt(p.gross):"–")}</td>
+        <td class="num">${(p.personalGross!==""&&p.personalGross!=null)?fmt(p.personalGross):"–"}</td>
+        <td>${dealKind(p)==="案件"
+            ? `<span class="status-chip ${yomiClass(p.yomi)}">${esc(p.yomi||"案件")}</span>`
+            : `<span class="status-chip">アポ${p.apoCount?"×"+p.apoCount:""}</span>`}</td>
+        <td>${esc(p.nextActionDate||"")}</td>
+        <td class="num"><button class="btn-mini">編集</button></td>`;
+      tr.querySelector("button").onclick=(e)=>{ e.stopPropagation(); openDealModal(p); };
+      tr.onclick=()=>openDealModal(p);
+      tb.appendChild(tr);
+    });
+  };
+  $("#addPipe",add).onclick=()=>openDealModal(null);
+  $("#addApo",add).onclick=()=>openApoModal();
+  draw(); drawSum();
+  return c;
+}
+const DEPT_OPTS = ["","CR","DM","HR","WA"];
+const ROUTE_OPTS = ["","WEB","紹介","交流会","代理店","レディクル","ScoreX","アイミツ","展示会","その他"];
+const ATTR_OPTS = ["","新規","既存"];
+const YOMI_OPTS = ["A","B","C","D","受注","ボツ","パス","成功"];   // ヨミ列の選択肢（確度＋結果）
+const optionsHtml=(opts,sel)=>opts.map(o=>`<option ${String(sel)===String(o)?"selected":""}>${o}</option>`).join("");
+function openDealModal(p){
+  const isNew=!p;
+  const d = p ? Object.assign({},p) : {kind:(cur.pipeKind==="all"?"見込み":cur.pipeKind),yomi:""};
+  const g=(k,def="")=>{ const v=d[k]; return v==null?def:v; };
+  const content = d.content!=null ? d.content : (d.name||"");
+  const grossTotal = d.grossTotal!=null ? d.grossTotal : (d.gross!=null?d.gross:"");
+  const dealType = d.dealType || (d.yomi ? "案件" : "アポ");   // 旧データ互換
+  const passOpts = [""].concat(db.members||[]);
+  if(d.passFrom && !passOpts.includes(d.passFrom)) passOpts.push(d.passFrom);   // 既存値も選択肢に残す
+  const chk=(k)=>d[k]?"checked":"";
+  const sec=t=>`<div style="font-weight:700;color:var(--navy);font-size:12px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px;">${t}</div>`;
+  const root=$("#modalRoot");
+  root.innerHTML=`<div class="modal-bg"><div class="modal" style="max-width:900px;">
+    <h3>${isNew?"案件を追加":"案件を編集"}</h3>
+    ${sec("基本情報")}
+    <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="field"><label>種別</label><select id="fType"><option ${dealType==="アポ"?"selected":""}>アポ</option><option ${dealType==="案件"?"selected":""}>案件</option></select></div>
+      <div class="field"><label>アポ回数</label><input id="fApoCount" type="number" min="0" value="${esc(g("apoCount"))}" placeholder="0"></div>
+      <div class="field"><label>次回アポ日</label><input id="fDate" type="date" value="${esc(g("nextActionDate"))}"></div>
+      <div class="field"><label>クライアント名</label><input id="fClient" value="${esc(g("client"))}"></div>
+      <div class="field"><label>担当者</label><input id="fOwner" value="${esc(g("owner"))}" placeholder="担当・共同担当"></div>
+      <div class="field"><label>案件名・内容</label><input id="fContent" value="${esc(content)}" placeholder="案件名・内容"></div>
+      <div class="field"><label>属性</label><select id="fAttr">${optionsHtml(ATTR_OPTS, g("attribute"))}</select></div>
+      <div class="field"><label>ルート</label><select id="fRoute">${optionsHtml(ROUTE_OPTS, g("route"))}</select></div>
+      <div class="field"><label>事業部</label><select id="fDept">${optionsHtml(DEPT_OPTS, g("dept"))}</select></div>
+      <div class="field"><label>初回接触日</label><input id="fFirst" type="date" value="${esc(g("firstContact"))}"></div>
+      <div class="field"><label>パス元（メンバー）</label><select id="fPass">${optionsHtml(passOpts, g("passFrom"))}</select></div>
+      <div class="field"><label>区分</label><select id="fKind">${PIPE_KINDS.map(k=>`<option ${d.kind===k?"selected":""}>${k}</option>`).join("")}</select></div>
+    </div>
+    ${sec("BANT・助")}
+    <div style="display:flex;gap:14px;align-items:center;font-size:13px;">
+      <label><input type="checkbox" id="fB" ${chk("bantB")}> B（予算）</label>
+      <label><input type="checkbox" id="fA" ${chk("bantA")}> A（決裁）</label>
+      <label><input type="checkbox" id="fN" ${chk("bantN")}> N（課題）</label>
+      <label><input type="checkbox" id="fT" ${chk("bantT")}> T（時期）</label>
+      <label><input type="checkbox" id="fJo" ${chk("subsidy")}> 助（助成金）</label>
+    </div>
+    <div id="dealDetail">
+    <div id="dealDetailNote" class="hint" style="margin-top:10px;"></div>
+    ${sec("確度")}
+    <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="field"><label>ヨミ</label><select id="fYomi"><option value="" ${!d.yomi?"selected":""}>（未選択）</option>${optionsHtml(YOMI_OPTS,d.yomi)}</select></div>
+    </div>
+    ${sec("金額（千円）")}
+    <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="field"><label>売上合計</label><input id="fSalesTotal" type="number" value="${esc(g("salesTotal"))}"></div>
+      <div class="field"><label>粗利合計</label><input id="fGrossTotal" type="number" value="${grossTotal}"></div>
+      <div class="field"><label> </label><button type="button" class="btn-ghost btn-mini" id="fAutoSplit" style="margin-top:2px;">サブ1=20%・サブ2=10%で自動分配</button></div>
+      <div class="field"><label>サブ1（20%分配）</label><input id="fSub1" type="number" value="${esc(g("sub1"))}"></div>
+      <div class="field"><label>サブ2（10%分配）</label><input id="fSub2" type="number" value="${esc(g("sub2"))}"></div>
+      <div class="field"><label> </label><span class="hint">残りが個人の売上・粗利になります</span></div>
+      <div class="field"><label>個人売上（自動）</label><input id="fPersSales" type="number" value="${esc(g("personalSales"))}"></div>
+      <div class="field"><label>個人粗利（自動＝粗利合計−サブ）</label><input id="fPersGross" type="number" value="${esc(g("personalGross"))}"></div>
+    </div>
+    ${sec("日程")}
+    <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+      <div class="field"><label>提案日（＝案件化日）</label><input id="fProp" type="date" value="${esc(g("proposalDate"))}"></div>
+      <div class="field"><label>受注日</label><input id="fOrder" type="date" value="${esc(g("orderDate"))}"></div>
+      <div class="field"><label>納品日</label><input id="fDeliv" type="date" value="${esc(g("deliveryDate"))}"></div>
+      <div class="field"><label> </label><div style="display:flex;gap:14px;align-items:center;padding-top:6px;font-size:13px;">
+        <label><input type="checkbox" id="fRecurring" ${chk("isRecurring")}> 定期</label>
+        <label><input type="checkbox" id="fBacklink" ${chk("backlink")}> 被リンク掲載</label></div></div>
+    </div>
+    </div>
+    ${sec("活動履歴（日付＋メモ）")}
+    <div id="actList" style="margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <input type="date" id="fActDate" style="width:150px;">
+      <input id="fActMemo" placeholder="活動メモ" style="flex:1;min-width:200px;">
+      <button type="button" class="btn-ghost btn-mini" id="fActAdd">＋ 追加</button>
+    </div>
+    <div class="modal-actions">
+      ${isNew?"":'<button class="btn-danger" id="dDelete" style="margin-right:auto;">削除</button>'}
+      <button class="btn-ghost" id="dCancel">キャンセル</button>
+      <button class="btn-primary" id="dSave">保存</button>
+    </div></div></div>`;
+  // 個人売上・個人粗利の自動計算（合計−サブ。売上は粗利の配分比率で按分）
+  const recalc=()=>{
+    const sales=Number($("#fSalesTotal").value)||0, gt=Number($("#fGrossTotal").value)||0;
+    const s1=Number($("#fSub1").value)||0, s2=Number($("#fSub2").value)||0;
+    const persGross=Math.max(0, gt - s1 - s2);
+    $("#fPersGross").value = persGross;
+    $("#fPersSales").value = gt>0 ? Math.round(sales*persGross/gt) : sales;
+  };
+  ["fSalesTotal","fGrossTotal","fSub1","fSub2"].forEach(id=>$("#"+id).addEventListener("input",recalc));
+  $("#fAutoSplit").onclick=()=>{
+    const gt=Number($("#fGrossTotal").value)||0;
+    $("#fSub1").value=Math.round(gt*0.2);
+    $("#fSub2").value=Math.round(gt*0.1);
+    recalc();
+  };
+  // 属性＝新規のときだけルートを選べる（既存は無効）
+  const updateRoute=()=>{
+    const isNew=$("#fAttr").value==="新規";
+    $("#fRoute").disabled=!isNew;
+    if(!isNew) $("#fRoute").value="";
+  };
+  $("#fAttr").addEventListener("change",updateRoute);
+  updateRoute();
+  // 活動履歴
+  let acts = Array.isArray(d.activities) ? d.activities.slice() : [];
+  const drawActs=()=>{
+    const el=$("#actList");
+    if(!acts.length){ el.innerHTML=`<div class="hint">まだ活動履歴はありません。</div>`; return; }
+    el.innerHTML = acts.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map((a,i)=>
+      `<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px;">
+        <span style="color:var(--muted);min-width:92px;">${esc(a.date||"")}</span>
+        <span style="flex:1;">${esc(a.memo||"")}</span>
+        <button type="button" class="btn-mini" data-del="${i}" style="color:var(--bad);">削除</button></div>`).join("");
+    el.querySelectorAll("button[data-del]").forEach(b=>b.onclick=()=>{
+      const sorted=acts.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+      const target=sorted[+b.dataset.del];
+      acts=acts.filter(x=>x!==target); drawActs();
+    });
+  };
+  drawActs();
+  $("#fActAdd").onclick=()=>{
+    const date=$("#fActDate").value, memo=$("#fActMemo").value.trim();
+    if(!date && !memo) return;
+    acts.push({date, memo}); $("#fActDate").value=""; $("#fActMemo").value=""; drawActs();
+  };
+  // 種別＝アポは基本情報・BANT・活動履歴のみ。種別＝案件で金額・ヨミ・日程が出る
+  const updateStage=()=>{
+    const minimal = ($("#fType").value==="アポ");
+    $("#dealDetail").style.display = minimal ? "none" : "";
+    $("#dealDetailNote").textContent = minimal
+      ? "種別＝アポはアポ活動の記録（アポ回数・次回アポ日・活動履歴・BANT）。案件化したら種別を「案件」に変えると金額・ヨミ・日程が出ます。"
+      : "";
+  };
+  $("#fType").addEventListener("change",updateStage);
+  updateStage();
+  $("#dCancel").onclick=()=>root.innerHTML="";
+  $("#dSave").onclick=()=>{
+    const num=id=>{ const v=$("#"+id).value; return v===""?"":Number(v); };
+    const v={
+      dealType:$("#fType").value, apoCount:num("fApoCount"),
+      kind:$("#fKind").value, firstContact:$("#fFirst").value, client:$("#fClient").value.trim(),
+      attribute:$("#fAttr").value.trim(), dept:$("#fDept").value, route:$("#fRoute").value.trim(),
+      passFrom:$("#fPass").value.trim(), owner:$("#fOwner").value.trim(), content:$("#fContent").value.trim(),
+      salesTotal:num("fSalesTotal"), grossTotal:num("fGrossTotal"), sub1:num("fSub1"), sub2:num("fSub2"),
+      personalSales:num("fPersSales"), personalGross:num("fPersGross"),
+      yomi:$("#fYomi").value,
+      bantB:$("#fB").checked, bantA:$("#fA").checked, bantN:$("#fN").checked, bantT:$("#fT").checked, subsidy:$("#fJo").checked,
+      proposalDate:$("#fProp").value, nextActionDate:$("#fDate").value, orderDate:$("#fOrder").value, deliveryDate:$("#fDeliv").value,
+      isRecurring:$("#fRecurring").checked, backlink:$("#fBacklink").checked, activities:acts
+    };
+    if(isNew){ db.pipeline.push(Object.assign({id:uid(),staffId:cur.staff},v)); }
+    else { Object.assign(p,v); }
+    save(); root.innerHTML=""; render();
+  };
+  if(!isNew) $("#dDelete").onclick=()=>{ const idx=db.pipeline.indexOf(p); if(idx>=0)db.pipeline.splice(idx,1); save(); root.innerHTML=""; render(); };
+}
+// アポ記録（初回＝新規案件 / 2回目以降＝既存案件にカウント）
+function openApoModal(){
+  const root=$("#modalRoot");
+  const myDeals=db.pipeline.filter(p=>p.staffId===cur.staff);
+  const passOpts=[""].concat(db.members||[]);
+  root.innerHTML=`<div class="modal-bg"><div class="modal" style="max-width:700px;">
+    <h3>アポ記録</h3>
+    <div class="map-grid" style="grid-template-columns:1fr;">
+      <div class="field"><label>アポ種別</label><select id="aMode">
+        <option value="first">初回アポ（新規案件として登録）</option>
+        <option value="more">2回目以降（既存の案件にアポをカウント）</option></select></div>
+    </div>
+    <div id="aFirst">
+      <div class="map-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="field"><label>初回接触日</label><input id="aFirstDate" type="date"></div>
+        <div class="field"><label>アポ日</label><input id="aDate" type="date"></div>
+        <div class="field"><label>クライアント名</label><input id="aClient"></div>
+        <div class="field"><label>担当者</label><input id="aOwner" placeholder="担当・共同担当"></div>
+        <div class="field"><label>案件名</label><input id="aContent" placeholder="案件名・内容"></div>
+        <div class="field"><label>属性</label><select id="aAttr">${optionsHtml(ATTR_OPTS,"")}</select></div>
+        <div class="field"><label>ルート</label><select id="aRoute">${optionsHtml(ROUTE_OPTS,"")}</select></div>
+      </div>
+    </div>
+    <div id="aMore" style="display:none;">
+      ${myDeals.length?`<div class="map-grid" style="grid-template-columns:2fr 1fr;">
+        <div class="field"><label>案件を選択</label><select id="aDeal">${myDeals.map(p=>`<option value="${p.id}">${esc(p.client||"(クライアント未入力)")}／${esc(dealContent(p))}（現在アポ${Number(p.apoCount)||0}回）</option>`).join("")}</select></div>
+        <div class="field"><label>アポ日</label><input id="aDate2" type="date"></div>
+      </div>`:`<div class="hint">既存の案件がありません。初回アポで登録してください。</div>`}
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="aCancel">キャンセル</button>
+      <button class="btn-primary" id="aSave">保存</button>
+    </div></div></div>`;
+  const upd=()=>{ const m=$("#aMode").value; $("#aFirst").style.display=m==="first"?"":"none"; $("#aMore").style.display=m==="more"?"":"none"; };
+  $("#aMode").onchange=upd; upd();
+  const updR=()=>{ const isNew=$("#aAttr").value==="新規"; $("#aRoute").disabled=!isNew; if(!isNew)$("#aRoute").value=""; };
+  $("#aAttr").onchange=updR; updR();
+  $("#aCancel").onclick=()=>root.innerHTML="";
+  $("#aSave").onclick=()=>{
+    const mode=$("#aMode").value;
+    if(mode==="first"){
+      const apoDate=$("#aDate").value;
+      db.pipeline.push({id:uid(),staffId:cur.staff,kind:(cur.pipeKind==="all"?"見込み":cur.pipeKind),
+        dealType:"アポ",apoCount:1,yomi:"",firstContact:$("#aFirstDate").value,nextActionDate:"",
+        client:$("#aClient").value.trim(),owner:$("#aOwner").value.trim(),content:$("#aContent").value.trim(),
+        attribute:$("#aAttr").value,route:$("#aRoute").value,
+        activities:[{date:apoDate,memo:"初回アポ"}]});
+    } else {
+      const sel=$("#aDeal"); if(!sel){ root.innerHTML=""; return; }
+      const p=db.pipeline.find(x=>x.id===sel.value); if(!p){ root.innerHTML=""; return; }
+      p.apoCount=(Number(p.apoCount)||0)+1;
+      if(!Array.isArray(p.activities)) p.activities=[];
+      p.activities.push({date:$("#aDate2").value, memo:`アポ（${p.apoCount}回目）`});
+    }
+    save(); root.innerHTML=""; render();
+  };
+}
+
+/* ---------- 案件（継続）：定期契約を期間で計上 ---------- */
+function recurringActive(r, ym){
+  const s=r.startMonth||"", e=r.endMonth||"";
+  if(s && ym < s) return false;
+  if(e && ym > e) return false;
+  return true;
+}
+// 個人の月額＝月額−サブ1−サブ2（分配後の自分の取り分）
+function recIndividual(r){ return Math.max(0,(Number(r.monthly)||0)-(Number(r.sub1)||0)-(Number(r.sub2)||0)); }
+function recurringMonthlyTotal(staffId, ym){
+  return db.recurring.filter(r=>r.staffId===staffId && recurringActive(r,ym))
+                     .reduce((s,r)=>s+recIndividual(r),0);
+}
+function recurringCard(){
+  const c = card("案件（継続）／定期契約","RECURRING");
+  const sum=document.createElement("div"); sum.id="recSum"; sum.className="month-summary"; sum.style.marginBottom="14px";
+  c.appendChild(sum);
+  const body=document.createElement("div"); body.className="scroll-x";
+  body.innerHTML=`<table class="deal-table" style="min-width:1000px;">
+    <thead><tr>
+      <th style="width:16%">クライアント</th><th style="width:20%">サービス・案件名</th>
+      <th style="width:11%;text-align:right">月額(千円)</th><th style="width:11%;text-align:right">個人月額</th>
+      <th style="width:10%">開始月</th><th style="width:10%">終了月</th>
+      <th style="width:8%">状態</th><th>メモ</th><th></th></tr></thead>
+    <tbody id="recBody"></tbody>
+  </table>`;
+  c.appendChild(body);
+  const add=document.createElement("div"); add.style.marginTop="10px";
+  add.innerHTML=`<button class="btn-mini" id="addRec">＋ 継続案件を追加</button>
+    <span class="hint" style="margin-left:8px;">月額を入れ、開始月〜終了月を指定すると、その期間の各月に同額が計上されます（終了月は空＝継続中）。</span>`;
+  c.appendChild(add);
+
+  const mine=()=>db.recurring.filter(r=>r.staffId===cur.staff);
+  const drawSum=()=>{
+    const list=mine();
+    const activeNow=list.filter(r=>recurringActive(r,cur.month));
+    const monthlyTotal=activeNow.reduce((s,r)=>s+recIndividual(r),0);   // 個人月額ベース
+    const fy=fyOfMonth(cur.month);
+    const fyTotal=fyMonths(fy).reduce((s,ym)=>s+list.filter(r=>recurringActive(r,ym)).reduce((a,r)=>a+recIndividual(r),0),0);
+    const mo=Number(cur.month.split("-")[1]);
+    sum.innerHTML=
+      `<div class="kpi"><div class="name">${mo}月の継続（個人月額・${activeNow.length}件）</div><div class="val">${fmt(monthlyTotal)} <small>千円</small></div></div>`
+      +`<div class="kpi"><div class="name">登録件数</div><div class="val">${list.length} <small>件</small></div></div>`
+      +`<div class="kpi" style="border-color:var(--cyan);"><div class="name">期内の継続売上見込み</div><div class="val">${fmt(fyTotal)} <small>千円</small></div>
+        <div class="hint" style="margin-top:4px;">${fy}年10月〜${fy+1}年9月期の合計</div></div>`;
+  };
+  const tb=$("#recBody",body);
+  const draw=()=>{
+    const list=mine();
+    tb.innerHTML="";
+    if(!list.length){ tb.innerHTML=`<tr><td colspan="9" class="hint">継続案件がありません。「＋ 継続案件を追加」から登録してください。</td></tr>`; }
+    list.forEach(r=>{
+      const activeNow=recurringActive(r,cur.month);
+      const fmtM=ym=>ym?ym.replace("-","/"):"";
+      const tr=document.createElement("tr"); tr.style.cursor="pointer";
+      tr.innerHTML=`
+        <td class="nm">${esc(r.client)||'<span class="hint">（未入力）</span>'}</td>
+        <td>${esc(r.name)}</td>
+        <td class="num">${(r.monthly!==""&&r.monthly!=null)?fmt(r.monthly):"–"}</td>
+        <td class="num">${fmt(recIndividual(r))}</td>
+        <td>${fmtM(r.startMonth)}</td>
+        <td>${r.endMonth?fmtM(r.endMonth):"継続中"}</td>
+        <td>${activeNow?'<span class="status-chip win">継続中</span>':'<span class="status-chip">対象外</span>'}</td>
+        <td class="mt">${esc(r.memo)}</td>
+        <td class="num"><button class="btn-mini">編集</button></td>`;
+      tr.querySelector("button").onclick=(e)=>{ e.stopPropagation(); openRecurringModal(r); };
+      tr.onclick=()=>openRecurringModal(r);
+      tb.appendChild(tr);
+    });
+  };
+  $("#addRec",add).onclick=()=>openRecurringModal(null);
+  draw(); drawSum();
+  return c;
+}
+function openRecurringModal(r){
+  const isNew=!r;
+  const d = r ? Object.assign({},r) : {client:"",name:"",monthly:"",sub1:"",sub2:"",startMonth:cur.month,endMonth:"",memo:""};
+  const root=$("#modalRoot");
+  root.innerHTML=`<div class="modal-bg"><div class="modal">
+    <h3>${isNew?"継続案件を追加":"継続案件を編集"}</h3>
+    <div class="map-grid" style="grid-template-columns:1fr 1fr;">
+      <div class="field"><label>クライアント</label><input id="rClient" value="${esc(d.client)}"></div>
+      <div class="field"><label>サービス・案件名</label><input id="rName" value="${esc(d.name)}" placeholder="保守・運用・SEO など"></div>
+      <div class="field"><label>月額（千円）</label><input id="rMonthly" type="number" value="${d.monthly??""}"></div>
+      <div class="field"><label> </label><button type="button" class="btn-ghost btn-mini" id="rAutoSplit" style="margin-top:2px;">サブ1=20%・サブ2=10%で自動分配</button></div>
+      <div class="field"><label>サブ1（20%分配）</label><input id="rSub1" type="number" value="${d.sub1??""}"></div>
+      <div class="field"><label>サブ2（10%分配）</label><input id="rSub2" type="number" value="${d.sub2??""}"></div>
+      <div class="field"><label>個人月額（自動＝月額−サブ）</label><input id="rPers" type="number" value="${recIndividual(d)}" readonly style="background:#f4f6f9;"></div>
+      <div class="field"><label> </label><span class="hint">個人月額が期間中の各月に計上されます</span></div>
+      <div class="field"><label>開始月</label><input id="rStart" type="month" value="${esc(d.startMonth||"")}"></div>
+      <div class="field"><label>終了月（空＝継続中）</label><input id="rEnd" type="month" value="${esc(d.endMonth||"")}"></div>
+    </div>
+    <div class="field" style="margin-top:6px;"><label>メモ</label><textarea id="rMemo" style="min-height:60px;">${esc(d.memo)}</textarea></div>
+    <div class="modal-actions">
+      ${isNew?"":'<button class="btn-danger" id="rDelete" style="margin-right:auto;">削除</button>'}
+      <button class="btn-ghost" id="rCancel">キャンセル</button>
+      <button class="btn-primary" id="rSave">保存</button>
+    </div></div></div>`;
+  const rRecalc=()=>{
+    const mo=Number($("#rMonthly").value)||0, s1=Number($("#rSub1").value)||0, s2=Number($("#rSub2").value)||0;
+    $("#rPers").value = Math.max(0, mo - s1 - s2);
+  };
+  ["rMonthly","rSub1","rSub2"].forEach(id=>$("#"+id).addEventListener("input",rRecalc));
+  $("#rAutoSplit").onclick=()=>{ const mo=Number($("#rMonthly").value)||0; $("#rSub1").value=Math.round(mo*0.2); $("#rSub2").value=Math.round(mo*0.1); rRecalc(); };
+  $("#rCancel").onclick=()=>root.innerHTML="";
+  $("#rSave").onclick=()=>{
+    const v={ client:$("#rClient").value.trim(), name:$("#rName").value.trim(),
+      monthly:$("#rMonthly").value===""?"":Number($("#rMonthly").value),
+      sub1:$("#rSub1").value===""?"":Number($("#rSub1").value),
+      sub2:$("#rSub2").value===""?"":Number($("#rSub2").value),
+      startMonth:$("#rStart").value, endMonth:$("#rEnd").value, memo:$("#rMemo").value };
+    if(isNew){ db.recurring.push(Object.assign({id:uid(),staffId:cur.staff},v)); }
+    else { Object.assign(r,v); }
+    save(); root.innerHTML=""; render();
+  };
+  if(!isNew) $("#rDelete").onclick=()=>{ const idx=db.recurring.indexOf(r); if(idx>=0)db.recurring.splice(idx,1); save(); root.innerHTML=""; render(); };
+}
+
+/* ---------- CSV取込 ---------- */
+const CSV_GUESS = {
+  staff:["担当者","担当","営業担当","営業","スタッフ","社員","氏名","名前"],
+  name:["案件名","案件","物件名","物件","件名","タイトル","顧客名","会社名","顧客","会社"],
+  amount:["金額","受注金額","納品金額","売上","売上金額","価格","契約金額"],
+  date:["受注日","納品日","成約日","契約日","登録日","日付","計上日","日"],
+  status:["ステータス","状態","区分","進捗","フェーズ","種別"]
+};
+function parseCSV(text){
+  const rows=[]; let i=0, field="", row=[], inQ=false;
+  while(i<text.length){
+    const ch=text[i];
+    if(inQ){
+      if(ch==='"'){ if(text[i+1]==='"'){field+='"';i+=2;continue;} inQ=false;i++;continue; }
+      field+=ch;i++;continue;
+    }
+    if(ch==='"'){inQ=true;i++;continue;}
+    if(ch===','){row.push(field);field="";i++;continue;}
+    if(ch==='\r'){i++;continue;}
+    if(ch==='\n'){row.push(field);rows.push(row);row=[];field="";i++;continue;}
+    field+=ch;i++;
+  }
+  if(field!==""||row.length){row.push(field);rows.push(row);}
+  return rows.filter(r=>r.some(c=>(c||"").trim()!==""));
+}
+function decodeBuf(buf){
+  let t=new TextDecoder("utf-8",{fatal:false}).decode(buf);
+  if(t.indexOf("�")>=0){ try{ t=new TextDecoder("shift_jis").decode(buf); }catch(e){} }
+  return t;
+}
+function guessCol(headers,keys){
+  for(let h=0;h<headers.length;h++){ if(keys.some(k=>(headers[h]||"").includes(k))) return h; }
+  return -1;
+}
+function normDate(s){
+  s=(s||"").trim();
+  let m=s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if(m) return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  m=s.match(/(\d{4})\D+(\d{1,2})/);
+  if(m) return `${m[1]}-${pad(+m[2])}`;
+  return s;
+}
+function parseAmount(s){ const n=Number((s||"").replace(/[^0-9.\-]/g,"")); return isNaN(n)?0:n; }
+function matchStaff(nameCell){
+  const v=(nameCell||"").trim();
+  if(!v) return null;
+  let s=db.staff.find(x=>x.name===v);
+  if(s) return s.id;
+  s=db.staff.find(x=>v.includes(x.name) || x.name.includes(v));
+  return s?s.id:null;
+}
+
+let csvState=null;
+function onCsvPicked(e){
+  const f=e.target.files[0]; e.target.value=""; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    const rows=parseCSV(decodeBuf(r.result));
+    if(rows.length<2){ alert("データが読み取れませんでした。CSVの中身をご確認ください。"); return; }
+    const headers=rows[0], data=rows.slice(1);
+    csvState={headers,data,map:{
+      staff:guessCol(headers,CSV_GUESS.staff),
+      name:guessCol(headers,CSV_GUESS.name),
+      amount:guessCol(headers,CSV_GUESS.amount),
+      date:guessCol(headers,CSV_GUESS.date),
+      status:guessCol(headers,CSV_GUESS.status)
+    },unit:"yen",replace:true};
+    openCsvModal();
+  };
+  r.readAsArrayBuffer(f);
+}
+function colOptions(sel){
+  return csvState.headers.map((h,i)=>`<option value="${i}" ${i===sel?"selected":""}>${esc(h||("列"+(i+1)))}</option>`).join("");
+}
+function openCsvModal(){
+  const root=$("#modalRoot");
+  root.innerHTML=`
+  <div class="modal-bg"><div class="modal">
+    <h3>CSV取込（CRMの案件データ）</h3>
+    <div class="hint">列の対応づけを確認してください。担当者名でスタッフに自動で振り分けます。数値はすべて千円で保存します。</div>
+    <div class="map-grid">
+      <div class="field"><label>担当者の列</label><select id="mStaff">${colOptions(csvState.map.staff)}</select></div>
+      <div class="field"><label>案件名の列</label><select id="mName">${colOptions(csvState.map.name)}</select></div>
+      <div class="field"><label>金額の列</label><select id="mAmount">${colOptions(csvState.map.amount)}</select></div>
+      <div class="field"><label>日付の列</label><select id="mDate">${colOptions(csvState.map.date)}</select></div>
+      <div class="field"><label>ステータスの列</label><select id="mStatus">${colOptions(csvState.map.status)}</select></div>
+      <div class="field"><label>金額の単位</label><select id="mUnit"><option value="yen">円（÷1000で千円化）</option><option value="sen">千円（そのまま）</option></select></div>
+    </div>
+    <label style="font-size:12px;display:flex;gap:6px;align-items:center;"><input type="checkbox" id="mReplace" checked> 取込前に既存の案件をすべて置き換える</label>
+    <div id="csvPreview"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="csvCancel">キャンセル</button>
+      <button class="btn-primary" id="csvCommit">この内容で取り込む</button>
+    </div>
+  </div></div>`;
+  const refresh=()=>{
+    csvState.map.staff=+$("#mStaff").value; csvState.map.name=+$("#mName").value;
+    csvState.map.amount=+$("#mAmount").value; csvState.map.date=+$("#mDate").value;
+    csvState.map.status=+$("#mStatus").value; csvState.unit=$("#mUnit").value;
+    renderCsvPreview();
+  };
+  ["mStaff","mName","mAmount","mDate","mStatus","mUnit"].forEach(id=>$("#"+id).onchange=refresh);
+  $("#csvCancel").onclick=()=>{ root.innerHTML=""; csvState=null; };
+  $("#csvCommit").onclick=commitCsv;
+  renderCsvPreview();
+}
+function buildDeals(){
+  const {data,map,unit}=csvState;
+  const out=[]; let unmatched=0;
+  data.forEach(r=>{
+    const sid=matchStaff(r[map.staff]);
+    let amt=parseAmount(r[map.amount]); if(unit==="yen") amt=Math.round(amt/1000);
+    const deal={ id:uid(), staffId:sid, staffName:(r[map.staff]||"").trim(),
+      name:(r[map.name]||"").trim(), amount:amt, date:normDate(r[map.date]),
+      status:(r[map.status]||"").trim() };
+    if(!sid) unmatched++;
+    out.push(deal);
+  });
+  return {out, unmatched};
+}
+function renderCsvPreview(){
+  const {out,unmatched}=buildDeals();
+  const matched=out.filter(d=>d.staffId);
+  const sample=out.slice(0,6);
+  $("#csvPreview").innerHTML=`
+    <div style="margin:10px 0 4px;font-size:12px;">
+      取込対象 ${out.length} 件中、スタッフに紐づく <b>${matched.length}</b> 件
+      ${unmatched?`<span class="warn-line">／ 担当者が一致しない ${unmatched} 件（スキップ）</span>`:""}
+    </div>
+    <div class="scroll-x"><table class="prev-table">
+      <thead><tr><th>担当者</th><th>→スタッフ</th><th>案件名</th><th>日付</th><th>ステータス</th><th>金額(千円)</th></tr></thead>
+      <tbody>${sample.map(d=>{
+        const sname=d.staffId?(db.staff.find(s=>s.id===d.staffId)||{}).name:`<span class="warn-line">未一致</span>`;
+        return `<tr><td>${esc(d.staffName)}</td><td>${sname}</td><td>${esc(d.name)}</td><td>${esc(d.date)}</td><td>${esc(d.status)}</td><td style="text-align:right">${fmt(d.amount)}</td></tr>`;
+      }).join("")}</tbody>
+    </table></div>
+    ${out.length>6?`<div class="hint">…ほか ${out.length-6} 件</div>`:""}`;
+}
+function commitCsv(){
+  const replace=$("#mReplace").checked;
+  const {out}=buildDeals();
+  const keep=out.filter(d=>d.staffId);
+  if(replace) db.deals=keep; else db.deals=db.deals.concat(keep);
+  save();
+  $("#modalRoot").innerHTML=""; csvState=null;
+  render();
+  alert(`案件を ${keep.length} 件取り込みました。`);
+}
+
+/* ---------- helper ---------- */
+function card(title,tag){
+  const c=document.createElement("section"); c.className="card";
+  c.innerHTML=`<h2><span class="tag">${tag}</span>${title}</h2>`;
+  return c;
+}
+function rateColor(r){ if(r>=100)return"var(--ok)"; if(r>=70)return"var(--warn)"; return"var(--bad)"; }
+function fmt(n){ return (Number(n)||0).toLocaleString("ja-JP"); }
+function esc(s){ return (s??"").toString().replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="weekly-goal-backup.json"; a.click();
+}
+function importData(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ const d=JSON.parse(r.result); if(d.staff){db=d;if(!db.deals)db.deals=[];if(!db.pipeline)db.pipeline=[];if(!db.recurring)db.recurring=[];if(!db.channels)db.channels=["既存","WEB","紹介","交流会","レディクル","代理店","展示会","アイミツ","その他"];if(!db.members)db.members=db.staff.map(s=>s.name);save();cur.staff=db.staff[0].id;render();alert("読み込みました");} }catch(err){alert("読み込めませんでした");} };
+  r.readAsText(f);
+}
+
+init();
+</script>
+</body>
+</html>
