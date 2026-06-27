@@ -530,6 +530,8 @@ function render(){
       app.appendChild(targetCard(m));
     }else if(cur.detailTab==="analysis"){
       app.appendChild(salesAnalysisCard());
+    }else if(cur.detailTab==="newana"){
+      app.appendChild(newAnalysisCard());
     }else if(cur.detailTab==="deals"){
       app.appendChild(dealsTab());
     }else if(cur.detailTab==="weekly"){
@@ -562,7 +564,7 @@ function bizSwitch(){
 }
 function detailSubtabs(){
   const tabs = cur.biz==="sales"
-    ? [["input","ダッシュボード"],["weekly","週次"],["deals","案件"],["analysis","年間"],["target","目標"]]
+    ? [["input","ダッシュボード"],["weekly","週次"],["deals","案件"],["analysis","年間"],["newana","新規分析"],["target","目標"]]
     : [["input","入力"],["deals","案件"],["analysis","年間"]];
   const d=document.createElement("div"); d.className="subtabs";
   d.innerHTML=tabs.map(([t,l])=>`<button data-t="${t}" class="${cur.detailTab===t?"active":""}">${l}</button>`).join("");
@@ -1183,6 +1185,79 @@ function salesAnalysisCard(){
     + block("案件化", data.案件化)
     + block("アポ", data.アポ)
     + `<div class="hint" style="margin-top:10px;">新規/既存に分けて表示。粗利は達成率・GAPを累計、案件化・アポは単月。達成（100%以上）＝緑、未達＝グレー。粗利の既存実績は継続込み。</div>`;
+  c.appendChild(wrap);
+  return c;
+}
+
+// 新規分析タブ：着地予想・受注率（提案→契約）・ルート別実績（新規案件ベース）
+function newAnalysisCard(){
+  const fy=fyOfMonth(cur.month);
+  const c=card(`新規分析（${fy}年10月〜${fy+1}年9月期・新規案件ベース）`,"新規分析");
+  const months=fyMonths(fy);
+  const deals=db.pipeline.filter(p=>p.staffId===cur.staff && dealKind(p)==="案件" && p.attribute==="新規");
+  const isWon=p=>p.yomi==="受注"||p.yomi==="成功";
+
+  // 着地予想（新規粗利・通期）＝受注確定＋A(100%)＋B(80%)
+  let confirmed=0; months.forEach(ym=>{ confirmed+=salesDealActual(cur.staff,ym)["粗利（新規）"]||0; });
+  let aSum=0,bSum=0;
+  deals.forEach(p=>{ if(p.yomi==="A") aSum+=dealGross(p); else if(p.yomi==="B") bSum+=dealGross(p); });
+  const bWt=Math.round(bSum*0.8);
+  const landing=confirmed+aSum+bWt;
+  let target=0; months.forEach(ym=>{ const mm=readSalesMonth(cur.staff,ym),kpi=mm&&mm.kpi?mm.kpi:[]; const k=kpi.find(x=>x.name==="粗利（新規）"); target+=k?Number(k.target)||0:0; });
+  const rate=rateOf(landing,target);
+  const achieved=target>0 && landing>=target;
+  const tcol=rateColor(rate);                 // 文字は今の色（達成度カラー）
+  const scale=Math.max(target,landing,1), w=v=>v/scale*100;
+  const cols= achieved ? {c:"#c8513e",a:"#2e9e5b",b:"#3b7ddd"} : {c:"#9aa1ab",a:"#b0b6bf",b:"#c7ccd3"};  // 未達はグレー
+  const seg=(amt,col,lab)=>amt>0?`<div style="width:${w(amt)}%;background:${col};" title="${lab} ${fmt(amt)}千円"></div>`:"";
+  const targetPos=Math.min(100,target/scale*100);
+  const legend=(col,lab,amt)=>`<span style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;background:${col};border-radius:2px;vertical-align:middle;margin-right:4px;"></span>${lab} <b>${fmt(amt)}</b></span>`;
+
+  // ルート別
+  const routes=[...new Set(deals.map(p=>p.route||"未設定"))];
+  const routeRows=routes.map(rt=>{
+    const ds=deals.filter(p=>(p.route||"未設定")===rt);
+    const prop=ds.length, won=ds.filter(isWon).length;
+    const gross=ds.filter(isWon).reduce((s,p)=>s+dealGross(p),0);
+    const wr=prop>0?Math.round(won/prop*100):0;
+    return `<tr><td class="l">${esc(rt)}</td><td>${prop}</td><td>${won}</td><td><span class="ratebadge" style="background:${won>0?'var(--ok)':'#b0b6bf'};">${wr}%</span></td><td>${fmt(gross)}</td></tr>`;
+  }).join("");
+  const totProp=deals.length, totWon=deals.filter(isWon).length;
+  const totWr=totProp>0?Math.round(totWon/totProp*100):0;
+  const totGross=deals.filter(isWon).reduce((s,p)=>s+dealGross(p),0);
+
+  const wrap=document.createElement("div");
+  wrap.innerHTML=`
+    <div style="font-weight:700;color:var(--navy);margin-bottom:6px;">新規粗利の着地予想（通期）</div>
+    <div class="hint" style="margin-bottom:8px;">着地予想 ＝ 受注確定 ＋ A案件（100%）＋ B案件（80%）。C・D案件は含めません。</div>
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-size:30px;font-weight:800;color:${tcol};font-variant-numeric:tabular-nums;">${fmt(landing)}<span style="font-size:14px;font-weight:600;color:var(--muted);"> / 通期目標 ${fmt(target)} 千円</span></div>
+      <span class="ratebadge" style="background:${tcol};font-size:14px;padding:3px 11px;">着地予想 ${rate}%</span>
+    </div>
+    <div style="position:relative;height:28px;background:#eef1f5;border-radius:8px;overflow:hidden;display:flex;margin-bottom:8px;">
+      ${seg(confirmed,cols.c,"受注確定")}${seg(aSum,cols.a,"A案件")}${seg(bWt,cols.b,"B案件×80%")}
+      <div style="position:absolute;left:${targetPos}%;top:0;bottom:0;border-left:2px dashed var(--navy);" title="目標 ${fmt(target)}"></div>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink);margin-bottom:4px;">
+      ${legend(cols.c,"受注確定",confirmed)} ${legend(cols.a,"＋A",aSum)} ${legend(cols.b,"＋B×80%",bWt)}
+      <span style="color:var(--muted);">｜破線＝目標 ${fmt(target)}${achieved?"":"／未達はグレー表示"}</span>
+    </div>
+
+    <div style="font-weight:700;color:var(--navy);margin:18px 0 6px;border-top:1px solid var(--line);padding-top:14px;">受注率（提案→契約）</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:6px;">
+      <span style="font-size:13px;color:var(--muted);">提案 <b style="color:var(--ink);font-size:18px;">${totProp}</b> 件</span>
+      <span style="color:var(--muted);">→</span>
+      <span style="font-size:13px;color:var(--muted);">受注 <b style="color:var(--ink);font-size:18px;">${totWon}</b> 件</span>
+      <span class="ratebadge" style="background:${totWon>0?'var(--ok)':'#b0b6bf'};font-size:14px;">受注率 ${totWr}%</span>
+    </div>
+
+    <div style="font-weight:700;color:var(--navy);margin:18px 0 6px;border-top:1px solid var(--line);padding-top:14px;">ルート別の実績</div>
+    <div class="scroll-x"><table class="sum-table" style="min-width:560px;">
+      <tr><th class="l">ルート</th><th>提案</th><th>受注</th><th>受注率</th><th>受注粗利(千円)</th></tr>
+      ${routeRows||`<tr><td class="l" colspan="5"><span class="hint">新規案件がありません</span></td></tr>`}
+      <tr style="border-top:2px solid var(--line);font-weight:700;"><td class="l">合計</td><td>${totProp}</td><td>${totWon}</td><td>${totWr}%</td><td>${fmt(totGross)}</td></tr>
+    </table></div>
+    <div class="hint" style="margin-top:10px;">新規案件（属性＝新規）のみ集計。提案＝案件化した新規案件、受注＝ヨミが受注/成功。</div>`;
   c.appendChild(wrap);
   return c;
 }
