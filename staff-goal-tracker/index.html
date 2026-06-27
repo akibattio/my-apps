@@ -1595,7 +1595,7 @@ const ATTR_OPTS = ["","新規","既存"];
 const YOMI_OPTS = ["A","B","C","D","受注","ボツ","パス","成功"];   // ヨミ列の選択肢（確度＋結果）
 const PROPOSAL_STATUS = ["","提案1","提案2","提案3","返答待"];     // 商談ステータス（旧「区分」を置換）
 const optionsHtml=(opts,sel)=>opts.map(o=>`<option ${String(sel)===String(o)?"selected":""}>${o}</option>`).join("");
-function bantText(p){ const b=[]; if(p.bantB)b.push("B"); if(p.bantA)b.push("A"); if(p.bantN)b.push("N"); if(p.bantT)b.push("T"); if(p.subsidy)b.push("助"); return b.join(" "); }
+function bantText(p){ const b=[]; if(p.bantB)b.push("B"); if(p.bantA)b.push("A"); if(p.bantN)b.push("N"); if(p.bantT)b.push("T"); if(p.subsidy)b.push("助"); return b.join(""); }
 function openDealModal(p){
   const isNew=!p;
   const d = p ? Object.assign({},p) : {yomi:""};
