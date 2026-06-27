@@ -1155,27 +1155,27 @@ function salesAnalysisCard(){
 
   const header=`<tr><th class="l">　</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th></tr>`;
   const valRow=(label,vals)=>`<tr><td class="l">${label}</td>${vals.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td style="font-weight:700;">${fmt(sumA(vals))}</td></tr>`;
-  // 達成=緑・未達=グレー（文字は白のまま）
+  // 達成=緑・未達=グレー
   const badge=r=>`<span class="ratebadge" style="background:${r>=100?'var(--ok)':'#b0b6bf'};">${r}%</span>`;
-  const gapCell=v=>`<td style="color:${v<0?'var(--bad)':(v>0?'var(--ok)':'var(--muted)')};font-weight:600;">${v>0?"+":""}${fmt(v)}</td>`;
-  const cum=arr=>{let s=0;return arr.map(v=>s+=v);};
-  const block=(title,d)=>{
+  // 単月の達成率行（目標0の月は–）
+  const rateRow=(label,T,A)=>`<tr><td class="l">${label}</td>${T.map((t,i)=>`<td>${t>0?badge(rateOf(A[i],t)):"–"}</td>`).join("")}<td>${sumA(T)>0?badge(rateOf(sumA(A),sumA(T))):"–"}</td></tr>`;
+  // 合計版（新規・既存をまとめる）：目標・実績・単月達成率
+  const totalBlock=(title,d)=>{
     const totT=d.nT.map((v,i)=>v+d.eT[i]), totA=d.nA.map((v,i)=>v+d.eA[i]);
-    let rateRow, gapRow;
-    if(d.cum){
-      const cT=cum(totT), cA=cum(totA);
-      rateRow=`<tr><td class="l">達成率（累計）</td>${cT.map((t,i)=>`<td>${t>0?badge(rateOf(cA[i],t)):"–"}</td>`).join("")}<td>${sumA(totT)>0?badge(rateOf(sumA(totA),sumA(totT))):"–"}</td></tr>`;
-      gapRow=`<tr><td class="l">GAP（累計）</td>${cT.map((t,i)=>gapCell(cA[i]-t)).join("")}${gapCell(sumA(totA)-sumA(totT))}</tr>`;
-    }else{
-      rateRow=`<tr><td class="l">達成率（単月）</td>${totT.map((t,i)=>`<td>${t>0?badge(rateOf(totA[i],t)):"–"}</td>`).join("")}<td>${sumA(totT)>0?badge(rateOf(sumA(totA),sumA(totT))):"–"}</td></tr>`;
-      gapRow=`<tr><td class="l">GAP（単月）</td>${totT.map((t,i)=>gapCell(totA[i]-t)).join("")}${gapCell(sumA(totA)-sumA(totT))}</tr>`;
-    }
-    return `<div style="font-weight:700;color:var(--navy);margin:16px 0 6px;">${title}（${d.unit}）</div>
+    return `<div style="font-weight:700;color:var(--navy);margin:14px 0 6px;">${title}（${d.unit}）</div>
       <div class="scroll-x"><table class="sum-table" style="min-width:960px;">
         ${header}
-        ${valRow("新規 目標",d.nT)}${valRow("新規 実績",d.nA)}
-        ${valRow("既存 目標",d.eT)}${valRow("既存 実績",d.eA)}
-        ${rateRow}${gapRow}
+        ${valRow("目標",totT)}${valRow("実績",totA)}
+        ${rateRow("達成率（単月）",totT,totA)}
+      </table></div>`;
+  };
+  // 分割版（新規・既存）：それぞれ目標・実績・単月達成率
+  const splitBlock=(title,d)=>{
+    return `<div style="font-weight:700;color:var(--navy);margin:14px 0 6px;">${title}（${d.unit}）</div>
+      <div class="scroll-x"><table class="sum-table" style="min-width:960px;">
+        ${header}
+        ${valRow("新規 目標",d.nT)}${valRow("新規 実績",d.nA)}${rateRow("新規 達成率（単月）",d.nT,d.nA)}
+        ${valRow("既存 目標",d.eT)}${valRow("既存 実績",d.eA)}${rateRow("既存 達成率（単月）",d.eT,d.eA)}
       </table></div>`;
   };
 
@@ -1184,6 +1184,9 @@ function salesAnalysisCard(){
   const grossTotA = data.粗利.nA.map((v,i)=>v+data.粗利.eA[i]);   // 通期 粗利実績（継続込み）
   const annTarget = sumA(grossTotT);
   const annActual = sumA(grossTotA);                              // 確定（受注＋継続の累計）
+  // バー用：受注と継続を分ける（ダッシュボード配色に合わせる）
+  let annRec=0; months.forEach(ym=>{ annRec+=recurringMonthlyTotal(cur.staff,ym); });
+  const annWon = Math.max(0, annActual - annRec);
   const caseDeals = db.pipeline.filter(p=>p.staffId===cur.staff && dealKind(p)==="案件");
   let aPipe=0,bPipe=0; caseDeals.forEach(p=>{ if(p.yomi==="A") aPipe+=dealGross(p); else if(p.yomi==="B") bPipe+=dealGross(p); });
   const bPipeW = Math.round(bPipe*0.8);
@@ -1192,16 +1195,18 @@ function salesAnalysisCard(){
   const rateLanding = rateOf(annLanding, annTarget);
   const gapActual = annActual - annTarget;
   const gapLanding = annLanding - annTarget;
-  const landingOK = annTarget>0 && annLanding>=annTarget;
   const colActual = rateColor(rateActual), colLanding = rateColor(rateLanding);
+  // 上半期(10-3月)・下半期(4-9月)の実績達成率
+  const h1T=sumA(grossTotT.slice(0,6)), h1A=sumA(grossTotA.slice(0,6)), h1R=rateOf(h1A,h1T);
+  const h2T=sumA(grossTotT.slice(6)),   h2A=sumA(grossTotA.slice(6)),   h2R=rateOf(h2A,h2T);
   const scale = Math.max(annTarget, annLanding, 1), bw=v=>v/scale*100;
-  const segCol = landingOK ? {c:"#2e9e5b",a:"#3b7ddd",b:"#7aa9ea"} : {c:"#9aa1ab",a:"#b0b6bf",b:"#c7ccd3"};  // 未達はグレー
   const seg=(amt,col,lab)=>amt>0?`<div style="width:${bw(amt)}%;background:${col};" title="${lab} ${fmt(amt)}千円"></div>`:"";
   const tpos=Math.min(100, annTarget/scale*100);
   const lg=(col,lab,amt)=>`<span style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;background:${col};border-radius:2px;vertical-align:middle;margin-right:4px;"></span>${lab} <b>${fmt(amt)}</b></span>`;
+  const halfTag=(lab,a,t,r)=>`<span style="white-space:nowrap;">${lab} <b style="color:var(--ink);">${fmt(a)}</b>/${fmt(t)} <span class="ratebadge" style="background:${rateColor(r)};font-size:11px;">${r}%</span></span>`;
   const summaryTop=`
     <div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:6px;background:#fafbfc;">
-      <div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="display:flex;gap:28px;flex-wrap:wrap;margin-bottom:10px;">
         <div>
           <div class="hint">通期目標（粗利・新規＋既存）</div>
           <div style="font-size:24px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;">${fmt(annTarget)}<small style="font-size:12px;color:var(--muted);"> 千円</small></div>
@@ -1217,23 +1222,32 @@ function salesAnalysisCard(){
           <div class="hint" style="color:${gapLanding<0?'var(--bad)':'var(--ok)'};">着地GAP ${gapLanding>0?"+":""}${fmt(gapLanding)}</div>
         </div>
       </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:10px;">
+        ${halfTag("上半期（10-3月）",h1A,h1T,h1R)} ${halfTag("下半期（4-9月）",h2A,h2T,h2R)}
+      </div>
       <div style="position:relative;height:26px;background:#eef1f5;border-radius:8px;overflow:hidden;display:flex;margin-bottom:6px;">
-        ${seg(annActual,segCol.c,"実績（確定）")}${seg(aPipe,segCol.a,"A見込み")}${seg(bPipeW,segCol.b,"B見込み×80%")}
+        ${seg(annWon,YOMI_COLOR.won,"受注")}${seg(annRec,YOMI_COLOR.rec,"継続")}${seg(aPipe,YOMI_COLOR.A,"A見込み")}${seg(bPipeW,YOMI_COLOR.B,"B見込み×80%")}
         <div style="position:absolute;left:${tpos}%;top:0;bottom:0;border-left:2px dashed var(--navy);" title="通期目標 ${fmt(annTarget)}"></div>
       </div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink);">
-        ${lg(segCol.c,"実績（確定・継続込み）",annActual)} ${lg(segCol.a,"＋A",aPipe)} ${lg(segCol.b,"＋B×80%",bPipeW)}
-        <span style="color:var(--muted);">｜破線＝通期目標 ${fmt(annTarget)}${landingOK?"":"／着地が目標未満のときバーはグレー"}</span>
+        ${lg(YOMI_COLOR.won,"受注",annWon)} ${lg(YOMI_COLOR.rec,"継続",annRec)} ${lg(YOMI_COLOR.A,"＋A",aPipe)} ${lg(YOMI_COLOR.B,"＋B×80%",bPipeW)}
+        <span style="color:var(--muted);">｜破線＝通期目標 ${fmt(annTarget)}</span>
       </div>
     </div>`;
 
+  const groupTitle=t=>`<div style="font-weight:800;color:var(--navy);font-size:14px;margin:18px 0 2px;border-top:2px solid var(--line);padding-top:14px;">${t}</div>`;
   const wrap=document.createElement("div");
   wrap.innerHTML =
     summaryTop
-    + block("粗利管理（実績は継続込み）", data.粗利)
-    + block("案件化", data.案件化)
-    + block("アポ", data.アポ)
-    + `<div class="hint" style="margin-top:10px;">新規/既存に分けて表示。粗利は達成率・GAPを累計、案件化・アポは単月。達成（100%以上）＝緑、未達＝グレー。粗利の既存実績は継続込み。</div>`;
+    + groupTitle("全体（新規・既存をまとめた数字）")
+    + totalBlock("粗利管理（実績は継続込み）", data.粗利)
+    + totalBlock("案件化", data.案件化)
+    + totalBlock("アポ", data.アポ)
+    + groupTitle("新規・既存の内訳")
+    + splitBlock("粗利管理（実績は継続込み）", data.粗利)
+    + splitBlock("案件化", data.案件化)
+    + splitBlock("アポ", data.アポ)
+    + `<div class="hint" style="margin-top:10px;">達成率はすべて単月（その月の実績÷目標）。達成（100%以上）＝緑、未達＝グレー。粗利の実績は継続込み。バー色はダッシュボードと共通（受注＝赤・継続＝紫・A＝緑・B＝青）。</div>`;
   c.appendChild(wrap);
   return c;
 }
