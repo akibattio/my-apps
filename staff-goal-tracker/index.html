@@ -133,6 +133,21 @@
   .kpi-month td.val{font-variant-numeric:tabular-nums;}
   .kpi-month td.actual{font-weight:700;color:var(--navy);}
 
+  /* 月次KPIカード */
+  .kpi-cards{display:flex;gap:14px;flex-wrap:wrap;}
+  .kpi-card{flex:1;min-width:260px;border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:#fff;}
+  .kpi-card .ttl{font-weight:700;color:var(--navy);font-size:15px;margin-bottom:8px;}
+  .kpi-card .ttl small{color:var(--muted);font-weight:400;font-size:11px;}
+  .kpi-card .big{font-size:26px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .kpi-card .big small{font-size:13px;font-weight:600;color:var(--muted);}
+  .kpi-card .pbar{height:8px;background:#eef1f5;border-radius:5px;overflow:hidden;margin:10px 0;}
+  .kpi-card .pbar span{display:block;height:100%;}
+  .kpi-card .bd{display:flex;gap:8px;}
+  .kpi-card .bd>div{flex:1;background:#fafbfc;border-radius:7px;padding:7px 9px;font-size:12px;}
+  .kpi-card .bd .lab{color:var(--muted);font-weight:600;margin-bottom:2px;}
+  .kpi-card .bd .nums{font-variant-numeric:tabular-nums;}
+  .kpi-card .bd .nums b{color:var(--navy);}
+
   /* 案件一覧 */
   .deal-table{width:100%;border-collapse:collapse;font-size:13px;}
   .deal-table th,.deal-table td{padding:7px 9px;border-bottom:1px solid var(--line);}
@@ -1005,30 +1020,27 @@ function salesGoalCard(m){
     {label:"案件化", unit:"件", nNew:"案件化（新規）", nExist:"案件化（既存）"},
     {label:"アポ", unit:"件", nNew:"アポ（新規）", nExist:"アポ（既存）"},
   ];
-  const body=document.createElement("div"); body.className="scroll-x";
-  let rows="";
+  const body=document.createElement("div");
+  let cards="";
   CATS.forEach(cat=>{
     const tN=kpiTarget(cat.nNew), tE=kpiTarget(cat.nExist), tS=tN+tE;
     const aN=A[cat.nNew]||0, aE=A[cat.nExist]||0;
     const cont=cat.cont?recNow():0;
     const aS=aN+aE+cont;
     const rate=rateOf(aS,tS);
-    rows+=`<tr>
-      <td class="l nm">${cat.label}<small>（${cat.unit}）</small></td>
-      <td class="val">${fmt(tN)}</td><td class="val actual">${fmt(aN)}</td>
-      <td class="val sep">${fmt(tE)}</td><td class="val actual">${fmt(aE)}${cont>0?` <small style="color:var(--muted);font-weight:400;">+継続${fmt(cont)}</small>`:""}</td>
-      <td class="val sep g-sum">${fmt(tS)}</td><td class="val actual g-sum">${fmt(aS)}</td>
-      <td class="sep">${tS>0?ratebadge(rate):"–"}</td></tr>`;
+    const col=rateColor(rate);
+    cards+=`<div class="kpi-card">
+      <div class="ttl">${cat.label}<small>（${cat.unit}）</small></div>
+      <div class="big">${fmt(aS)}<small>/ 目標 ${fmt(tS)}</small> <span class="ratebadge" style="background:${tS>0?col:'var(--muted)'};">${tS>0?rate+"%":"–"}</span></div>
+      <div class="pbar"><span style="width:${tS>0?Math.min(100,rate):0}%;background:${col};"></span></div>
+      <div class="bd">
+        <div><div class="lab">新規</div><div class="nums">実績 <b>${fmt(aN)}</b> / 目標 ${fmt(tN)}</div></div>
+        <div><div class="lab">既存</div><div class="nums">実績 <b>${fmt(aE)}</b>${cont>0?` <small style="color:var(--muted);">+継続${fmt(cont)}</small>`:""} / 目標 ${fmt(tE)}</div></div>
+      </div>
+    </div>`;
   });
-  body.innerHTML=`
-    <table class="kpi-month" style="min-width:760px;">
-      <thead>
-        <tr><th class="l" rowspan="2">指標</th><th colspan="2">新規</th><th colspan="2" class="sep">既存</th><th colspan="2" class="sep g-sumh">合計</th><th rowspan="2" class="sep">達成率</th></tr>
-        <tr><th>目標</th><th>実績</th><th class="sep">目標</th><th>実績</th><th class="sep g-sumh">目標</th><th class="g-sumh">実績</th></tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="hint" style="margin-top:8px;">目標は「目標」タブ、実績は「案件（ヨミ）」の登録内容から自動集計（粗利＝受注日／案件化＝提案日／アポ＝活動履歴の日付）。粗利の合計実績は継続込み。</div>`;
+  body.innerHTML=`<div class="kpi-cards">${cards}</div>
+    <div class="hint" style="margin-top:10px;">目標は「目標」タブ、実績は「案件（ヨミ）」の登録内容から自動集計（粗利＝受注日／案件化＝提案日／アポ＝活動履歴の日付）。粗利の合計実績は継続込み。</div>`;
   c.appendChild(body);
   const residual=document.createElement("div"); residual.id="salesResidual"; residual.style.marginTop="14px";
   c.appendChild(residual);
