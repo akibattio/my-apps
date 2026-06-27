@@ -483,6 +483,7 @@ function render(){
     }else if(cur.detailTab==="weekly"){
       app.appendChild(weeksCard(m));
     }else{
+      app.appendChild(monthDashboardCard(m));
       app.appendChild(salesGoalCard(m));
       app.appendChild(pipelineSummaryCard());
       app.appendChild(salesReviewCard(m));
@@ -1218,6 +1219,52 @@ function dealGross(p){
 }
 function dealContent(p){ return p.content!=null ? p.content : (p.name||""); }
 function dealKind(p){ return p.dealType || (p.yomi ? "案件" : "アポ"); }   // アポ / 案件
+// 今月の着地見込み（月次ダッシュボードのメイン）
+function monthLanding(staffId, ym, m){
+  const A = salesDealActual(staffId, ym);
+  const rec = recurringMonthlyTotal(staffId, ym);
+  const confirmed = (A["粗利（新規）"]||0)+(A["粗利（既存）"]||0)+rec;   // 確定（今月受注＋継続）
+  let weighted=0;                                                       // 未受注の見込み（ヨミ加重）
+  db.pipeline.filter(p=>p.staffId===staffId && dealKind(p)==="案件").forEach(p=>{
+    if(YOMI_COEF[p.yomi]) weighted += dealGross(p)*YOMI_COEF[p.yomi];
+  });
+  weighted=Math.round(weighted);
+  const target = kpiSum(m.kpi, GROSS_NAMES, "target");
+  return {target, confirmed, rec, weighted, landing:confirmed+weighted};
+}
+function monthDashboardCard(m){
+  const c = card("今月の着地見込み（粗利）","今月");
+  const L = monthLanding(cur.staff, cur.month, m);
+  const rate = rateOf(L.landing, L.target);
+  const color = rateColor(rate);
+  const pct = x=> L.target>0 ? Math.min(100, x/L.target*100) : 0;
+  const confPct = pct(L.confirmed), landPct = pct(L.landing);
+  const mikoPct = Math.max(0, landPct - confPct);
+  // 一言コメント
+  let msg;
+  if(L.target<=0) msg="目標が未設定です。「目標」タブで今月の粗利目標を入れてください。";
+  else if(L.confirmed>=L.target) msg="すでに受注で目標達成。さらに上積みしていきましょう。";
+  else if(L.landing>=L.target) msg="この見込みなら目標到達。見込みを受注に変えていきましょう。";
+  else msg=`着地見込みは目標の ${rate}%。目標まで あと ${fmt(L.target-L.landing)} 千円ぶんの見込みが必要です。`;
+  const wrap=document.createElement("div");
+  wrap.innerHTML=`
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-size:34px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;">${fmt(L.landing)}<span style="font-size:15px;font-weight:600;color:var(--muted);"> / 目標 ${fmt(L.target)} 千円</span></div>
+      <span class="ratebadge" style="background:${color};font-size:15px;padding:3px 12px;">着地見込み ${rate}%</span>
+    </div>
+    <div style="height:26px;background:#eef1f5;border-radius:13px;overflow:hidden;display:flex;margin-bottom:8px;">
+      <div style="width:${confPct}%;background:var(--ok);" title="確定"></div>
+      <div style="width:${mikoPct}%;background:#9fdbe2;" title="見込み"></div>
+    </div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-bottom:10px;">
+      <span><span style="display:inline-block;width:11px;height:11px;background:var(--ok);border-radius:2px;vertical-align:middle;margin-right:5px;"></span>確定（今月受注＋継続） <b>${fmt(L.confirmed)}</b> 千円</span>
+      <span><span style="display:inline-block;width:11px;height:11px;background:#9fdbe2;border-radius:2px;vertical-align:middle;margin-right:5px;"></span>見込み（案件ヨミ加重） <b>${fmt(L.weighted)}</b> 千円</span>
+      <span style="color:var(--muted);">＝ 着地見込み <b>${fmt(L.landing)}</b> 千円</span>
+    </div>
+    <div style="border-left:4px solid ${color};background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:14px;font-weight:600;">${msg}</div>`;
+  c.appendChild(wrap);
+  return c;
+}
 // 案件タブ：商談（ヨミ）と継続契約を1つにまとめ、中で切替
 function dealsTab(){
   const wrap=document.createElement("div");
