@@ -1225,11 +1225,10 @@ function pipelineCard(){
   sum.id = "pipeSum"; sum.className = "month-summary"; sum.style.marginBottom="14px";
   c.appendChild(sum);
   const body = document.createElement("div"); body.className="scroll-x";
-  body.innerHTML = `<table class="deal-table" style="min-width:1000px;">
+  body.innerHTML = `<table class="deal-table" style="min-width:1400px;white-space:nowrap;">
     <thead><tr>
-      <th style="width:9%">区分</th><th style="width:17%">クライアント</th><th style="width:24%">内容</th>
-      <th style="width:11%;text-align:right">粗利合計</th><th style="width:11%;text-align:right">個人粗利</th>
-      <th style="width:9%">ヨミ</th><th style="width:11%">次回A日</th><th></th></tr></thead>
+      <th>ステータス</th><th>クライアント</th><th>担当</th><th>内容</th><th>属性</th>
+      <th style="text-align:right">粗利</th><th>ヨミ</th><th>受注日</th><th>BANT助</th><th>次回アポ</th><th>活動履歴</th><th></th></tr></thead>
     <tbody id="pipeBody"></tbody>
   </table>`;
   c.appendChild(body);
@@ -1272,20 +1271,25 @@ function pipelineCard(){
   const draw = ()=>{
     const list = visible();
     tb.innerHTML="";
-    if(!list.length){ tb.innerHTML=`<tr><td colspan="8" class="hint">案件がありません。「＋ アポ記録」または「＋ 案件を追加」から登録してください。</td></tr>`; }
+    if(!list.length){ tb.innerHTML=`<tr><td colspan="12" class="hint">案件がありません。「＋ アポ記録」または「＋ 案件を追加」から登録してください。</td></tr>`; }
     list.forEach(p=>{
-      const isMikomi=(p.kind||"見込み")==="見込み";
+      const acts=(p.activities||[]).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+      const lastAct=acts[0];
       const tr=document.createElement("tr"); tr.style.cursor="pointer";
       tr.innerHTML=`
-        <td>${esc(p.kind||"見込み")}</td>
+        <td>${p.propStatus?`<span class="status-chip deliver">${esc(p.propStatus)}</span>`:'<span class="hint">–</span>'}</td>
         <td class="nm">${esc(p.client)||'<span class="hint">（未入力）</span>'}</td>
+        <td>${esc(p.owner||"")}</td>
         <td>${esc(dealContent(p))}</td>
-        <td class="num">${(p.grossTotal!==""&&p.grossTotal!=null)?fmt(p.grossTotal):((p.gross!==""&&p.gross!=null)?fmt(p.gross):"–")}</td>
-        <td class="num">${(p.personalGross!==""&&p.personalGross!=null)?fmt(p.personalGross):"–"}</td>
+        <td>${esc(p.attribute||"")}</td>
+        <td class="num">${fmt(dealGross(p))}</td>
         <td>${dealKind(p)==="案件"
             ? `<span class="status-chip ${yomiClass(p.yomi)}">${esc(p.yomi||"案件")}</span>`
             : `<span class="status-chip">アポ${p.apoCount?"×"+p.apoCount:""}</span>`}</td>
+        <td>${esc(p.orderDate||"")}</td>
+        <td>${esc(bantText(p))||'<span class="hint">–</span>'}</td>
         <td>${esc(p.nextActionDate||"")}</td>
+        <td>${acts.length?`${acts.length}件${lastAct&&lastAct.date?`（最新${esc(lastAct.date)}）`:""}`:'<span class="hint">–</span>'}</td>
         <td class="num"><button class="btn-mini">編集</button></td>`;
       tr.querySelector("button").onclick=(e)=>{ e.stopPropagation(); openDealModal(p); };
       tr.onclick=()=>openDealModal(p);
@@ -1301,7 +1305,9 @@ const DEPT_OPTS = ["","CR","DM","HR","WA"];
 const ROUTE_OPTS = ["","WEB","紹介","交流会","代理店","レディクル","ScoreX","アイミツ","展示会","その他"];
 const ATTR_OPTS = ["","新規","既存"];
 const YOMI_OPTS = ["A","B","C","D","受注","ボツ","パス","成功"];   // ヨミ列の選択肢（確度＋結果）
+const PROPOSAL_STATUS = ["","提案1","提案2","提案3","返答待"];     // 商談ステータス（旧「区分」を置換）
 const optionsHtml=(opts,sel)=>opts.map(o=>`<option ${String(sel)===String(o)?"selected":""}>${o}</option>`).join("");
+function bantText(p){ const b=[]; if(p.bantB)b.push("B"); if(p.bantA)b.push("A"); if(p.bantN)b.push("N"); if(p.bantT)b.push("T"); if(p.subsidy)b.push("助"); return b.join("・"); }
 function openDealModal(p){
   const isNew=!p;
   const d = p ? Object.assign({},p) : {kind:(cur.pipeKind==="all"?"見込み":cur.pipeKind),yomi:""};
@@ -1319,7 +1325,7 @@ function openDealModal(p){
     ${sec("基本情報")}
     <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
       <div class="field"><label>種別</label><select id="fType"><option ${dealType==="アポ"?"selected":""}>アポ</option><option ${dealType==="案件"?"selected":""}>案件</option></select></div>
-      <div class="field"><label>アポ回数</label><input id="fApoCount" type="number" min="0" value="${esc(g("apoCount"))}" placeholder="0"></div>
+      <div class="field"><label>アポ回数（自動）</label><input id="fApoCount" type="number" value="${Number(g("apoCount"))||0}" readonly style="background:#f4f6f9;"></div>
       <div class="field"><label>次回アポ日</label><input id="fDate" type="date" value="${esc(g("nextActionDate"))}"></div>
       <div class="field"><label>クライアント名</label><input id="fClient" value="${esc(g("client"))}"></div>
       <div class="field"><label>担当者</label><input id="fOwner" value="${esc(g("owner"))}" placeholder="担当・共同担当"></div>
@@ -1329,7 +1335,7 @@ function openDealModal(p){
       <div class="field"><label>事業部</label><select id="fDept">${optionsHtml(DEPT_OPTS, g("dept"))}</select></div>
       <div class="field"><label>初回接触日</label><input id="fFirst" type="date" value="${esc(g("firstContact"))}"></div>
       <div class="field"><label>パス元（メンバー）</label><select id="fPass">${optionsHtml(passOpts, g("passFrom"))}</select></div>
-      <div class="field"><label>区分</label><select id="fKind">${PIPE_KINDS.map(k=>`<option ${d.kind===k?"selected":""}>${k}</option>`).join("")}</select></div>
+      <div class="field"><label>ステータス</label><select id="fPropStatus">${optionsHtml(PROPOSAL_STATUS, g("propStatus"))}</select></div>
     </div>
     ${sec("BANT・助")}
     <div style="display:flex;gap:14px;align-items:center;font-size:13px;">
@@ -1349,12 +1355,15 @@ function openDealModal(p){
     <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
       <div class="field"><label>売上合計</label><input id="fSalesTotal" type="number" value="${esc(g("salesTotal"))}"></div>
       <div class="field"><label>粗利合計</label><input id="fGrossTotal" type="number" value="${grossTotal}"></div>
-      <div class="field"><label> </label><button type="button" class="btn-ghost btn-mini" id="fAutoSplit" style="margin-top:2px;">サブ1=20%・サブ2=10%で自動分配</button></div>
-      <div class="field"><label>サブ1（20%分配）</label><input id="fSub1" type="number" value="${esc(g("sub1"))}"></div>
-      <div class="field"><label>サブ2（10%分配）</label><input id="fSub2" type="number" value="${esc(g("sub2"))}"></div>
-      <div class="field"><label> </label><span class="hint">残りが個人の売上・粗利になります</span></div>
-      <div class="field"><label>個人売上（自動）</label><input id="fPersSales" type="number" value="${esc(g("personalSales"))}"></div>
-      <div class="field"><label>個人粗利（自動＝粗利合計−サブ）</label><input id="fPersGross" type="number" value="${esc(g("personalGross"))}"></div>
+      <div class="field"><label> </label><span class="hint">サブを選ぶと粗利の20%/10%を分配、残りが個人</span></div>
+      <div class="field"><label>サブ1（20%・人を選択）</label><select id="fSub1Person">${optionsHtml(passOpts, g("sub1Person"))}</select></div>
+      <div class="field"><label>サブ1 金額（自動）</label><input id="fSub1" type="number" value="${esc(g("sub1"))}" readonly style="background:#f4f6f9;"></div>
+      <div class="field"><label> </label></div>
+      <div class="field"><label>サブ2（10%・人を選択）</label><select id="fSub2Person">${optionsHtml(passOpts, g("sub2Person"))}</select></div>
+      <div class="field"><label>サブ2 金額（自動）</label><input id="fSub2" type="number" value="${esc(g("sub2"))}" readonly style="background:#f4f6f9;"></div>
+      <div class="field"><label> </label></div>
+      <div class="field"><label>個人売上（自動）</label><input id="fPersSales" type="number" value="${esc(g("personalSales"))}" readonly style="background:#f4f6f9;"></div>
+      <div class="field"><label>個人粗利（自動）</label><input id="fPersGross" type="number" value="${esc(g("personalGross"))}" readonly style="background:#f4f6f9;"></div>
     </div>
     ${sec("日程")}
     <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
@@ -1378,21 +1387,19 @@ function openDealModal(p){
       <button class="btn-ghost" id="dCancel">キャンセル</button>
       <button class="btn-primary" id="dSave">保存</button>
     </div></div></div>`;
-  // 個人売上・個人粗利の自動計算（合計−サブ。売上は粗利の配分比率で按分）
+  // サブは人を選ぶと粗利の20%/10%を自動分配、残りが個人。売上は配分比率で按分
   const recalc=()=>{
     const sales=Number($("#fSalesTotal").value)||0, gt=Number($("#fGrossTotal").value)||0;
-    const s1=Number($("#fSub1").value)||0, s2=Number($("#fSub2").value)||0;
+    const s1=$("#fSub1Person").value ? Math.round(gt*0.2) : 0;
+    const s2=$("#fSub2Person").value ? Math.round(gt*0.1) : 0;
+    $("#fSub1").value=s1; $("#fSub2").value=s2;
     const persGross=Math.max(0, gt - s1 - s2);
     $("#fPersGross").value = persGross;
     $("#fPersSales").value = gt>0 ? Math.round(sales*persGross/gt) : sales;
   };
-  ["fSalesTotal","fGrossTotal","fSub1","fSub2"].forEach(id=>$("#"+id).addEventListener("input",recalc));
-  $("#fAutoSplit").onclick=()=>{
-    const gt=Number($("#fGrossTotal").value)||0;
-    $("#fSub1").value=Math.round(gt*0.2);
-    $("#fSub2").value=Math.round(gt*0.1);
-    recalc();
-  };
+  ["fSalesTotal","fGrossTotal"].forEach(id=>$("#"+id).addEventListener("input",recalc));
+  ["fSub1Person","fSub2Person"].forEach(id=>$("#"+id).addEventListener("change",recalc));
+  recalc();
   // 属性＝新規のときだけルートを選べる（既存は無効）
   const updateRoute=()=>{
     const isNew=$("#fAttr").value==="新規";
@@ -1437,11 +1444,12 @@ function openDealModal(p){
   $("#dSave").onclick=()=>{
     const num=id=>{ const v=$("#"+id).value; return v===""?"":Number(v); };
     const v={
-      dealType:$("#fType").value, apoCount:num("fApoCount"),
-      kind:$("#fKind").value, firstContact:$("#fFirst").value, client:$("#fClient").value.trim(),
+      dealType:$("#fType").value,   // アポ回数は手動変更不可（アポ記録ボタンからのみ）
+      propStatus:$("#fPropStatus").value, firstContact:$("#fFirst").value, client:$("#fClient").value.trim(),
       attribute:$("#fAttr").value.trim(), dept:$("#fDept").value, route:$("#fRoute").value.trim(),
       passFrom:$("#fPass").value.trim(), owner:$("#fOwner").value.trim(), content:$("#fContent").value.trim(),
-      salesTotal:num("fSalesTotal"), grossTotal:num("fGrossTotal"), sub1:num("fSub1"), sub2:num("fSub2"),
+      salesTotal:num("fSalesTotal"), grossTotal:num("fGrossTotal"),
+      sub1Person:$("#fSub1Person").value, sub2Person:$("#fSub2Person").value, sub1:num("fSub1"), sub2:num("fSub2"),
       personalSales:num("fPersSales"), personalGross:num("fPersGross"),
       yomi:$("#fYomi").value,
       bantB:$("#fB").checked, bantA:$("#fA").checked, bantN:$("#fN").checked, bantT:$("#fT").checked, subsidy:$("#fJo").checked,
