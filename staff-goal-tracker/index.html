@@ -1219,6 +1219,32 @@ function dealGross(p){
 }
 function dealContent(p){ return p.content!=null ? p.content : (p.name||""); }
 function dealKind(p){ return p.dealType || (p.yomi ? "案件" : "アポ"); }   // アポ / 案件
+// 月の経過割合（過去月=1・未来月=0・今月=今日/月末日）
+function monthProgress(ym){
+  const now=new Date(); const today=now.getFullYear()*12+(now.getMonth()+1);
+  const [y,mo]=ym.split("-").map(Number); const cm=y*12+mo;
+  if(cm<today) return 1; if(cm>today) return 0;
+  const last=new Date(y,mo,0).getDate();
+  return Math.min(1, now.getDate()/last);
+}
+// 未受注の見込み（ヨミ加重）— 現在のパイプライン
+function pipelineWeighted(staffId){
+  let w=0;
+  db.pipeline.filter(p=>p.staffId===staffId && dealKind(p)==="案件").forEach(p=>{ if(YOMI_COEF[p.yomi]) w+=dealGross(p)*YOMI_COEF[p.yomi]; });
+  return Math.round(w);
+}
+// 期末の着地（通期目標／累計確定＋見込み）
+function fyLanding(staffId, fy){
+  let target=0, confirmed=0;
+  fyMonths(fy).forEach(ym=>{
+    const mm=readSalesMonth(staffId,ym), kpi=mm&&mm.kpi?mm.kpi:[];
+    target+=kpiSum(kpi, GROSS_NAMES, "target");
+    const Am=salesDealActual(staffId,ym);
+    confirmed+=(Am["粗利（新規）"]||0)+(Am["粗利（既存）"]||0)+recurringMonthlyTotal(staffId,ym);
+  });
+  const weighted=pipelineWeighted(staffId);
+  return {target, confirmed, weighted, landing:confirmed+weighted};
+}
 // 今月の着地見込み（月次ダッシュボードのメイン）
 function monthLanding(staffId, ym, m){
   const A = salesDealActual(staffId, ym);
@@ -1246,6 +1272,29 @@ function monthDashboardCard(m){
   else if(L.confirmed>=L.target) msg="すでに受注で目標達成。さらに上積みしていきましょう。";
   else if(L.landing>=L.target) msg="この見込みなら目標到達。見込みを受注に変えていきましょう。";
   else msg=`着地見込みは目標の ${rate}%。目標まで あと ${fmt(L.target-L.landing)} 千円ぶんの見込みが必要です。`;
+  // 2. 活動（アポ・案件化が目標ペースか）
+  const A = salesDealActual(cur.staff, cur.month);
+  const prog = monthProgress(cur.month);
+  const apoT=kpiSum(m.kpi,APO_NAMES,"target"), apoA=(A["アポ（新規）"]||0)+(A["アポ（既存）"]||0);
+  const caseT=kpiSum(m.kpi,CASE_NAMES,"target"), caseA=(A["案件化（新規）"]||0)+(A["案件化（既存）"]||0);
+  const apoExp=Math.round(apoT*prog), caseExp=Math.round(caseT*prog);
+  const paceTag=(a,exp,t)=> t<=0?'<span class="hint">目標未設定</span>'
+    : (a>=exp?'<span class="ratebadge" style="background:var(--ok)">ペース順調</span>':'<span class="ratebadge" style="background:var(--warn)">遅れ気味</span>');
+  let actMsg;
+  if(apoT<=0&&caseT<=0) actMsg="活動目標（アポ・案件化）が未設定です。「目標」タブで設定すると、ペースが見えます。";
+  else actMsg=`${apoT>0?(apoA>=apoExp?"アポは目標ペース":"アポが遅れ気味"):"アポ目標未設定"}、${caseT>0?(caseA>=caseExp?"案件化も順調":"案件化が遅れ気味"):"案件化目標未設定"}。見込み（ヨミ加重）は ${fmt(L.weighted)} 千円積み上がっています。`;
+  // 3. 期末（期）の達成可能性
+  const F = fyLanding(cur.staff, fyOfMonth(cur.month));
+  const fyRate = rateOf(F.landing, F.target);
+  const fyColor = rateColor(fyRate);
+  const fyPct=x=> F.target>0?Math.min(100,x/F.target*100):0;
+  const fyConfPct=fyPct(F.confirmed), fyMikoPct=Math.max(0,fyPct(F.landing)-fyConfPct);
+  let fyMsg;
+  if(F.target<=0) fyMsg="通期目標が未設定です。";
+  else if(F.landing>=F.target) fyMsg="この見込みなら期末も目標到達ペースです。";
+  else fyMsg=`期末の着地見込みは通期目標の ${fyRate}%。残り月で あと ${fmt(F.target-F.landing)} 千円の上積みが必要です。`;
+  const sec=t=>`<div style="font-weight:700;color:var(--navy);font-size:13px;margin:18px 0 8px;border-top:1px solid var(--line);padding-top:14px;">${t}</div>`;
+
   const wrap=document.createElement("div");
   wrap.innerHTML=`
     <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
@@ -1261,7 +1310,25 @@ function monthDashboardCard(m){
       <span><span style="display:inline-block;width:11px;height:11px;background:#9fdbe2;border-radius:2px;vertical-align:middle;margin-right:5px;"></span>見込み（案件ヨミ加重） <b>${fmt(L.weighted)}</b> 千円</span>
       <span style="color:var(--muted);">＝ 着地見込み <b>${fmt(L.landing)}</b> 千円</span>
     </div>
-    <div style="border-left:4px solid ${color};background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:14px;font-weight:600;">${msg}</div>`;
+    <div style="border-left:4px solid ${color};background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:14px;font-weight:600;">${msg}</div>
+
+    ${sec("見込みを増やす活動（今月の経過 "+Math.round(prog*100)+"%）")}
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+      <div class="kpi" style="min-width:180px;"><div class="name">アポ ${paceTag(apoA,apoExp,apoT)}</div><div class="val">${fmt(apoA)} <small>/ 目標 ${fmt(apoT)} 件</small></div><div class="hint" style="margin-top:4px;">今ペース目安 ${fmt(apoExp)} 件</div></div>
+      <div class="kpi" style="min-width:180px;"><div class="name">案件化 ${paceTag(caseA,caseExp,caseT)}</div><div class="val">${fmt(caseA)} <small>/ 目標 ${fmt(caseT)} 件</small></div><div class="hint" style="margin-top:4px;">今ペース目安 ${fmt(caseExp)} 件</div></div>
+      <div class="kpi" style="min-width:180px;border-color:var(--cyan);"><div class="name">見込みの積み上げ</div><div class="val">${fmt(L.weighted)} <small>千円</small></div><div class="hint" style="margin-top:4px;">案件ヨミの加重</div></div>
+    </div>
+    <div style="border-left:4px solid var(--cyan);background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:13px;">${actMsg}</div>
+
+    ${sec("期末（期）の達成可能性")}
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+      <div style="font-size:22px;font-weight:800;color:var(--navy);">${fmt(F.landing)}<span style="font-size:13px;font-weight:600;color:var(--muted);"> / 通期目標 ${fmt(F.target)} 千円</span></div>
+      <span class="ratebadge" style="background:${fyColor};">${fyRate}%</span>
+    </div>
+    <div style="height:20px;background:#eef1f5;border-radius:10px;overflow:hidden;display:flex;margin-bottom:8px;">
+      <div style="width:${fyConfPct}%;background:var(--ok);"></div><div style="width:${fyMikoPct}%;background:#9fdbe2;"></div>
+    </div>
+    <div style="border-left:4px solid ${fyColor};background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:13px;">${fyMsg}</div>`;
   c.appendChild(wrap);
   return c;
 }
