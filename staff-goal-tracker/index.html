@@ -562,7 +562,7 @@ function bizSwitch(){
 }
 function detailSubtabs(){
   const tabs = cur.biz==="sales"
-    ? [["target","目標"],["input","ダッシュボード"],["weekly","週次"],["deals","案件"],["analysis","年間"]]
+    ? [["input","ダッシュボード"],["weekly","週次"],["deals","案件"],["analysis","年間"],["target","目標"]]
     : [["input","入力"],["deals","案件"],["analysis","年間"]];
   const d=document.createElement("div"); d.className="subtabs";
   d.innerHTML=tabs.map(([t,l])=>`<button data-t="${t}" class="${cur.detailTab===t?"active":""}">${l}</button>`).join("");
@@ -1002,7 +1002,7 @@ function targetCard(m){
   c.appendChild(note);
 
   const box=document.createElement("div"); box.className="scroll-x";
-  const head=`<tr><th class="l">指標</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th><th></th></tr>`;
+  const head=`<tr><th class="l">指標</th><th></th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th></tr>`;
   box.innerHTML=`<table class="sum-table" style="min-width:1040px;"><thead>${head}</thead><tbody id="tgtGrid"></tbody></table>`;
   c.appendChild(box);
 
@@ -1012,7 +1012,7 @@ function targetCard(m){
       const tr=document.createElement("tr"); tr.dataset.row=nm;
       const cells=monthObjs.map((mo,i)=>`<td><input type="number" data-i="${i}" value="${getK(mo,nm).target??""}" placeholder="0" style="width:78px;text-align:right;"></td>`).join("");
       const total=monthObjs.reduce((s,mo)=>s+(Number(getK(mo,nm).target)||0),0);
-      tr.innerHTML=`<td class="l nm">${nm}<small style="color:var(--muted);font-weight:400;">（${u}）</small></td>${cells}<td class="tot">${fmt(total)}</td><td class="num"><button class="btn-mini" data-copy="${nm}">→右へ</button></td>`;
+      tr.innerHTML=`<td class="l nm">${nm}<small style="color:var(--muted);font-weight:400;">（${u}）</small></td><td><button class="btn-mini" data-copy="${nm}">→右へ</button></td>${cells}<td class="tot">${fmt(total)}</td>`;
       tb.appendChild(tr);
       tr.querySelectorAll("input").forEach(inp=>inp.oninput=e=>{
         getK(monthObjs[+inp.dataset.i],nm).target = e.target.value===""?"":Number(e.target.value);
@@ -1279,8 +1279,8 @@ function monthProgress(ym){
   const last=new Date(y,mo,0).getDate();
   return Math.min(1, now.getDate()/last);
 }
-// 着地見込み用のヨミ確度（A=ほぼ決まる/B=8割/C=半分/D=初期）
-const YOMI_LAND = {A:1.0, B:0.8, C:0.5, D:0.2};
+// 着地見込み用のヨミ確度（A=100%/B=80%/C=30%/D=0%）
+const YOMI_LAND = {A:1.0, B:0.8, C:0.3, D:0};
 // ヨミ別の案件額（個人粗利合計）と着地寄与
 function pipelineByYomi(staffId){
   const by={A:0,B:0,C:0,D:0};
@@ -1305,13 +1305,15 @@ function fyLanding(staffId, fy){
 // 今月の着地見込み（月次ダッシュボードのメイン）
 function monthLanding(staffId, ym, m){
   const A = salesDealActual(staffId, ym);
-  const rec = recurringMonthlyTotal(staffId, ym);
-  const confirmed = (A["粗利（新規）"]||0)+(A["粗利（既存）"]||0)+rec;   // 確定（今月受注＋継続）
+  const won = (A["粗利（新規）"]||0)+(A["粗利（既存）"]||0);   // 受注確定
+  const rec = recurringMonthlyTotal(staffId, ym);             // 継続
+  const confirmed = won+rec;
   const P = pipelineByYomi(staffId);
   const target = kpiSum(m.kpi, GROSS_NAMES, "target");
-  return {target, confirmed, rec, by:P.by, contrib:P.contrib, weighted:P.weighted, landing:confirmed+P.weighted};
+  return {target, won, rec, confirmed, by:P.by, contrib:P.contrib, weighted:P.weighted, landing:confirmed+P.weighted};
 }
-const YOMI_COLOR = {confirmed:"var(--ok)", A:"#1bb6c1", B:"#5bcad2", C:"#9fdbe2", D:"#d4eef1"};
+// 確定=赤／継続=紫／A=緑／B=ブルー／C=黄／D=グレー
+const YOMI_COLOR = {won:"#c8513e", rec:"#8b5cf6", A:"#2e9e5b", B:"#3b7ddd", C:"#d8a72a", D:"#b0b6bf"};
 function monthDashboardCard(m){
   const c = card("今月の見込み粗利","見込み");
   const L = monthLanding(cur.staff, cur.month, m);
@@ -1323,27 +1325,17 @@ function monthDashboardCard(m){
   const targetPos = Math.min(100, L.target/scale*100);
   let msg;
   if(L.target<=0) msg="目標が未設定です。「目標」タブで今月の粗利目標を入れてください。";
-  else if(L.confirmed>=L.target) msg="すでに受注で目標達成。さらに上積みしていきましょう。";
-  else if(L.landing>=L.target) msg="この見込み（A〜D込み）なら目標到達。受注に変えていきましょう。";
+  else if(L.confirmed>=L.target) msg="すでに受注＋継続で目標達成。さらに上積みしていきましょう。";
+  else if(L.landing>=L.target) msg="この見込み（A〜C込み）なら目標到達。受注に変えていきましょう。";
   else msg=`着地見込みは目標の ${rate}%。目標まで あと ${fmt(L.target-L.landing)} 千円の見込みが必要です。`;
-  // 期末
-  const F = fyLanding(cur.staff, fyOfMonth(cur.month));
-  const fyRate = rateOf(F.landing, F.target), fyColor=rateColor(fyRate);
-  const fyPct=x=> F.target>0?Math.min(100,x/F.target*100):0;
-  const fyConfPct=fyPct(F.confirmed), fyMikoPct=Math.max(0,fyPct(F.landing)-fyConfPct);
-  let fyMsg;
-  if(F.target<=0) fyMsg="通期目標が未設定です。";
-  else if(F.landing>=F.target) fyMsg="この見込みなら期末も目標到達ペースです。";
-  else fyMsg=`期末の着地見込みは通期目標の ${fyRate}%。残り月で あと ${fmt(F.target-F.landing)} 千円の上積みが必要です。`;
   const sec=t=>`<div style="font-weight:700;color:var(--navy);font-size:13px;margin:18px 0 8px;border-top:1px solid var(--line);padding-top:14px;">${t}</div>`;
   const legend=(col,lab,amt)=>`<span style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;background:${col};border-radius:2px;vertical-align:middle;margin-right:4px;"></span>${lab} <b>${fmt(amt)}</b></span>`;
-  const yomiPanel=["A","B","C","D"].map(y=>{
-    const pctc={A:100,B:80,C:50,D:20}[y];
-    return `<div class="kpi" style="border-left:4px solid ${YOMI_COLOR[y]};">
-      <div class="name">ヨミ${y}<small style="color:var(--muted);">（確度${pctc}%）</small></div>
+  const PCT={A:100,B:80,C:30,D:0};
+  const yomiPanel=["A","B","C","D"].map(y=>
+    `<div class="kpi" style="border-left:4px solid ${YOMI_COLOR[y]};">
+      <div class="name">ヨミ${y}<small style="color:var(--muted);">（確度${PCT[y]}%）</small></div>
       <div class="val">${fmt(L.by[y])} <small>千円</small></div>
-      <div class="hint" style="margin-top:4px;">着地に＋${fmt(L.contrib[y])}</div></div>`;
-  }).join("");
+      <div class="hint" style="margin-top:4px;">着地に＋${fmt(L.contrib[y])}</div></div>`).join("");
 
   const wrap=document.createElement("div");
   wrap.innerHTML=`
@@ -1352,31 +1344,21 @@ function monthDashboardCard(m){
       <span class="ratebadge" style="background:${color};font-size:15px;padding:3px 12px;">着地見込み ${rate}%</span>
     </div>
     <div style="position:relative;height:30px;background:#eef1f5;border-radius:8px;overflow:hidden;display:flex;margin-bottom:8px;">
-      ${seg(L.confirmed,YOMI_COLOR.confirmed,"確定")}
+      ${seg(L.won,YOMI_COLOR.won,"受注確定")}
+      ${seg(L.rec,YOMI_COLOR.rec,"継続")}
       ${seg(L.contrib.A,YOMI_COLOR.A,"A見込み")}
       ${seg(L.contrib.B,YOMI_COLOR.B,"B見込み")}
       ${seg(L.contrib.C,YOMI_COLOR.C,"C見込み")}
-      ${seg(L.contrib.D,YOMI_COLOR.D,"D見込み")}
       <div style="position:absolute;left:${targetPos}%;top:0;bottom:0;border-left:2px dashed var(--navy);" title="目標 ${fmt(L.target)}"></div>
     </div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink);margin-bottom:6px;">
-      ${legend(YOMI_COLOR.confirmed,"確定",L.confirmed)} ${legend(YOMI_COLOR.A,"＋A",L.contrib.A)} ${legend(YOMI_COLOR.B,"＋B",L.contrib.B)} ${legend(YOMI_COLOR.C,"＋C",L.contrib.C)} ${legend(YOMI_COLOR.D,"＋D",L.contrib.D)}
+      ${legend(YOMI_COLOR.won,"受注",L.won)} ${legend(YOMI_COLOR.rec,"継続",L.rec)} ${legend(YOMI_COLOR.A,"＋A",L.contrib.A)} ${legend(YOMI_COLOR.B,"＋B",L.contrib.B)} ${legend(YOMI_COLOR.C,"＋C",L.contrib.C)}
       <span style="color:var(--muted);">｜破線＝目標 ${fmt(L.target)}</span>
     </div>
     <div style="border-left:4px solid ${color};background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:14px;font-weight:600;">${msg}</div>
 
     ${sec("ヨミ別の見込み（個人粗利）")}
-    <div class="month-summary">${yomiPanel}</div>
-
-    ${sec("期末（期）の達成可能性")}
-    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-      <div style="font-size:22px;font-weight:800;color:var(--navy);">${fmt(F.landing)}<span style="font-size:13px;font-weight:600;color:var(--muted);"> / 通期目標 ${fmt(F.target)} 千円</span></div>
-      <span class="ratebadge" style="background:${fyColor};">${fyRate}%</span>
-    </div>
-    <div style="height:20px;background:#eef1f5;border-radius:10px;overflow:hidden;display:flex;margin-bottom:8px;">
-      <div style="width:${fyConfPct}%;background:var(--ok);"></div><div style="width:${fyMikoPct}%;background:#9fdbe2;"></div>
-    </div>
-    <div style="border-left:4px solid ${fyColor};background:#fafbfc;padding:9px 12px;border-radius:6px;font-size:13px;">${fyMsg}</div>`;
+    <div class="month-summary">${yomiPanel}</div>`;
   c.appendChild(wrap);
   return c;
 }
