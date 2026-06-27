@@ -1484,57 +1484,106 @@ function pipelineSummaryCard(){
   c.appendChild(wrap);
   return c;
 }
+// 案件のステータス：アポ（自動判定）／提案前／提案済
+function dealStatus(p){
+  if(dealKind(p)==="アポ") return "アポ";
+  return p.stage || (p.proposalDate ? "提案済" : "提案前");
+}
+function attrChip(a){
+  if(a==="新規") return `<span class="status-chip" style="background:#e3f0ff;color:#1f5fb0;border-color:#bcd8fb;">新規</span>`;
+  if(a==="既存") return `<span class="status-chip" style="background:#fdebd8;color:#bd6f24;border-color:#f3d2ad;">既存</span>`;
+  return '<span class="hint">–</span>';
+}
+function statusChip(p){
+  const s=dealStatus(p);
+  const cls={"アポ":"","提案前":"deliver","提案済":"win"}[s]||"";
+  return `<span class="status-chip ${cls}">${s}</span>`;
+}
 function pipelineCard(){
   const c = card("案件管理","PIPELINE");
-  const body = document.createElement("div"); body.className="scroll-x";
-  body.innerHTML = `<table class="deal-table" style="min-width:1400px;white-space:nowrap;">
-    <thead><tr>
-      <th>ステータス</th><th>クライアント</th><th>担当</th><th>内容</th><th>属性</th>
-      <th style="text-align:right">粗利</th><th>ヨミ</th><th>受注日</th><th>BANT助</th><th>次回アポ</th><th>活動履歴</th><th></th></tr></thead>
-    <tbody id="pipeBody"></tbody>
-  </table>`;
-  c.appendChild(body);
+  // 「アポ記録／案件を追加」ボタンは表の上部へ
   const add = document.createElement("div");
-  add.style.marginTop="10px";
+  add.style.marginBottom="10px";
   add.innerHTML=`<button class="btn-primary btn-mini" id="addApo">＋ アポ記録</button>
     <button class="btn-mini" id="addPipe" style="margin-left:8px;">＋ 案件を追加（詳細）</button>
-    <span class="hint" style="margin-left:8px;">行をクリックで全項目を編集。見込み合計は個人粗利をヨミ係数で加重（A0.9/B0.6/C0.3/D0.1）。</span>`;
+    <span class="hint" style="margin-left:8px;">行クリックで編集。見出しクリックで並び替え。活動履歴はマウスを乗せると内容表示。</span>`;
   c.appendChild(add);
+  const body = document.createElement("div"); body.className="scroll-x";
+  c.appendChild(body);
 
-  const mine = ()=>db.pipeline.filter(p=>p.staffId===cur.staff);
-  const visible = ()=>mine();
-  const tb = $("#pipeBody",body);
-  const draw = ()=>{
-    const list = visible();
-    tb.innerHTML="";
-    if(!list.length){ tb.innerHTML=`<tr><td colspan="12" class="hint">案件がありません。「＋ アポ記録」または「＋ 案件を追加」から登録してください。</td></tr>`; }
-    list.forEach(p=>{
-      const acts=(p.activities||[]).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
-      const lastAct=acts[0];
-      const tr=document.createElement("tr"); tr.style.cursor="pointer";
-      tr.innerHTML=`
-        <td>${p.propStatus?`<span class="status-chip deliver">${esc(p.propStatus)}</span>`:'<span class="hint">–</span>'}</td>
-        <td class="nm">${esc(p.client)||'<span class="hint">（未入力）</span>'}</td>
-        <td>${esc(p.owner||"")}</td>
-        <td>${esc(dealContent(p))}</td>
-        <td>${esc(p.attribute||"")}</td>
-        <td class="num">${fmt(dealGross(p))}</td>
-        <td>${dealKind(p)==="案件"
-            ? `<span class="status-chip ${yomiClass(p.yomi)}">${esc(p.yomi||"案件")}</span>`
-            : `<span class="status-chip">アポ${p.apoCount?"×"+p.apoCount:""}</span>`}</td>
-        <td>${esc(p.orderDate||"")}</td>
-        <td>${esc(bantText(p))||'<span class="hint">–</span>'}</td>
-        <td>${esc(p.nextActionDate||"")}</td>
-        <td>${acts.length?`${acts.length}件${lastAct&&lastAct.date?`（最新${esc(lastAct.date)}）`:""}`:'<span class="hint">–</span>'}</td>
-        <td class="num"><button class="btn-mini">編集</button></td>`;
-      tr.querySelector("button").onclick=(e)=>{ e.stopPropagation(); openDealModal(p); };
-      tr.onclick=()=>openDealModal(p);
-      tb.appendChild(tr);
-    });
+  const cols=[
+    {k:"client",   l:"クライアント"},
+    {k:"owner",    l:"担当"},
+    {k:"content",  l:"内容"},
+    {k:"attribute",l:"属性"},
+    {k:"apo",      l:"アポ", num:true},
+    {k:"gross",    l:"粗利", num:true},
+    {k:"yomi",     l:"ヨミ"},
+    {k:"status",   l:"ステータス"},
+    {k:"orderDate",l:"受注日"},
+    {k:"nextActionDate", l:"次回アポ"},
+    {k:"act",      l:"活動履歴"},
+  ];
+  if(!cur.pipeSort) cur.pipeSort={key:null,dir:1};
+  const valOf=(p,k)=>{
+    switch(k){
+      case "apo": return Number(p.apoCount)||0;
+      case "gross": return dealGross(p);
+      case "yomi": return ({"受注":0,"成功":1,"A":2,"B":3,"C":4,"D":5,"ボツ":8,"パス":9}[p.yomi]??7);
+      case "status": return ({"アポ":0,"提案前":1,"提案済":2}[dealStatus(p)]||0);
+      case "content": return dealContent(p)||"";
+      case "act": return (p.activities||[]).length;
+      default: return p[k]||"";
+    }
   };
+  const cellOf=(p,k)=>{
+    switch(k){
+      case "client": return `<td class="nm">${esc(p.client)||'<span class="hint">（未入力）</span>'}</td>`;
+      case "owner": return `<td>${esc(p.owner||"")}</td>`;
+      case "content": return `<td>${esc(dealContent(p))}</td>`;
+      case "attribute": return `<td>${attrChip(p.attribute)}</td>`;
+      case "apo": return `<td class="num">${Number(p.apoCount)||0}</td>`;
+      case "gross": return `<td class="num">${fmt(dealGross(p))}</td>`;
+      case "yomi": return `<td>${dealKind(p)==="案件"?`<span class="status-chip ${yomiClass(p.yomi)}">${esc(p.yomi||"–")}</span>`:'<span class="hint">–</span>'}</td>`;
+      case "status": return `<td>${statusChip(p)}</td>`;
+      case "orderDate": return `<td>${esc(p.orderDate||"")||'<span class="hint">–</span>'}</td>`;
+      case "nextActionDate": return `<td>${esc(p.nextActionDate||"")||'<span class="hint">–</span>'}</td>`;
+      case "act": {
+        const acts=(p.activities||[]).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+        if(!acts.length) return `<td><span class="hint">–</span></td>`;
+        const tip=acts.map(a=>`${a.date||""}　${a.memo||""}`).join("\n");
+        return `<td title="${esc(tip)}" style="cursor:help;text-decoration:underline dotted;">${acts.length}件</td>`;
+      }
+      default: return `<td></td>`;
+    }
+  };
+  const draw=()=>{
+    const list=db.pipeline.filter(p=>p.staffId===cur.staff).slice();
+    const {key,dir}=cur.pipeSort;
+    if(key) list.sort((a,b)=>{ const x=valOf(a,key),y=valOf(b,key);
+      return (typeof x==="number"&&typeof y==="number") ? (x-y)*dir : String(x).localeCompare(String(y),"ja")*dir; });
+    const head=`<tr>${cols.map(col=>{
+      const arrow=cur.pipeSort.key===col.k?(cur.pipeSort.dir>0?" ▲":" ▼"):"";
+      return `<th data-k="${col.k}" style="cursor:pointer;${col.num?"text-align:right;":""}white-space:nowrap;">${col.l}${arrow}</th>`;
+    }).join("")}<th></th></tr>`;
+    const rows = list.length ? list.map(p=>
+      `<tr data-id="${p.id}" style="cursor:pointer;">${cols.map(col=>cellOf(p,col.k)).join("")}<td class="num"><button class="btn-mini" data-edit="${p.id}">編集</button></td></tr>`
+    ).join("") : `<tr><td colspan="${cols.length+1}" class="hint">案件がありません。「＋ アポ記録」または「＋ 案件を追加」から登録してください。</td></tr>`;
+    body.innerHTML=`<table class="deal-table" style="min-width:1180px;white-space:nowrap;"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+    body.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{
+      const k=th.dataset.k;
+      if(cur.pipeSort.key===k) cur.pipeSort.dir*=-1; else { cur.pipeSort.key=k; cur.pipeSort.dir=1; }
+      draw();
+    });
+    body.querySelectorAll("tr[data-id]").forEach(tr=>{
+      const p=db.pipeline.find(x=>x.id===tr.dataset.id);
+      tr.onclick=()=>openDealModal(p);
+    });
+    body.querySelectorAll("button[data-edit]").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); openDealModal(db.pipeline.find(x=>x.id===b.dataset.edit)); });
+  };
+  draw();
   $("#addPipe",add).onclick=()=>openDealModal(null);
   $("#addApo",add).onclick=()=>openApoModal();
-  draw();
   return c;
 }
 const DEPT_OPTS = ["","CR","DM","HR","WA"];
@@ -1546,78 +1595,89 @@ const optionsHtml=(opts,sel)=>opts.map(o=>`<option ${String(sel)===String(o)?"se
 function bantText(p){ const b=[]; if(p.bantB)b.push("B"); if(p.bantA)b.push("A"); if(p.bantN)b.push("N"); if(p.bantT)b.push("T"); if(p.subsidy)b.push("助"); return b.join("・"); }
 function openDealModal(p){
   const isNew=!p;
-  const d = p ? Object.assign({},p) : {kind:(cur.pipeKind==="all"?"見込み":cur.pipeKind),yomi:""};
+  const d = p ? Object.assign({},p) : {yomi:""};
   const g=(k,def="")=>{ const v=d[k]; return v==null?def:v; };
   const content = d.content!=null ? d.content : (d.name||"");
   const grossTotal = d.grossTotal!=null ? d.grossTotal : (d.gross!=null?d.gross:"");
-  const dealType = d.dealType || (d.yomi ? "案件" : "アポ");   // 旧データ互換
   const passOpts = [""].concat(db.members||[]);
   if(d.passFrom && !passOpts.includes(d.passFrom)) passOpts.push(d.passFrom);   // 既存値も選択肢に残す
   const chk=(k)=>d[k]?"checked":"";
-  const sec=t=>`<div style="font-weight:700;color:var(--navy);font-size:12px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:4px;">${t}</div>`;
+  const initStatus = isNew ? "提案前" : dealStatus(d);
+  const sec=t=>`<div style="font-weight:700;color:var(--navy);font-size:12px;margin:10px 0 5px;border-bottom:1px solid var(--line);padding-bottom:3px;">${t}</div>`;
   const root=$("#modalRoot");
-  root.innerHTML=`<div class="modal-bg"><div class="modal" style="max-width:900px;">
-    <h3>${isNew?"案件を追加":"案件を編集"}</h3>
+  root.innerHTML=`<div class="modal-bg"><div class="modal" style="max-width:880px;">
+    <h3 style="margin-bottom:8px;">${isNew?"案件を追加":"案件を編集"}</h3>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">
+      <div class="field" style="max-width:200px;margin:0;"><label>ステータス</label>
+        <select id="fStatus">
+          <option ${initStatus==="アポ"?"selected":""}>アポ</option>
+          <option ${initStatus==="提案前"?"selected":""}>提案前</option>
+          <option ${initStatus==="提案済"?"selected":""}>提案済</option>
+        </select></div>
+      <div id="stageNote" class="hint" style="flex:1;min-width:200px;"></div>
+    </div>
+
     ${sec("基本情報")}
     <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <div class="field"><label>種別</label><select id="fType"><option ${dealType==="アポ"?"selected":""}>アポ</option><option ${dealType==="案件"?"selected":""}>案件</option></select></div>
-      <div class="field"><label>アポ回数（自動）</label><input id="fApoCount" type="number" value="${Number(g("apoCount"))||0}" readonly style="background:#f4f6f9;"></div>
-      <div class="field"><label>次回アポ日</label><input id="fDate" type="date" value="${esc(g("nextActionDate"))}"></div>
+      <div class="field"><label>初回接触日</label><input id="fFirst" type="date" value="${esc(g("firstContact"))}"></div>
       <div class="field"><label>クライアント名</label><input id="fClient" value="${esc(g("client"))}"></div>
       <div class="field"><label>担当者</label><input id="fOwner" value="${esc(g("owner"))}" placeholder="担当・共同担当"></div>
       <div class="field"><label>案件名・内容</label><input id="fContent" value="${esc(content)}" placeholder="案件名・内容"></div>
       <div class="field"><label>属性</label><select id="fAttr">${optionsHtml(ATTR_OPTS, g("attribute"))}</select></div>
       <div class="field"><label>ルート</label><select id="fRoute">${optionsHtml(ROUTE_OPTS, g("route"))}</select></div>
-      <div class="field"><label>事業部</label><select id="fDept">${optionsHtml(DEPT_OPTS, g("dept"))}</select></div>
-      <div class="field"><label>初回接触日</label><input id="fFirst" type="date" value="${esc(g("firstContact"))}"></div>
-      <div class="field"><label>パス元（メンバー）</label><select id="fPass">${optionsHtml(passOpts, g("passFrom"))}</select></div>
-      <div class="field"><label>ステータス</label><select id="fPropStatus">${optionsHtml(PROPOSAL_STATUS, g("propStatus"))}</select></div>
     </div>
-    ${sec("BANT・助")}
-    <div style="display:flex;gap:14px;align-items:center;font-size:13px;">
-      <label><input type="checkbox" id="fB" ${chk("bantB")}> B（予算）</label>
-      <label><input type="checkbox" id="fA" ${chk("bantA")}> A（決裁）</label>
-      <label><input type="checkbox" id="fN" ${chk("bantN")}> N（課題）</label>
-      <label><input type="checkbox" id="fT" ${chk("bantT")}> T（時期）</label>
-      <label><input type="checkbox" id="fJo" ${chk("subsidy")}> 助（助成金）</label>
+
+    <div id="propWrap">
+    <div id="grpApo">
+      <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="field"><label>アポ回数（自動）</label><input id="fApoCount" type="number" value="${Number(g("apoCount"))||0}" readonly style="background:#f4f6f9;"></div>
+        <div class="field"><label>次回アポ日</label><input id="fNext" type="date" value="${esc(g("nextActionDate"))}"></div>
+      </div>
+      ${sec("活動履歴（日付＋メモ）")}
+      <div id="actList" style="margin-bottom:6px;"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="date" id="fActDate" style="width:150px;">
+        <input id="fActMemo" placeholder="活動メモ" style="flex:1;min-width:180px;">
+        <button type="button" class="btn-ghost btn-mini" id="fActAdd">＋ 追加</button>
+      </div>
     </div>
-    <div id="dealDetail">
-    <div id="dealDetailNote" class="hint" style="margin-top:10px;"></div>
-    ${sec("確度")}
-    <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <div class="field"><label>ヨミ</label><select id="fYomi"><option value="" ${!d.yomi?"selected":""}>（未選択）</option>${optionsHtml(YOMI_OPTS,d.yomi)}</select></div>
+
+    <div id="grpProp">
+      ${sec("日程・確度")}
+      <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+        <div class="field"><label>提案日（案件化日）</label><input id="fProp" type="date" value="${esc(g("proposalDate"))}"></div>
+        <div class="field"><label>受注日</label><input id="fOrder" type="date" value="${esc(g("orderDate"))}"></div>
+        <div class="field"><label>納品日</label><input id="fDeliv" type="date" value="${esc(g("deliveryDate"))}"></div>
+        <div class="field"><label>確度（ヨミ）</label><select id="fYomi"><option value="" ${!d.yomi?"selected":""}>（未選択）</option>${optionsHtml(YOMI_OPTS,d.yomi)}</select></div>
+        <div class="field"><label>パス元（メンバー）</label><select id="fPass">${optionsHtml(passOpts, g("passFrom"))}</select></div>
+        <div class="field"><label>事業部</label><select id="fDept">${optionsHtml(DEPT_OPTS, g("dept"))}</select></div>
+        <div class="field" style="grid-column:span 2;"><label>BANT助</label>
+          <div style="display:flex;gap:14px;align-items:center;padding-top:6px;font-size:13px;">
+            <label><input type="checkbox" id="fB" ${chk("bantB")}> B</label>
+            <label><input type="checkbox" id="fA" ${chk("bantA")}> A</label>
+            <label><input type="checkbox" id="fN" ${chk("bantN")}> N</label>
+            <label><input type="checkbox" id="fT" ${chk("bantT")}> T</label>
+            <label><input type="checkbox" id="fJo" ${chk("subsidy")}> 助</label>
+          </div></div>
+      </div>
+      ${sec("金額（千円）／サブ配分")}
+      <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+        <div class="field"><label>売上合計</label><input id="fSalesTotal" type="number" value="${esc(g("salesTotal"))}"></div>
+        <div class="field"><label>粗利合計</label><input id="fGrossTotal" type="number" value="${grossTotal}"></div>
+        <div class="field"><label>個人売上（自動）</label><input id="fPersSales" type="number" value="${esc(g("personalSales"))}" readonly style="background:#f4f6f9;"></div>
+        <div class="field"><label>個人粗利（自動）</label><input id="fPersGross" type="number" value="${esc(g("personalGross"))}" readonly style="background:#f4f6f9;"></div>
+        <div class="field"><label>サブ1（20%・人）</label><select id="fSub1Person">${optionsHtml(passOpts, g("sub1Person"))}</select></div>
+        <div class="field"><label>サブ1 金額（自動）</label><input id="fSub1" type="number" value="${esc(g("sub1"))}" readonly style="background:#f4f6f9;"></div>
+        <div class="field"><label>サブ2（10%・人）</label><select id="fSub2Person">${optionsHtml(passOpts, g("sub2Person"))}</select></div>
+        <div class="field"><label>サブ2 金額（自動）</label><input id="fSub2" type="number" value="${esc(g("sub2"))}" readonly style="background:#f4f6f9;"></div>
+        <div class="field" style="grid-column:span 4;"><div style="display:flex;gap:16px;align-items:center;padding-top:2px;font-size:13px;flex-wrap:wrap;">
+          <label><input type="checkbox" id="fRecurring" ${chk("isRecurring")}> 定期</label>
+          <label><input type="checkbox" id="fBacklink" ${chk("backlink")}> 被リンク掲載</label>
+          <span class="hint">サブに人を選ぶと粗利の20%/10%を分配、残りが個人</span></div></div>
+      </div>
     </div>
-    ${sec("金額（千円）")}
-    <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr;">
-      <div class="field"><label>売上合計</label><input id="fSalesTotal" type="number" value="${esc(g("salesTotal"))}"></div>
-      <div class="field"><label>粗利合計</label><input id="fGrossTotal" type="number" value="${grossTotal}"></div>
-      <div class="field"><label> </label><span class="hint">サブを選ぶと粗利の20%/10%を分配、残りが個人</span></div>
-      <div class="field"><label>サブ1（20%・人を選択）</label><select id="fSub1Person">${optionsHtml(passOpts, g("sub1Person"))}</select></div>
-      <div class="field"><label>サブ1 金額（自動）</label><input id="fSub1" type="number" value="${esc(g("sub1"))}" readonly style="background:#f4f6f9;"></div>
-      <div class="field"><label> </label></div>
-      <div class="field"><label>サブ2（10%・人を選択）</label><select id="fSub2Person">${optionsHtml(passOpts, g("sub2Person"))}</select></div>
-      <div class="field"><label>サブ2 金額（自動）</label><input id="fSub2" type="number" value="${esc(g("sub2"))}" readonly style="background:#f4f6f9;"></div>
-      <div class="field"><label> </label></div>
-      <div class="field"><label>個人売上（自動）</label><input id="fPersSales" type="number" value="${esc(g("personalSales"))}" readonly style="background:#f4f6f9;"></div>
-      <div class="field"><label>個人粗利（自動）</label><input id="fPersGross" type="number" value="${esc(g("personalGross"))}" readonly style="background:#f4f6f9;"></div>
     </div>
-    ${sec("日程")}
-    <div class="map-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
-      <div class="field"><label>提案日（＝案件化日）</label><input id="fProp" type="date" value="${esc(g("proposalDate"))}"></div>
-      <div class="field"><label>受注日</label><input id="fOrder" type="date" value="${esc(g("orderDate"))}"></div>
-      <div class="field"><label>納品日</label><input id="fDeliv" type="date" value="${esc(g("deliveryDate"))}"></div>
-      <div class="field"><label> </label><div style="display:flex;gap:14px;align-items:center;padding-top:6px;font-size:13px;">
-        <label><input type="checkbox" id="fRecurring" ${chk("isRecurring")}> 定期</label>
-        <label><input type="checkbox" id="fBacklink" ${chk("backlink")}> 被リンク掲載</label></div></div>
-    </div>
-    </div>
-    ${sec("活動履歴（日付＋メモ）")}
-    <div id="actList" style="margin-bottom:8px;"></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <input type="date" id="fActDate" style="width:150px;">
-      <input id="fActMemo" placeholder="活動メモ" style="flex:1;min-width:200px;">
-      <button type="button" class="btn-ghost btn-mini" id="fActAdd">＋ 追加</button>
-    </div>
+
     <div class="modal-actions">
       ${isNew?"":'<button class="btn-danger" id="dDelete" style="margin-right:auto;">削除</button>'}
       <button class="btn-ghost" id="dCancel">キャンセル</button>
@@ -1666,33 +1726,41 @@ function openDealModal(p){
     if(!date && !memo) return;
     acts.push({date, memo}); $("#fActDate").value=""; $("#fActMemo").value=""; drawActs();
   };
-  // 種別＝アポは基本情報・BANT・活動履歴のみ。種別＝案件で金額・ヨミ・日程が出る
+  // ステータスでフォームを段階表示：提案前＝基本のみ／アポ＝基本＋アポ情報＋活動／提案済＝全部
   const updateStage=()=>{
-    const minimal = ($("#fType").value==="アポ");
-    $("#dealDetail").style.display = minimal ? "none" : "";
-    $("#dealDetailNote").textContent = minimal
-      ? "種別＝アポはアポ活動の記録（アポ回数・次回アポ日・活動履歴・BANT）。案件化したら種別を「案件」に変えると金額・ヨミ・日程が出ます。"
-      : "";
+    const s=$("#fStatus").value;
+    $("#grpApo").style.display  = (s==="アポ"||s==="提案済") ? "" : "none";
+    $("#grpProp").style.display = (s==="提案済") ? "" : "none";
+    $("#propWrap").style.display = (s==="提案前") ? "none" : "block";
+    $("#stageNote").textContent =
+      s==="提案前" ? "提案前：基本情報だけ入力。提案したら「提案済」に切り替えると日程・金額・確度が出ます。" :
+      s==="アポ"   ? "アポ：アポ回数・次回アポ日・活動履歴を記録します。" :
+                     "提案済：日程・金額・確度・サブ配分まで入力できます。";
   };
-  $("#fType").addEventListener("change",updateStage);
+  $("#fStatus").addEventListener("change",updateStage);
   updateStage();
   $("#dCancel").onclick=()=>root.innerHTML="";
   $("#dSave").onclick=()=>{
-    const num=id=>{ const v=$("#"+id).value; return v===""?"":Number(v); };
+    const num=id=>{ const el=$("#"+id); if(!el) return ""; const v=el.value; return v===""?"":Number(v); };
+    const val=id=>{ const el=$("#"+id); return el?el.value:""; };
+    const ck=id=>{ const el=$("#"+id); return el?el.checked:false; };
+    const status=$("#fStatus").value;
     const v={
-      dealType:$("#fType").value,   // アポ回数は手動変更不可（アポ記録ボタンからのみ）
-      propStatus:$("#fPropStatus").value, firstContact:$("#fFirst").value, client:$("#fClient").value.trim(),
-      attribute:$("#fAttr").value.trim(), dept:$("#fDept").value, route:$("#fRoute").value.trim(),
-      passFrom:$("#fPass").value.trim(), owner:$("#fOwner").value.trim(), content:$("#fContent").value.trim(),
+      dealType: status==="アポ" ? "アポ" : "案件",
+      stage: status==="アポ" ? "" : status,
+      firstContact:val("fFirst"), client:val("fClient").trim(),
+      attribute:val("fAttr").trim(), dept:val("fDept"), route:val("fRoute").trim(),
+      passFrom:val("fPass").trim(), owner:val("fOwner").trim(), content:val("fContent").trim(),
+      nextActionDate:val("fNext"),
       salesTotal:num("fSalesTotal"), grossTotal:num("fGrossTotal"),
-      sub1Person:$("#fSub1Person").value, sub2Person:$("#fSub2Person").value, sub1:num("fSub1"), sub2:num("fSub2"),
+      sub1Person:val("fSub1Person"), sub2Person:val("fSub2Person"), sub1:num("fSub1"), sub2:num("fSub2"),
       personalSales:num("fPersSales"), personalGross:num("fPersGross"),
-      yomi:$("#fYomi").value,
-      bantB:$("#fB").checked, bantA:$("#fA").checked, bantN:$("#fN").checked, bantT:$("#fT").checked, subsidy:$("#fJo").checked,
-      proposalDate:$("#fProp").value, nextActionDate:$("#fDate").value, orderDate:$("#fOrder").value, deliveryDate:$("#fDeliv").value,
-      isRecurring:$("#fRecurring").checked, backlink:$("#fBacklink").checked, activities:acts
+      yomi:val("fYomi"),
+      bantB:ck("fB"), bantA:ck("fA"), bantN:ck("fN"), bantT:ck("fT"), subsidy:ck("fJo"),
+      proposalDate:val("fProp"), orderDate:val("fOrder"), deliveryDate:val("fDeliv"),
+      isRecurring:ck("fRecurring"), backlink:ck("fBacklink"), activities:acts
     };
-    if(isNew){ db.pipeline.push(Object.assign({id:uid(),staffId:cur.staff},v)); }
+    if(isNew){ db.pipeline.push(Object.assign({id:uid(),staffId:cur.staff,apoCount:0},v)); }
     else { Object.assign(p,v); }
     save(); root.innerHTML=""; render();
   };
