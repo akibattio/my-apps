@@ -1142,40 +1142,47 @@ function salesAnalysisCard(){
   const moLabels = months.map(ym=>Number(ym.split("-")[1])+"月");
   const sumA = arr=>arr.reduce((s,v)=>s+v,0);
 
-  // 目標＝目標タブ／実績＝案件から自動集計。粗利は継続込み
-  const gT=[], gA=[], caseT=[],caseA=[],apoT=[],apoA=[];
-  months.forEach(ym=>{
-    const mm=readSalesMonth(cur.staff,ym);
-    const kpi=mm&&mm.kpi?mm.kpi:[];
-    const A=salesDealActual(cur.staff,ym);
-    gT.push(kpiSum(kpi, GROSS_NAMES, "target"));
-    gA.push((A["粗利（新規）"]||0)+(A["粗利（既存）"]||0)+recurringMonthlyTotal(cur.staff,ym));
-    caseT.push(kpiSum(kpi, CASE_NAMES, "target")); caseA.push((A["案件化（新規）"]||0)+(A["案件化（既存）"]||0));
-    apoT.push(kpiSum(kpi, APO_NAMES, "target"));   apoA.push((A["アポ（新規）"]||0)+(A["アポ（既存）"]||0));
-  });
+  // 各カテゴリの新規/既存の目標・実績（月別）。粗利の既存実績は継続込み
+  const pick=(field,names)=>{const out=[];months.forEach(ym=>{const mm=readSalesMonth(cur.staff,ym);const kpi=mm&&mm.kpi?mm.kpi:[];const k=kpi.find(x=>x.name===names);out.push(k?Number(k[field])||0:0);});return out;};
+  const actual=(name,isGrossExist)=>{const out=[];months.forEach(ym=>{const A=salesDealActual(cur.staff,ym);let v=A[name]||0;if(isGrossExist)v+=recurringMonthlyTotal(cur.staff,ym);out.push(v);});return out;};
+  const data={
+    粗利:{nT:pick("target","粗利（新規）"),nA:actual("粗利（新規）"),eT:pick("target","粗利（既存）"),eA:actual("粗利（既存）",true),cum:true,unit:"千円"},
+    案件化:{nT:pick("target","案件化（新規）"),nA:actual("案件化（新規）"),eT:pick("target","案件化（既存）"),eA:actual("案件化（既存）"),cum:false,unit:"件"},
+    アポ:{nT:pick("target","アポ（新規）"),nA:actual("アポ（新規）"),eT:pick("target","アポ（既存）"),eA:actual("アポ（既存）"),cum:false,unit:"件"},
+  };
 
   const header=`<tr><th class="l">　</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th></tr>`;
+  const valRow=(label,vals)=>`<tr><td class="l">${label}</td>${vals.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td style="font-weight:700;">${fmt(sumA(vals))}</td></tr>`;
+  // 達成=緑・未達=グレー（文字は白のまま）
+  const badge=r=>`<span class="ratebadge" style="background:${r>=100?'var(--ok)':'#b0b6bf'};">${r}%</span>`;
   const gapCell=v=>`<td style="color:${v<0?'var(--bad)':(v>0?'var(--ok)':'var(--muted)')};font-weight:600;">${v>0?"+":""}${fmt(v)}</td>`;
-  const valRow=(label,vals)=>`<tr><td class="l">${label}</td>${vals.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td>${fmt(sumA(vals))}</td></tr>`;
-  const rateRow=(T,A)=>`<tr><td class="l">達成率</td>${T.map((t,i)=>`<td>${t>0?ratebadge(rateOf(A[i],t)):"–"}</td>`).join("")}<td>${sumA(T)>0?ratebadge(rateOf(sumA(A),sumA(T))):"–"}</td></tr>`;
-  const gapRow=(T,A)=>`<tr><td class="l">GAP</td>${T.map((t,i)=>gapCell(A[i]-t)).join("")}${gapCell(sumA(A)-sumA(T))}</tr>`;
-  const block=(title,T,A,extraRows="")=>`
-    <div style="font-weight:700;color:var(--navy);margin:14px 0 6px;">${title}</div>
-    <div class="scroll-x"><table class="sum-table" style="min-width:920px;">
-      ${header}
-      ${valRow("目標",T)}
-      ${valRow("実績",A)}
-      ${rateRow(T,A)}
-      ${gapRow(T,A)}
-      ${extraRows}
-    </table></div>`;
+  const cum=arr=>{let s=0;return arr.map(v=>s+=v);};
+  const block=(title,d)=>{
+    const totT=d.nT.map((v,i)=>v+d.eT[i]), totA=d.nA.map((v,i)=>v+d.eA[i]);
+    let rateRow, gapRow;
+    if(d.cum){
+      const cT=cum(totT), cA=cum(totA);
+      rateRow=`<tr><td class="l">達成率（累計）</td>${cT.map((t,i)=>`<td>${t>0?badge(rateOf(cA[i],t)):"–"}</td>`).join("")}<td>${sumA(totT)>0?badge(rateOf(sumA(totA),sumA(totT))):"–"}</td></tr>`;
+      gapRow=`<tr><td class="l">GAP（累計）</td>${cT.map((t,i)=>gapCell(cA[i]-t)).join("")}${gapCell(sumA(totA)-sumA(totT))}</tr>`;
+    }else{
+      rateRow=`<tr><td class="l">達成率（単月）</td>${totT.map((t,i)=>`<td>${t>0?badge(rateOf(totA[i],t)):"–"}</td>`).join("")}<td>${sumA(totT)>0?badge(rateOf(sumA(totA),sumA(totT))):"–"}</td></tr>`;
+      gapRow=`<tr><td class="l">GAP（単月）</td>${totT.map((t,i)=>gapCell(totA[i]-t)).join("")}${gapCell(sumA(totA)-sumA(totT))}</tr>`;
+    }
+    return `<div style="font-weight:700;color:var(--navy);margin:16px 0 6px;">${title}（${d.unit}）</div>
+      <div class="scroll-x"><table class="sum-table" style="min-width:960px;">
+        ${header}
+        ${valRow("新規 目標",d.nT)}${valRow("新規 実績",d.nA)}
+        ${valRow("既存 目標",d.eT)}${valRow("既存 実績",d.eA)}
+        ${rateRow}${gapRow}
+      </table></div>`;
+  };
 
   const wrap=document.createElement("div");
   wrap.innerHTML =
-    block("粗利管理（千円・新規＋既存・実績は継続込み）", gT, gA)
-    + block("案件化（件・新規＋既存）", caseT, caseA)
-    + block("アポ（件・新規＋既存）", apoT, apoA)
-    + `<div class="hint" style="margin-top:10px;">粗利・案件化・アポ＝月次KPI（新規＋既存）から集計。粗利の実績は継続込み。新規/既存の内訳・ヨミABCDの月別推移・受注率は今後の対応予定です。</div>`;
+    block("粗利管理（実績は継続込み）", data.粗利)
+    + block("案件化", data.案件化)
+    + block("アポ", data.アポ)
+    + `<div class="hint" style="margin-top:10px;">新規/既存に分けて表示。粗利は達成率・GAPを累計、案件化・アポは単月。達成（100%以上）＝緑、未達＝グレー。粗利の既存実績は継続込み。</div>`;
   c.appendChild(wrap);
   return c;
 }
