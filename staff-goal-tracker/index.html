@@ -1521,6 +1521,7 @@ function pipelineCard(){
     {k:"yomi",     l:"ヨミ"},
     {k:"status",   l:"ステータス"},
     {k:"orderDate",l:"受注日"},
+    {k:"bant",     l:"BANT助"},
     {k:"nextActionDate", l:"次回アポ"},
     {k:"act",      l:"活動履歴"},
   ];
@@ -1532,6 +1533,7 @@ function pipelineCard(){
       case "yomi": return ({"受注":0,"成功":1,"A":2,"B":3,"C":4,"D":5,"ボツ":8,"パス":9}[p.yomi]??7);
       case "status": return ({"アポ":0,"提案前":1,"提案済":2}[dealStatus(p)]||0);
       case "content": return dealContent(p)||"";
+      case "bant": return bantText(p);
       case "act": return (p.activities||[]).length;
       default: return p[k]||"";
     }
@@ -1547,6 +1549,7 @@ function pipelineCard(){
       case "yomi": return `<td>${dealKind(p)==="案件"?`<span class="status-chip ${yomiClass(p.yomi)}">${esc(p.yomi||"–")}</span>`:'<span class="hint">–</span>'}</td>`;
       case "status": return `<td>${statusChip(p)}</td>`;
       case "orderDate": return `<td>${esc(p.orderDate||"")||'<span class="hint">–</span>'}</td>`;
+      case "bant": return `<td>${esc(bantText(p))||'<span class="hint">–</span>'}</td>`;
       case "nextActionDate": return `<td>${esc(p.nextActionDate||"")||'<span class="hint">–</span>'}</td>`;
       case "act": {
         const acts=(p.activities||[]).slice().sort((a,b)=>(b.date||"").localeCompare(a.date||""));
@@ -1592,7 +1595,7 @@ const ATTR_OPTS = ["","新規","既存"];
 const YOMI_OPTS = ["A","B","C","D","受注","ボツ","パス","成功"];   // ヨミ列の選択肢（確度＋結果）
 const PROPOSAL_STATUS = ["","提案1","提案2","提案3","返答待"];     // 商談ステータス（旧「区分」を置換）
 const optionsHtml=(opts,sel)=>opts.map(o=>`<option ${String(sel)===String(o)?"selected":""}>${o}</option>`).join("");
-function bantText(p){ const b=[]; if(p.bantB)b.push("B"); if(p.bantA)b.push("A"); if(p.bantN)b.push("N"); if(p.bantT)b.push("T"); if(p.subsidy)b.push("助"); return b.join("・"); }
+function bantText(p){ const b=[]; if(p.bantB)b.push("B"); if(p.bantA)b.push("A"); if(p.bantN)b.push("N"); if(p.bantT)b.push("T"); if(p.subsidy)b.push("助"); return b.join(" "); }
 function openDealModal(p){
   const isNew=!p;
   const d = p ? Object.assign({},p) : {yomi:""};
