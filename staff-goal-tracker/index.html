@@ -486,6 +486,7 @@ function render(){
       app.appendChild(weeksCard(m));
     }else{
       app.appendChild(salesGoalCard(m));
+      app.appendChild(pipelineSummaryCard());
       app.appendChild(salesReviewCard(m));
     }
   }else{
@@ -1219,11 +1220,37 @@ function dealGross(p){
 }
 function dealContent(p){ return p.content!=null ? p.content : (p.name||""); }
 function dealKind(p){ return p.dealType || (p.yomi ? "案件" : "アポ"); }   // アポ / 案件
+// 案件サマリー（ブロック/カード）：月次タブに表示
+function pipelineSummaryCard(){
+  const c = card("案件サマリー","PIPELINE");
+  const all = db.pipeline.filter(p=>p.staffId===cur.staff);
+  const apoDeals = all.filter(p=>dealKind(p)==="アポ");
+  const caseDeals = all.filter(p=>dealKind(p)==="案件");
+  const apoTotal = all.reduce((s,p)=>s+(Number(p.apoCount)||0),0);
+  const caseApoSum = caseDeals.reduce((s,p)=>s+(Number(p.apoCount)||0),0);
+  const avgApo = caseDeals.length ? (caseApoSum/caseDeals.length) : 0;
+  const caseRate = all.length ? Math.round(caseDeals.length/all.length*100) : 0;
+  const by = {A:{n:0,g:0},B:{n:0,g:0},C:{n:0,g:0},D:{n:0,g:0}};
+  caseDeals.forEach(p=>{ if(!by[p.yomi]) return; by[p.yomi].n++; by[p.yomi].g+=dealGross(p); });
+  const total = YOMI.reduce((s,y)=>s+by[y].g,0);
+  const weighted = Math.round(YOMI.reduce((s,y)=>s+by[y].g*YOMI_COEF[y],0));
+  const wrap=document.createElement("div"); wrap.className="month-summary";
+  wrap.innerHTML =
+    `<div class="kpi"><div class="name">アポ案件</div><div class="val">${apoDeals.length} <small>件</small></div></div>`
+    + `<div class="kpi"><div class="name">案件化</div><div class="val">${caseDeals.length} <small>件</small></div><div class="hint" style="margin-top:4px;">案件化率 ${caseRate}%</div></div>`
+    + `<div class="kpi"><div class="name">総アポ回数</div><div class="val">${apoTotal} <small>回</small></div></div>`
+    + `<div class="kpi" style="border-color:var(--cyan);"><div class="name">案件化までの平均アポ数</div><div class="val">${avgApo.toFixed(1)} <small>回/件</small></div></div>`
+    + YOMI.map(y=>`<div class="kpi"><div class="name">ヨミ${y}（${by[y].n}件）</div>
+      <div class="val">${fmt(by[y].g)} <small>千円</small></div></div>`).join("")
+    + `<div class="kpi" style="border-color:var(--cyan);">
+        <div class="name">案件化の見込み / 加重</div>
+        <div class="val">${fmt(total)} <small>千円</small></div>
+        <div class="hint" style="margin-top:4px;">加重 ${fmt(weighted)} 千円</div></div>`;
+  c.appendChild(wrap);
+  return c;
+}
 function pipelineCard(){
   const c = card("案件管理","PIPELINE");
-  const sum = document.createElement("div");
-  sum.id = "pipeSum"; sum.className = "month-summary"; sum.style.marginBottom="14px";
-  c.appendChild(sum);
   const body = document.createElement("div"); body.className="scroll-x";
   body.innerHTML = `<table class="deal-table" style="min-width:1400px;white-space:nowrap;">
     <thead><tr>
@@ -1241,32 +1268,6 @@ function pipelineCard(){
 
   const mine = ()=>db.pipeline.filter(p=>p.staffId===cur.staff);
   const visible = ()=>mine();
-
-  const drawSum = ()=>{
-    const all = mine();
-    const apoDeals = all.filter(p=>dealKind(p)==="アポ");
-    const caseDeals = all.filter(p=>dealKind(p)==="案件");
-    const apoTotal = all.reduce((s,p)=>s+(Number(p.apoCount)||0),0);        // 総アポ回数
-    const caseApoSum = caseDeals.reduce((s,p)=>s+(Number(p.apoCount)||0),0);
-    const avgApo = caseDeals.length ? (caseApoSum/caseDeals.length) : 0;     // 案件化までの平均アポ数
-    const caseRate = all.length ? Math.round(caseDeals.length/all.length*100) : 0;
-    // ヨミ見込みは案件のうち A〜D。個人粗利ベース
-    const by = {A:{n:0,g:0},B:{n:0,g:0},C:{n:0,g:0},D:{n:0,g:0}};
-    caseDeals.forEach(p=>{ if(!by[p.yomi]) return; by[p.yomi].n++; by[p.yomi].g+=dealGross(p); });
-    const total = YOMI.reduce((s,y)=>s+by[y].g,0);
-    const weighted = Math.round(YOMI.reduce((s,y)=>s+by[y].g*YOMI_COEF[y],0));
-    sum.innerHTML =
-      `<div class="kpi"><div class="name">アポ案件</div><div class="val">${apoDeals.length} <small>件</small></div></div>`
-      + `<div class="kpi"><div class="name">案件化</div><div class="val">${caseDeals.length} <small>件</small></div><div class="hint" style="margin-top:4px;">案件化率 ${caseRate}%</div></div>`
-      + `<div class="kpi"><div class="name">総アポ回数</div><div class="val">${apoTotal} <small>回</small></div></div>`
-      + `<div class="kpi" style="border-color:var(--cyan);"><div class="name">案件化までの平均アポ数</div><div class="val">${avgApo.toFixed(1)} <small>回/件</small></div></div>`
-      + YOMI.map(y=>`<div class="kpi"><div class="name">ヨミ${y}（${by[y].n}件）</div>
-        <div class="val">${fmt(by[y].g)} <small>千円</small></div></div>`).join("")
-      + `<div class="kpi" style="border-color:var(--cyan);">
-          <div class="name">案件化の見込み / 加重</div>
-          <div class="val">${fmt(total)} <small>千円</small></div>
-          <div class="hint" style="margin-top:4px;">加重 ${fmt(weighted)} 千円</div></div>`;
-  };
   const tb = $("#pipeBody",body);
   const draw = ()=>{
     const list = visible();
@@ -1298,7 +1299,7 @@ function pipelineCard(){
   };
   $("#addPipe",add).onclick=()=>openDealModal(null);
   $("#addApo",add).onclick=()=>openApoModal();
-  draw(); drawSum();
+  draw();
   return c;
 }
 const DEPT_OPTS = ["","CR","DM","HR","WA"];
