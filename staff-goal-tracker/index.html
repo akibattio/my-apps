@@ -320,6 +320,14 @@ function sumHalf(staffId, fyStart, half){
   halfMonths(fyStart,half).forEach(ym=>{ t+=readTarget(staffId,ym); a+=readActual(staffId,ym); });
   return {target:t, actual:a};
 }
+// 営業（受注）の月次達成：粗利目標と実績（継続込み）。個別ページの年間タブと同じ集計
+function salesMonthAch(staffId, ym){
+  const mm=db.months[staffId+"|sales|"+ym], kpi=mm&&mm.kpi?mm.kpi:[];
+  const target=kpiSum(kpi, GROSS_NAMES, "target");
+  const A=salesDealActual(staffId,ym);
+  const actual=(A["粗利（新規）"]||0)+(A["粗利（既存）"]||0)+recurringMonthlyTotal(staffId,ym);
+  return {target, actual};
+}
 
 let db = load();
 if(!db.deals) db.deals = [];   // CSV取込の案件データ（納品）
@@ -646,6 +654,33 @@ function renderSummaryView(app){
     <div class="hint" style="margin-top:8px;">実績の入っていない月は「–」。各セルは実績（千円）と達成率。</div>`;
   c2.appendChild(wrap2);
   app.appendChild(c2);
+
+  // 2.5) 営業（受注）の月別達成率（粗利・継続込み）。スタッフ×月の個別達成率
+  const salesStaff = db.staff.filter(s=>s.metric==="受注");
+  if(salesStaff.length){
+    const c25 = card("営業（受注）月別の達成率（粗利・継続込み）","受注月次");
+    const sHead = `<tr><th class="l">スタッフ</th>` +
+      months.map(ym=>`<th>${Number(ym.split("-")[1])}月</th>`).join("") + `<th>通期</th></tr>`;
+    let sBody="";
+    const sDepts=[...new Set(salesStaff.map(s=>s.dept||"その他"))];
+    sDepts.forEach(d=>{
+      sBody += `<tr class="dept"><td colspan="${months.length+2}">${esc(d)}</td></tr>`;
+      salesStaff.filter(s=>(s.dept||"その他")===d).forEach(s=>{
+        let yt=0,ya=0;
+        const cells = months.map(ym=>{
+          const {actual,target}=salesMonthAch(s.id,ym); yt+=target; ya+=actual;
+          if(target<=0 && actual<=0) return `<td class="mini-cell mt">–</td>`;
+          return `<td class="mini-cell">${fmt(actual)}<small>${ratebadge(rateOf(actual,target))}</small></td>`;
+        }).join("");
+        sBody += `<tr><td class="l nm">${esc(s.name)}</td>${cells}<td class="mini-cell"><b>${fmt(ya)}</b><small>${ratebadge(rateOf(ya,yt))}</small></td></tr>`;
+      });
+    });
+    const wrap25=document.createElement("div"); wrap25.className="scroll-x";
+    wrap25.innerHTML=`<table class="sum-table">${sHead}${sBody}</table>
+      <div class="hint" style="margin-top:8px;">各セルは粗利実績（千円・継続込み）と達成率。目標は「目標」タブ、実績は案件から自動集計。個別ページの年間タブと同じ集計です。</div>`;
+    c25.appendChild(wrap25);
+    app.appendChild(c25);
+  }
 
   // 3) メンバー管理（パス元の選択肢マスタ）
   app.appendChild(memberCard());
