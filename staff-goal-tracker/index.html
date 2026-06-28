@@ -1117,6 +1117,19 @@ function salesDealActual(staffId, ym){
   });
   return r;
 }
+// パス実績：自分がパス元（紹介元）になっている案件で受注した分の集計（貢献度・自分の数字には合算しない）
+function passStats(staffId, monthsList){
+  const me=(db.staff.find(s=>s.id===staffId)||{}).name;
+  let count=0, gross=0;
+  if(me){
+    db.pipeline.forEach(p=>{
+      if(p.passFrom!==me || !p.orderDate) return;            // パス元＝自分・受注済みのみ
+      if(monthsList && !monthsList.includes((""+p.orderDate).slice(0,7))) return;
+      count++; gross += Number(p.grossTotal)||dealGross(p);
+    });
+  }
+  return {count, gross};
+}
 // 月次KPI（目標は目標タブ反映・実績は案件から自動集計）
 function salesGoalCard(m){
   const c = card("今月の営業KPI（目標と実績）","SALES");
@@ -1265,6 +1278,7 @@ function salesAnalysisCard(){
   // バー用：受注と継続を分ける（ダッシュボード配色に合わせる）
   let annRec=0; months.forEach(ym=>{ annRec+=recurringMonthlyTotal(cur.staff,ym); });
   const annWon = Math.max(0, annActual - annRec);
+  const passY = passStats(cur.staff, months);   // 通年のパス実績（貢献度）
   const caseDeals = db.pipeline.filter(p=>p.staffId===cur.staff && dealKind(p)==="案件");
   let aPipe=0,bPipe=0; caseDeals.forEach(p=>{ if(p.yomi==="A") aPipe+=dealGross(p); else if(p.yomi==="B") bPipe+=dealGross(p); });
   const bPipeW = Math.round(bPipe*0.8);
@@ -1313,6 +1327,11 @@ function salesAnalysisCard(){
           ${halfBlock("上半期（10-3月）",h1A,h1T,h1R,h1Prog)}
           ${halfBlock("下半期（4-9月）",h2A,h2T,h2R,h2Prog)}
         </div>
+        <div style="margin-left:20px;padding-left:24px;border-left:1px solid var(--line);">
+          <div class="hint" style="font-weight:700;color:var(--cyan);">パス実績（通年・貢献）</div>
+          <div style="font-size:24px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;">${fmt(passY.gross)} <small style="font-size:12px;color:var(--muted);">千円</small></div>
+          <div class="hint">${passY.count}件 ※合算外</div>
+        </div>
       </div>
       <div style="position:relative;height:26px;background:#eef1f5;border-radius:8px;overflow:hidden;display:flex;margin-bottom:6px;">
         ${seg(annWon,YOMI_COLOR.won,"受注")}${seg(annRec,YOMI_COLOR.rec,"継続")}${seg(aPipe,YOMI_COLOR.A,"A見込み")}${seg(bPipeW,YOMI_COLOR.B,"B見込み×80%")}
@@ -1326,12 +1345,23 @@ function salesAnalysisCard(){
 
   const groupTitle=t=>`<div style="font-weight:800;color:var(--navy);font-size:14px;margin:18px 0 2px;border-top:2px solid var(--line);padding-top:14px;">${t}</div>`;
   const wrap=document.createElement("div");
+  // パス実績（月別・貢献度）
+  const passArr=months.map(ym=>passStats(cur.staff,[ym]).gross);
+  const passCntArr=months.map(ym=>passStats(cur.staff,[ym]).count);
+  const passTable=`
+    <div style="font-weight:800;color:var(--cyan);font-size:14px;margin:18px 0 4px;border-top:2px solid var(--line);padding-top:14px;">パス実績（貢献度・あなた発の紹介で受注／自分の数字には合算しません）</div>
+    <div class="scroll-x"><table class="sum-table" style="min-width:960px;">
+      ${header}
+      <tr><td class="l">受注粗利(千円)</td>${passArr.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td style="font-weight:700;color:var(--cyan);">${fmt(sumA(passArr))}</td></tr>
+      <tr><td class="l">件数</td>${passCntArr.map(v=>`<td>${v||"–"}</td>`).join("")}<td style="font-weight:700;">${sumA(passCntArr)}</td></tr>
+    </table></div>`;
   wrap.innerHTML =
     summaryTop
     + groupTitle("全体（新規・既存をまとめた数字）")
     + totalBlock("粗利管理（実績は継続込み）", data.粗利)
     + totalBlock("案件化", data.案件化)
     + totalBlock("アポ", data.アポ)
+    + passTable
     + groupTitle("新規・既存の内訳")
     + splitBlock("粗利管理（実績は継続込み）", data.粗利)
     + splitBlock("案件化", data.案件化)
@@ -1643,10 +1673,22 @@ function monthDashboardCard(m){
       ${legend(COL_NEW,"受注（新規）",wonNew)} ${legend(COL_EXIST,"受注（既存）",wonExist)} ${legend(COL_REC,"継続",L.rec)}
       ${L.target>0?`<span style="color:var(--muted);">｜破線＝目標 ${fmt(L.target)}</span>`:""}
     </div>`;
+  // パス実績（今月・貢献度。自分の数字には合算しない）
+  const passM=passStats(cur.staff, [cur.month]);
+  const passBox=`
+    <div style="min-width:170px;border:1px solid var(--line);border-left:4px solid var(--cyan);border-radius:8px;padding:10px 12px;background:#f0fbfc;">
+      <div class="hint" style="font-weight:700;color:var(--cyan);">パス実績（今月）</div>
+      <div style="font-size:22px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;">${fmt(passM.gross)} <small style="font-size:11px;color:var(--muted);">千円</small></div>
+      <div class="hint">${passM.count}件　あなた発の紹介で受注</div>
+      <div class="hint" style="margin-top:2px;">※自分の粗利には合算しません（貢献度）</div>
+    </div>`;
   const wrap=document.createElement("div");
   wrap.innerHTML=`
     ${sec0(`今月の実績（受注＋継続）　合計 ${fmt(L.confirmed)} 千円`)}
-    ${actualBar}
+    <div style="display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;">
+      <div style="flex:1;min-width:280px;">${actualBar}</div>
+      ${passBox}
+    </div>
 
     ${sec("着地見込みのシナリオ（受注＋継続を土台に積み増し）")}
     <div class="month-summary">${scenarioPanel}</div>
