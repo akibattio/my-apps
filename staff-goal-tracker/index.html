@@ -758,6 +758,17 @@ function monthMainTarget(m){
   }
   return (m.goals && m.goals[0]) ? Number(m.goals[0].target)||0 : 0;
 }
+// 週次の実績＝その週に受注した粗利の合計（案件のorderDateから自動集計／獲得目標と同じ基準＝継続は含まない）
+function weekGrossActual(staffId, ym, period){
+  let s=0;
+  db.pipeline.filter(d=>d.staffId===staffId).forEach(d=>{
+    const od=""+(d.orderDate||"");
+    if(!od.startsWith(ym)) return;
+    const day=Number(od.split("-")[2]);
+    if(day>=period.start && day<=period.end) s+=dealGross(d);
+  });
+  return s;
+}
 function weekCheckHtml(m){
   const need = weeksOfMonth(cur.month).length;
   const sum = m.weeks.slice(0,need).reduce((s,w)=>s+(Number(w.planTarget)||0),0);
@@ -804,6 +815,8 @@ function weeksCard(m){
     $("#weekSplit",splitBar).onclick=()=>{ splitWeeklyEven(m); render(); };
   }
   const periods = weeksOfMonth(cur.month);
+  const isSales = cur.biz==="sales";
+  if(isSales){ periods.forEach((p,i)=>{ m.weeks[i].actual = weekGrossActual(cur.staff, cur.month, p); }); save(); }  // 実績は案件から自動反映
   periods.forEach((p,i)=>{
     const w = m.weeks[i];
     const target = Number(w.planTarget)||0;
@@ -827,7 +840,8 @@ function weeksCard(m){
         </div>
         <div class="col" style="padding:10px;">
           <h4>② 実績（ふりかえる）</h4>
-          <div class="num-line"><label>実績値</label><input type="number" class="i-ac" value="${w.actual}" placeholder="0"></div>
+          <div class="num-line"><label>実績値${isSales?"（自動）":""}</label><input type="number" class="i-ac" value="${w.actual}" placeholder="0" ${isSales?'readonly style="background:#f4f6f9;"':''}></div>
+          ${isSales?'<div class="hint" style="margin:-4px 0 6px;">この週に受注した粗利を案件から自動集計（継続は含みません）。</div>':''}
           <h4>できた行動</h4>
           <textarea class="i-da" placeholder="実際にやれたこと">${esc(w.doneAction)}</textarea>
         </div>
@@ -839,7 +853,7 @@ function weeksCard(m){
     const pt=$(".i-pt",div),pa=$(".i-pa",div),ac=$(".i-ac",div),da=$(".i-da",div),fb=$(".i-fb",div);
     pt.oninput=e=>{w.planTarget=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);updateWeekCheck(m);};
     pa.oninput=e=>{w.planAction=e.target.value;save();};
-    ac.oninput=e=>{w.actual=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);div.classList.toggle("done",e.target.value!=="");};
+    if(!isSales) ac.oninput=e=>{w.actual=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);div.classList.toggle("done",e.target.value!=="");};
     da.oninput=e=>{w.doneAction=e.target.value;save();};
     fb.oninput=e=>{w.feedback=e.target.value;save();};
     c.appendChild(div);
