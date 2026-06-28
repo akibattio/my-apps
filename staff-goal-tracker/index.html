@@ -261,6 +261,7 @@ function periodLabel(p, ym){
 
 // ---- 期（10月開始・翌9月締め）まわり ----
 const pad=n=>String(n).padStart(2,"0");
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
 function curFY(){ const d=new Date(); return (d.getMonth()+1)>=10 ? d.getFullYear() : d.getFullYear()-1; }
 function fyOfMonth(ym){ const [y,mo]=ym.split("-").map(Number); return mo>=10 ? y : y-1; }
 function prevMonth(ym){ const [y,mo]=ym.split("-").map(Number); const py=mo===1?y-1:y, pm=mo===1?12:mo-1; return `${py}-${pad(pm)}`; }
@@ -333,9 +334,10 @@ let db = load();
 if(!db.deals) db.deals = [];   // CSV取込の案件データ（納品）
 if(!db.pipeline) db.pipeline = [];  // 営業の案件パイプライン（ヨミ管理）
 if(!db.recurring) db.recurring = [];  // 営業の継続案件（定期契約・期間で計上）
+if(!db.reports) db.reports = {};      // 日報（key: staffId|YYYY-MM-DD → {notice, plan, fb}）
 if(!db.channels) db.channels = ["既存","WEB","紹介","交流会","レディクル","代理店","展示会","アイミツ","その他"];  // チャネルマスタ（管理者が編集）
 if(!db.members) db.members = db.staff.map(s=>s.name);  // メンバーマスタ（パス元の選択肢・管理者が編集）
-let cur = { staff:null, month:null, view:"detail", fyStart:curFY(), role:"staff", detailTab:"input", biz:"sales", pipeKind:"all", dealView:"pipeline" };
+let cur = { staff:null, month:null, view:"detail", fyStart:curFY(), role:"staff", detailTab:"input", biz:"sales", pipeKind:"all", dealView:"pipeline", reportDate:todayStr() };
 
 function load(){
   try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d&&d.staff) return d; }catch(e){}
@@ -540,6 +542,8 @@ function render(){
       app.appendChild(salesAnalysisCard());
     }else if(cur.detailTab==="newana"){
       app.appendChild(newAnalysisCard());
+    }else if(cur.detailTab==="daily"){
+      app.appendChild(dailyReportCard());
     }else if(cur.detailTab==="deals"){
       app.appendChild(dealsTab());
     }else if(cur.detailTab==="weekly"){
@@ -572,7 +576,7 @@ function bizSwitch(){
 }
 function detailSubtabs(){
   const tabs = cur.biz==="sales"
-    ? [["input","ダッシュボード"],["deals","案件"],["weekly","週次"],["analysis","年間"],["newana","新規分析"],["target","目標"]]
+    ? [["input","ダッシュボード"],["daily","日報"],["deals","案件"],["weekly","週次"],["analysis","年間"],["newana","新規分析"],["target","目標"]]
     : [["input","入力"],["deals","案件"],["analysis","年間"]];
   const d=document.createElement("div"); d.className="subtabs";
   d.innerHTML=tabs.map(([t,l])=>`<button data-t="${t}" class="${cur.detailTab===t?"active":""}">${l}</button>`).join("");
@@ -1726,6 +1730,105 @@ function monthDashboardCard(m){
   c.appendChild(wrap);
   return c;
 }
+/* ---------- 日報（1日の報告） ---------- */
+// その日のKPI（契約＝受注・案件化＝提案・アポ＝活動履歴）を案件から自動集計
+function dailyKPI(staffId, date){
+  let keiyakuCnt=0, keiyakuGross=0, caseCnt=0, apoCnt=0;
+  db.pipeline.filter(p=>p.staffId===staffId).forEach(p=>{
+    if((""+(p.orderDate||""))===date){ keiyakuCnt++; keiyakuGross+=dealGross(p); }
+    if((""+(p.proposalDate||""))===date){ caseCnt++; }
+    (p.activities||[]).forEach(a=>{ if((""+(a.date||""))===date) apoCnt++; });
+  });
+  return {keiyakuCnt, keiyakuGross, caseCnt, apoCnt};
+}
+function reportKey(){ return cur.staff+"|"+cur.reportDate; }
+function getReport(){ return db.reports[reportKey()] || (db.reports[reportKey()]={notice:"",plan:"",fb:"",fbElements:""}); }
+// Anthropic APIキー（各自設定・localStorageに保存）
+function aiKey(){ return localStorage.getItem("anthropic_key")||""; }
+async function aiFeedback(notice, elements, currentFb){
+  const key=aiKey();
+  if(!key) throw new Error("nokey");
+  const sys="あなたは営業チームの上司です。部下の日報を読み、現場目線で簡潔（3〜4文）に、具体的なねぎらいと次の一手のアドバイスを日本語で返します。整いすぎた定型文や説教くさい表現は避け、自然な口調で。";
+  const user = elements && elements.trim()
+    ? `部下の今日の気づき・報告：\n${notice||"（記載なし）"}\n\n下書きフィードバック：\n${currentFb||"（なし）"}\n\n上司として盛り込みたい要素：\n${elements}\n\n上記の要素を自然に反映してフィードバックをリライトしてください。本文のみ出力。`
+    : `部下の今日の気づき・報告：\n${notice||"（記載なし）"}\n\nこれに対する上司からのフィードバック案を作成してください。本文のみ出力。`;
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true","content-type":"application/json"},
+    body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,system:sys,messages:[{role:"user",content:user}]})
+  });
+  if(!res.ok){ const t=await res.text(); throw new Error("api "+res.status+" "+t.slice(0,120)); }
+  const j=await res.json();
+  return (j.content||[]).map(b=>b.text||"").join("").trim();
+}
+function dailyReportCard(){
+  const c=card("日報（1日の報告）","DAILY");
+  const r=getReport();
+  const K=dailyKPI(cur.staff, cur.reportDate);
+  const wrap=document.createElement("div");
+  wrap.innerHTML=`
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <div class="field" style="margin:0;max-width:200px;"><label>日付</label><input type="date" id="rDate" value="${esc(cur.reportDate)}"></div>
+      <button class="btn-ghost btn-mini" id="rToday">今日</button>
+      <button class="btn-ghost btn-mini" id="rKey" style="margin-left:auto;">AIキー設定</button>
+    </div>
+
+    <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:8px;">本日のKPI振り返り（案件から自動集計）</div>
+    <div class="month-summary" style="margin-bottom:16px;">
+      <div class="kpi" style="border-left:4px solid ${YOMI_COLOR.won};"><div class="name">契約（受注）</div><div class="val">${K.keiyakuCnt} <small>件</small></div><div class="hint" style="margin-top:4px;">粗利 ${fmt(K.keiyakuGross)} 千円</div></div>
+      <div class="kpi" style="border-left:4px solid #1f5fb0;"><div class="name">案件化（提案）</div><div class="val">${K.caseCnt} <small>件</small></div></div>
+      <div class="kpi" style="border-left:4px solid var(--cyan);"><div class="name">アポ</div><div class="val">${K.apoCnt} <small>件</small></div></div>
+    </div>
+
+    <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">気づき・報告</div>
+    <textarea id="rNotice" placeholder="今日の気づき・うまくいったこと・課題・共有事項" style="min-height:90px;margin-bottom:14px;">${esc(r.notice)}</textarea>
+
+    <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">明日の計画</div>
+    <textarea id="rPlan" placeholder="明日やること・アポ予定・狙い" style="min-height:70px;margin-bottom:14px;">${esc(r.plan)}</textarea>
+
+    <div style="border-top:1px solid var(--line);padding-top:14px;">
+      <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">上司フィードバック</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+        <button class="btn-primary btn-mini" id="rGen">気づきからFB案を生成</button>
+        <input id="rElements" placeholder="上司が盛り込む要素（例：代理店接触を増やす）" style="flex:1;min-width:220px;">
+        <button class="btn-mini" id="rRewrite">要素を反映してリライト</button>
+      </div>
+      <textarea id="rFb" placeholder="AIの返信案がここに出ます。手動で変更もできます。" style="min-height:90px;">${esc(r.fb)}</textarea>
+      <div class="hint" id="rStatus" style="margin-top:4px;"></div>
+    </div>`;
+  c.appendChild(wrap);
+
+  const $r=id=>wrap.querySelector(id);
+  $r("#rDate").onchange=e=>{ cur.reportDate=e.target.value||todayStr(); render(); };
+  $r("#rToday").onclick=()=>{ cur.reportDate=todayStr(); render(); };
+  $r("#rNotice").oninput=e=>{ getReport().notice=e.target.value; save(); };
+  $r("#rPlan").oninput=e=>{ getReport().plan=e.target.value; save(); };
+  $r("#rFb").oninput=e=>{ getReport().fb=e.target.value; save(); };
+  $r("#rElements").oninput=e=>{ getReport().fbElements=e.target.value; save(); };
+  $r("#rElements").value=r.fbElements||"";
+  $r("#rKey").onclick=()=>{
+    const cur0=aiKey();
+    const v=prompt("Anthropic APIキー（このブラウザにのみ保存されます）", cur0);
+    if(v!=null){ localStorage.setItem("anthropic_key", v.trim()); alert(v.trim()?"保存しました":"クリアしました"); }
+  };
+  const run=async(useElements)=>{
+    const st=$r("#rStatus");
+    if(!aiKey()){ st.textContent="先に「AIキー設定」でAnthropic APIキーを入れてください。"; st.style.color="var(--bad)"; return; }
+    st.style.color="var(--muted)"; st.textContent="生成中…";
+    try{
+      const out=await aiFeedback($r("#rNotice").value, useElements?$r("#rElements").value:"", $r("#rFb").value);
+      $r("#rFb").value=out; getReport().fb=out; save();
+      st.textContent="生成しました（手動で編集できます）。";
+    }catch(err){
+      st.style.color="var(--bad)";
+      st.textContent = err.message==="nokey" ? "APIキーが未設定です。" : ("生成に失敗しました："+err.message);
+    }
+  };
+  $r("#rGen").onclick=()=>run(false);
+  $r("#rRewrite").onclick=()=>run(true);
+  return c;
+}
+
 // 案件タブ：商談（ヨミ）と継続契約を1つにまとめ、中で切替
 function dealsTab(){
   const wrap=document.createElement("div");
