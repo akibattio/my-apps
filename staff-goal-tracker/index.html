@@ -1620,10 +1620,10 @@ function pipelineSummaryCard(){
   c.appendChild(wrap);
   return c;
 }
-// 案件のステータス：アポ（自動判定）／提案前／提案済
+// 案件のステータス：アポ（自動判定）／提案済（提案前は廃止し案件はすべて提案済扱い）
 function dealStatus(p){
   if(dealKind(p)==="アポ") return "アポ";
-  return p.stage || (p.proposalDate ? "提案済" : "提案前");
+  return "提案済";
 }
 function attrChip(a){
   if(a==="新規") return `<span class="status-chip" style="background:#e3f0ff;color:#1f5fb0;border-color:#bcd8fb;">新規</span>`;
@@ -1632,7 +1632,7 @@ function attrChip(a){
 }
 function statusChip(p){
   const s=dealStatus(p);
-  const cls={"アポ":"","提案前":"deliver","提案済":"win"}[s]||"";
+  const cls={"アポ":"","提案済":"win"}[s]||"";
   return `<span class="status-chip ${cls}">${s}</span>`;
 }
 function pipelineCard(){
@@ -1674,7 +1674,7 @@ function pipelineCard(){
       case "apo": return Number(p.apoCount)||0;
       case "gross": return dealGross(p);
       case "yomi": return ({"受注":0,"成功":1,"A":2,"B":3,"C":4,"D":5,"ボツ":8,"パス":9}[p.yomi]??7);
-      case "status": return ({"アポ":0,"提案前":1,"提案済":2}[dealStatus(p)]||0);
+      case "status": return ({"アポ":0,"提案済":2}[dealStatus(p)]||0);
       case "content": return dealContent(p)||"";
       case "bant": return bantText(p);
       case "act": return (p.activities||[]).length;
@@ -1765,7 +1765,7 @@ function openDealModal(p){
   const passOpts = [""].concat(db.members||[]);
   if(d.passFrom && !passOpts.includes(d.passFrom)) passOpts.push(d.passFrom);   // 既存値も選択肢に残す
   const chk=(k)=>d[k]?"checked":"";
-  const initStatus = isNew ? "提案前" : dealStatus(d);
+  const initStatus = isNew ? "提案済" : dealStatus(d);
   const sec=t=>`<div style="font-weight:700;color:var(--navy);font-size:12px;margin:10px 0 5px;border-bottom:1px solid var(--line);padding-bottom:3px;">${t}</div>`;
   const root=$("#modalRoot");
   root.innerHTML=`<div class="modal-bg"><div class="modal" style="max-width:880px;">
@@ -1774,8 +1774,7 @@ function openDealModal(p){
       <div class="field" style="max-width:200px;margin:0;"><label>ステータス</label>
         <select id="fStatus">
           <option ${initStatus==="アポ"?"selected":""}>アポ</option>
-          <option ${initStatus==="提案前"?"selected":""}>提案前</option>
-          <option ${initStatus==="提案済"?"selected":""}>提案済</option>
+          <option ${initStatus!=="アポ"?"selected":""}>提案済</option>
         </select></div>
       <div id="stageNote" class="hint" style="flex:1;min-width:200px;"></div>
     </div>
@@ -1889,16 +1888,15 @@ function openDealModal(p){
     if(!date && !memo) return;
     acts.push({date, memo}); $("#fActDate").value=""; $("#fActMemo").value=""; drawActs();
   };
-  // ステータスでフォームを段階表示：提案前＝基本のみ／アポ＝基本＋アポ情報＋活動／提案済＝全部
+  // ステータスでフォームを段階表示：アポ＝基本＋アポ情報＋活動／提案済＝全部
   const updateStage=()=>{
     const s=$("#fStatus").value;
-    $("#grpApo").style.display  = (s==="アポ"||s==="提案済") ? "" : "none";
+    $("#grpApo").style.display  = "";
     $("#grpProp").style.display = (s==="提案済") ? "" : "none";
-    $("#propWrap").style.display = (s==="提案前") ? "none" : "block";
+    $("#propWrap").style.display = "block";
     $("#stageNote").textContent =
-      s==="提案前" ? "提案前：基本情報だけ入力。提案したら「提案済」に切り替えると日程・金額・確度が出ます。" :
-      s==="アポ"   ? "アポ：アポ回数・次回アポ日・活動履歴を記録します。" :
-                     "提案済：日程・金額・確度・サブ配分まで入力できます。";
+      s==="アポ" ? "アポ：アポ回数・次回アポ日・活動履歴を記録します。"
+                 : "提案済：日程・金額・確度・サブ配分まで入力できます。";
   };
   $("#fStatus").addEventListener("change",updateStage);
   updateStage();
