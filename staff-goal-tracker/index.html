@@ -1365,15 +1365,27 @@ function newAnalysisCard(){
   const targetPos=Math.min(100,target/scale*100);
   const legend=(col,lab,amt)=>`<span style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;background:${col};border-radius:2px;vertical-align:middle;margin-right:4px;"></span>${lab} <b>${fmt(amt)}</b></span>`;
 
-  // ルート別
-  const routes=[...new Set(deals.map(p=>p.route||"未設定"))];
-  const routeRows=routes.map(rt=>{
-    const ds=deals.filter(p=>(p.route||"未設定")===rt);
-    const prop=ds.length, won=ds.filter(isWon).length;
-    const gross=ds.filter(isWon).reduce((s,p)=>s+dealGross(p),0);
-    const wr=prop>0?Math.round(won/prop*100):0;
-    return `<tr><td class="l">${esc(rt)}</td><td>${prop}</td><td>${won}</td><td><span class="ratebadge" style="background:${won>0?'var(--ok)':'#b0b6bf'};">${wr}%</span></td><td>${fmt(gross)}</td></tr>`;
-  }).join("");
+  // ルート別（今月／通年で共通利用するビルダー）
+  const routeTable=(subset)=>{
+    const routes=[...new Set(subset.map(p=>p.route||"未設定"))];
+    const body=routes.map(rt=>{
+      const ds=subset.filter(p=>(p.route||"未設定")===rt);
+      const prop=ds.length, won=ds.filter(isWon).length;
+      const gross=ds.filter(isWon).reduce((s,p)=>s+dealGross(p),0);
+      const wr=prop>0?Math.round(won/prop*100):0;
+      return `<tr><td class="l">${esc(rt)}</td><td>${prop}</td><td>${won}</td><td><span class="ratebadge" style="background:${won>0?'var(--ok)':'#b0b6bf'};">${wr}%</span></td><td>${fmt(gross)}</td></tr>`;
+    }).join("");
+    const tp=subset.length, tw=subset.filter(isWon).length, tg=subset.filter(isWon).reduce((s,p)=>s+dealGross(p),0);
+    const twr=tp>0?Math.round(tw/tp*100):0;
+    return `<div class="scroll-x"><table class="sum-table" style="min-width:560px;">
+      <tr><th class="l">ルート</th><th>提案</th><th>受注</th><th>受注率</th><th>受注粗利(千円)</th></tr>
+      ${body||`<tr><td class="l" colspan="5"><span class="hint">該当する新規案件がありません</span></td></tr>`}
+      <tr style="border-top:2px solid var(--line);font-weight:700;"><td class="l">合計</td><td>${tp}</td><td>${tw}</td><td>${twr}%</td><td>${fmt(tg)}</td></tr>
+    </table></div>`;
+  };
+  const moNm=Number(cur.month.split("-")[1])+"月";
+  const idxNow=months.indexOf(cur.month);
+  const monthSubset=deals.filter(p=> (""+(p.proposalDate||"")).startsWith(cur.month) || (""+(p.orderDate||"")).startsWith(cur.month));
   const totProp=deals.length, totWon=deals.filter(isWon).length;
   const totWr=totProp>0?Math.round(totWon/totProp*100):0;
   const totGross=deals.filter(isWon).reduce((s,p)=>s+dealGross(p),0);
@@ -1385,6 +1397,7 @@ function newAnalysisCard(){
   const wonArr=months.map(ym=>deals.filter(p=>isWon(p)&&inM(p.orderDate,ym)).length);
   const grossArr=months.map(ym=>deals.filter(p=>isWon(p)&&inM(p.orderDate,ym)).reduce((s,p)=>s+dealGross(p),0));
   const sumA=a=>a.reduce((s,v)=>s+v,0);
+  const mProp=idxNow>=0?propArr[idxNow]:0, mWon=idxNow>=0?wonArr[idxNow]:0, mWr=mProp>0?Math.round(mWon/mProp*100):0;
   const moHeader=`<tr><th class="l">　</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th></tr>`;
   const monthTable=`
     <div style="font-weight:800;color:var(--navy);font-size:14px;margin-bottom:6px;">月次分析（新規案件・一覧）</div>
@@ -1416,20 +1429,28 @@ function newAnalysisCard(){
     </div>
 
     <div style="font-weight:700;color:var(--navy);margin:18px 0 6px;border-top:1px solid var(--line);padding-top:14px;">受注率（提案→契約）</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:6px;">
-      <span style="font-size:13px;color:var(--muted);">提案 <b style="color:var(--ink);font-size:18px;">${totProp}</b> 件</span>
-      <span style="color:var(--muted);">→</span>
-      <span style="font-size:13px;color:var(--muted);">受注 <b style="color:var(--ink);font-size:18px;">${totWon}</b> 件</span>
-      <span class="ratebadge" style="background:${totWon>0?'var(--ok)':'#b0b6bf'};font-size:14px;">受注率 ${totWr}%</span>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:baseline;margin-bottom:6px;">
+      <div style="display:flex;gap:8px;align-items:baseline;">
+        <span class="hint">今月（${moNm}）</span>
+        <span style="font-size:13px;color:var(--muted);">提案 <b style="color:var(--ink);font-size:16px;">${mProp}</b></span>
+        <span style="color:var(--muted);">→</span>
+        <span style="font-size:13px;color:var(--muted);">受注 <b style="color:var(--ink);font-size:16px;">${mWon}</b></span>
+        <span class="ratebadge" style="background:${mWon>0?'var(--ok)':'#b0b6bf'};font-size:13px;">${mWr}%</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:baseline;border-left:1px solid var(--line);padding-left:24px;">
+        <span class="hint">通年</span>
+        <span style="font-size:13px;color:var(--muted);">提案 <b style="color:var(--ink);font-size:16px;">${totProp}</b></span>
+        <span style="color:var(--muted);">→</span>
+        <span style="font-size:13px;color:var(--muted);">受注 <b style="color:var(--ink);font-size:16px;">${totWon}</b></span>
+        <span class="ratebadge" style="background:${totWon>0?'var(--ok)':'#b0b6bf'};font-size:13px;">${totWr}%</span>
+      </div>
     </div>
 
-    <div style="font-weight:700;color:var(--navy);margin:18px 0 6px;border-top:1px solid var(--line);padding-top:14px;">ルート別の実績</div>
-    <div class="scroll-x"><table class="sum-table" style="min-width:560px;">
-      <tr><th class="l">ルート</th><th>提案</th><th>受注</th><th>受注率</th><th>受注粗利(千円)</th></tr>
-      ${routeRows||`<tr><td class="l" colspan="5"><span class="hint">新規案件がありません</span></td></tr>`}
-      <tr style="border-top:2px solid var(--line);font-weight:700;"><td class="l">合計</td><td>${totProp}</td><td>${totWon}</td><td>${totWr}%</td><td>${fmt(totGross)}</td></tr>
-    </table></div>
-    <div class="hint" style="margin-top:10px;">新規案件（属性＝新規）のみ集計。提案＝案件化した新規案件、受注＝ヨミが受注/成功。</div>`;
+    <div style="font-weight:700;color:var(--navy);margin:18px 0 6px;border-top:1px solid var(--line);padding-top:14px;">ルート別の実績（今月：${moNm}）</div>
+    ${routeTable(monthSubset)}
+    <div style="font-weight:700;color:var(--navy);margin:16px 0 6px;">ルート別の実績（通年）</div>
+    ${routeTable(deals)}
+    <div class="hint" style="margin-top:10px;">新規案件（属性＝新規）のみ集計。今月＝提案日または受注日がその月の案件。受注＝ヨミが受注/成功。提案＝案件化した新規案件。</div>`;
   c.appendChild(wrap);
   return c;
 }
