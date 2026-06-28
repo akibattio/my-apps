@@ -1443,9 +1443,34 @@ function newAnalysisCard(){
     </table></div>
     <div class="hint" style="margin:6px 0 16px;">提案＝その月に提案（案件化）した新規案件、受注＝その月に受注した新規案件。受注率は同月内の参考値。</div>`;
 
+  // ルート別 月次（受注数・受注粗利）
+  const routesAll=[...new Set(deals.map(p=>p.route||"未設定"))];
+  const rCnt=(rt,ym)=>deals.filter(p=>(p.route||"未設定")===rt && isWon(p) && inM(p.orderDate,ym)).length;
+  const rGross=(rt,ym)=>deals.filter(p=>(p.route||"未設定")===rt && isWon(p) && inM(p.orderDate,ym)).reduce((s,p)=>s+dealGross(p),0);
+  const routeMonthTable=(getter,unitLabel)=>{
+    const rows=routesAll.map(rt=>{
+      const vals=months.map(ym=>getter(rt,ym));
+      return `<tr><td class="l">${esc(rt)}</td>${vals.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td style="font-weight:700;">${fmt(sumA(vals))}</td></tr>`;
+    }).join("");
+    const colTot=months.map(ym=>routesAll.reduce((s,rt)=>s+getter(rt,ym),0));
+    return `<div class="scroll-x"><table class="sum-table" style="min-width:960px;">
+      <tr><th class="l">ルート＼${unitLabel}</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th></tr>
+      ${rows||`<tr><td class="l" colspan="${months.length+2}"><span class="hint">新規案件がありません</span></td></tr>`}
+      <tr style="border-top:2px solid var(--line);font-weight:700;"><td class="l">合計</td>${colTot.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td>${fmt(sumA(colTot))}</td></tr>
+    </table></div>`;
+  };
+  const routeMonthSection=`
+    <div style="font-weight:800;color:var(--navy);font-size:14px;margin:6px 0 6px;border-top:1px solid var(--line);padding-top:14px;">ルート別の月次（新規・受注ベース）</div>
+    <div style="font-weight:700;color:var(--navy);margin:6px 0 4px;">受注数（件）</div>
+    ${routeMonthTable(rCnt,"件")}
+    <div style="font-weight:700;color:var(--navy);margin:12px 0 4px;">受注粗利（千円）</div>
+    ${routeMonthTable(rGross,"千円")}
+    <div class="hint" style="margin:6px 0 16px;">その月に受注した新規案件を、ルート別に集計（受注＝ヨミが受注/成功）。</div>`;
+
   const wrap=document.createElement("div");
   wrap.innerHTML=`
     ${monthTable}
+    ${routeMonthSection}
     <div style="font-weight:700;color:var(--navy);margin:6px 0 6px;border-top:2px solid var(--line);padding-top:14px;">新規粗利の着地予想（通期）</div>
     <div class="hint" style="margin-bottom:8px;">着地予想 ＝ 受注確定 ＋ A案件（100%）＋ B案件（80%）。C・D案件は含めません。</div>
     <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
