@@ -858,6 +858,7 @@ function weeksCard(m){
         <span class="wk">${WEEK_LABELS[i]}</span>
         <span class="period">${periodLabel(p, cur.month)}</span>
         ${rate!=null?`<span class="rate-pill" style="background:${rateColor(rate)}">達成 ${rate}%</span>`:`<span class="hint">未集計</span>`}
+        ${isSales?paceBadge(actual, target, weekElapsed(cur.month,p)):""}
         <span class="rate"></span>
       </div>
       <div class="grid2">
@@ -1241,15 +1242,19 @@ function salesAnalysisCard(){
   // 上半期(10-3月)・下半期(4-9月)の実績達成率
   const h1T=sumA(grossTotT.slice(0,6)), h1A=sumA(grossTotA.slice(0,6)), h1R=rateOf(h1A,h1T);
   const h2T=sumA(grossTotT.slice(6)),   h2A=sumA(grossTotA.slice(6)),   h2R=rateOf(h2A,h2T);
+  // 期中のペース判定（経過月数に対して順調か）。色（赤黄緑）は最終評価＝絶対達成率のまま
+  const fyProg=monthsElapsed(months, cur.month);
+  const h1Prog=monthsElapsed(halfMonths(fy,"H1"), cur.month);
+  const h2Prog=monthsElapsed(halfMonths(fy,"H2"), cur.month);
   const scale = Math.max(annTarget, annLanding, 1), bw=v=>v/scale*100;
   const seg=(amt,col,lab)=>amt>0?`<div style="width:${bw(amt)}%;background:${col};" title="${lab} ${fmt(amt)}千円"></div>`:"";
   const tpos=Math.min(100, annTarget/scale*100);
   const lg=(col,lab,amt)=>`<span style="white-space:nowrap;"><span style="display:inline-block;width:11px;height:11px;background:${col};border-radius:2px;vertical-align:middle;margin-right:4px;"></span>${lab} <b>${fmt(amt)}</b></span>`;
   // 実績ブロックと同じサイズ感の半期ブロック
-  const halfBlock=(lab,a,t,r)=>`
+  const halfBlock=(lab,a,t,r,prog)=>`
     <div>
       <div class="hint">${lab}</div>
-      <div style="font-size:24px;font-weight:800;color:${rateColor(r)};font-variant-numeric:tabular-nums;">${fmt(a)} <span class="ratebadge" style="background:${rateColor(r)};font-size:12px;vertical-align:middle;">${r}%</span></div>
+      <div style="font-size:24px;font-weight:800;color:${rateColor(r)};font-variant-numeric:tabular-nums;">${fmt(a)} <span class="ratebadge" style="background:${rateColor(r)};font-size:12px;vertical-align:middle;">${r}%</span>${paceBadge(a,t,prog)}</div>
       <div class="hint">/ 目標 ${fmt(t)}</div>
     </div>`;
   const summaryTop=`
@@ -1261,7 +1266,7 @@ function salesAnalysisCard(){
         </div>
         <div>
           <div class="hint">実績（累計・継続込み）</div>
-          <div style="font-size:24px;font-weight:800;color:${colActual};font-variant-numeric:tabular-nums;">${fmt(annActual)} <span class="ratebadge" style="background:${colActual};font-size:12px;vertical-align:middle;">${rateActual}%</span></div>
+          <div style="font-size:24px;font-weight:800;color:${colActual};font-variant-numeric:tabular-nums;">${fmt(annActual)} <span class="ratebadge" style="background:${colActual};font-size:12px;vertical-align:middle;">${rateActual}%</span>${paceBadge(annActual,annTarget,fyProg)}</div>
           <div class="hint" style="color:${gapActual<0?'var(--bad)':'var(--ok)'};">GAP ${gapActual>0?"+":""}${fmt(gapActual)}</div>
         </div>
         <div>
@@ -1270,8 +1275,8 @@ function salesAnalysisCard(){
           <div class="hint" style="color:${gapLanding<0?'var(--bad)':'var(--ok)'};">着地GAP ${gapLanding>0?"+":""}${fmt(gapLanding)}</div>
         </div>
         <div style="display:flex;gap:24px;flex-wrap:wrap;margin-left:20px;padding-left:24px;border-left:1px solid var(--line);">
-          ${halfBlock("上半期（10-3月）",h1A,h1T,h1R)}
-          ${halfBlock("下半期（4-9月）",h2A,h2T,h2R)}
+          ${halfBlock("上半期（10-3月）",h1A,h1T,h1R,h1Prog)}
+          ${halfBlock("下半期（4-9月）",h2A,h2T,h2R,h2Prog)}
         </div>
       </div>
       <div style="position:relative;height:26px;background:#eef1f5;border-radius:8px;overflow:hidden;display:flex;margin-bottom:6px;">
@@ -2256,6 +2261,30 @@ function card(title,tag){
   return c;
 }
 function rateColor(r){ if(r>=100)return"var(--ok)"; if(r>=70)return"var(--warn)"; return"var(--bad)"; }
+// 期中向け：経過割合に対して順調か（順調/遅れ気味）。最終評価の絶対達成率とは役割が別
+function paceBadge(actual, target, prog){
+  if(target<=0 || prog<=0) return "";
+  return actual >= target*prog
+    ? '<span class="ratebadge" style="background:var(--ok);font-size:11px;margin-left:4px;">順調</span>'
+    : '<span class="ratebadge" style="background:var(--warn);font-size:11px;margin-left:4px;">遅れ気味</span>';
+}
+// 月リストの経過割合（当月＝その月まで完了として (index+1)/件数。範囲外は0か1）
+function monthsElapsed(monthsList, ym){
+  const idx=monthsList.indexOf(ym);
+  if(idx>=0) return (idx+1)/monthsList.length;
+  return ym > monthsList[monthsList.length-1] ? 1 : 0;
+}
+// 週の経過割合（当月の今週は経過日数ベース、過去週は1、未来週は0）
+function weekElapsed(ym, period){
+  const now=new Date();
+  const curYM=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  if(ym<curYM) return 1;
+  if(ym>curYM) return 0;
+  const d=now.getDate();
+  if(d>period.end) return 1;
+  if(d<period.start) return 0;
+  return (d-period.start+1)/(period.end-period.start+1);
+}
 function fmt(n){ return (Number(n)||0).toLocaleString("ja-JP"); }
 function esc(s){ return (s??"").toString().replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 
