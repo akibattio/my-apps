@@ -564,7 +564,7 @@ function bizSwitch(){
 }
 function detailSubtabs(){
   const tabs = cur.biz==="sales"
-    ? [["input","ダッシュボード"],["weekly","週次"],["deals","案件"],["analysis","年間"],["newana","新規分析"],["target","目標"]]
+    ? [["input","ダッシュボード"],["deals","案件"],["weekly","週次"],["analysis","年間"],["newana","新規分析"],["target","目標"]]
     : [["input","入力"],["deals","案件"],["analysis","年間"]];
   const d=document.createElement("div"); d.className="subtabs";
   d.innerHTML=tabs.map(([t,l])=>`<button data-t="${t}" class="${cur.detailTab===t?"active":""}">${l}</button>`).join("");
@@ -1638,6 +1638,13 @@ function pipelineCard(){
     <button class="btn-mini" id="addPipe" style="margin-left:8px;">＋ 案件を追加（詳細）</button>
     <span class="hint" style="margin-left:8px;">行クリックで編集。見出しクリックで並び替え。活動履歴はマウスを乗せると内容表示。</span>`;
   c.appendChild(add);
+  // ヨミで絞り込み（受注・没などを隠せる）。デフォルトで受注・成功・ボツ・パスを非表示
+  const YOMI_FILTER_KEYS=["A","B","C","D","アポ","未設定","受注","成功","ボツ","パス"];
+  if(!cur.pipeYomiHidden) cur.pipeYomiHidden=["受注","成功","ボツ","パス"];
+  const yomiKey=p=> dealKind(p)==="アポ" ? "アポ" : (p.yomi||"未設定");
+  const filterBar=document.createElement("div");
+  filterBar.style.cssText="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;";
+  c.appendChild(filterBar);
   const body = document.createElement("div"); body.className="scroll-x";
   c.appendChild(body);
 
@@ -1691,7 +1698,7 @@ function pipelineCard(){
     }
   };
   const draw=()=>{
-    const list=db.pipeline.filter(p=>p.staffId===cur.staff).slice();
+    const list=db.pipeline.filter(p=>p.staffId===cur.staff && !cur.pipeYomiHidden.includes(yomiKey(p))).slice();
     const {key,dir}=cur.pipeSort;
     if(key) list.sort((a,b)=>{ const x=valOf(a,key),y=valOf(b,key);
       return (typeof x==="number"&&typeof y==="number") ? (x-y)*dir : String(x).localeCompare(String(y),"ja")*dir; });
@@ -1701,7 +1708,7 @@ function pipelineCard(){
     }).join("")}<th></th></tr>`;
     const rows = list.length ? list.map(p=>
       `<tr data-id="${p.id}" style="cursor:pointer;">${cols.map(col=>cellOf(p,col.k)).join("")}<td class="num"><button class="btn-mini" data-edit="${p.id}">編集</button></td></tr>`
-    ).join("") : `<tr><td colspan="${cols.length+1}" class="hint">案件がありません。「＋ アポ記録」または「＋ 案件を追加」から登録してください。</td></tr>`;
+    ).join("") : `<tr><td colspan="${cols.length+1}" class="hint">${db.pipeline.some(p=>p.staffId===cur.staff)?"絞り込み条件に合う案件がありません（ヨミの絞り込みを確認）。":"案件がありません。「＋ アポ記録」または「＋ 案件を追加」から登録してください。"}</td></tr>`;
     body.innerHTML=`<table class="deal-table" style="min-width:1180px;white-space:nowrap;"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
     body.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{
       const k=th.dataset.k;
@@ -1714,6 +1721,23 @@ function pipelineCard(){
     });
     body.querySelectorAll("button[data-edit]").forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); openDealModal(db.pipeline.find(x=>x.id===b.dataset.edit)); });
   };
+  const drawFilter=()=>{
+    const counts={}; db.pipeline.filter(p=>p.staffId===cur.staff).forEach(p=>{ const k=yomiKey(p); counts[k]=(counts[k]||0)+1; });
+    filterBar.innerHTML=`<span class="hint" style="margin-right:2px;">ヨミで絞り込み：</span>`
+      + YOMI_FILTER_KEYS.map(k=>{
+          const on=!cur.pipeYomiHidden.includes(k);
+          return `<button class="btn-mini" data-y="${esc(k)}" style="border:1px solid var(--line);${on?"":"opacity:.4;"}">${esc(k)}${counts[k]?`<span class="hint" style="margin-left:3px;">${counts[k]}</span>`:""}</button>`;
+        }).join("")
+      + `<button class="btn-mini" data-y="__all" style="margin-left:6px;">全表示</button>`;
+    filterBar.querySelectorAll("button[data-y]").forEach(b=>b.onclick=()=>{
+      const k=b.dataset.y;
+      if(k==="__all") cur.pipeYomiHidden=[];
+      else if(cur.pipeYomiHidden.includes(k)) cur.pipeYomiHidden=cur.pipeYomiHidden.filter(x=>x!==k);
+      else cur.pipeYomiHidden=cur.pipeYomiHidden.concat(k);
+      drawFilter(); draw();
+    });
+  };
+  drawFilter();
   draw();
   $("#addPipe",add).onclick=()=>openDealModal(null);
   $("#addApo",add).onclick=()=>openApoModal();
