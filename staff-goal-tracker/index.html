@@ -1547,9 +1547,19 @@ function monthDashboardCard(m){
       <div class="hint" style="margin-top:4px;">着地に＋${fmt(L.contrib[y])}</div></div>`).join("");
 
   const sec0=t=>`<div style="font-weight:700;color:var(--navy);font-size:13px;margin:2px 0 8px;">${t}</div>`;
+  // 今月の実績（確定）の内訳：受注（新規/既存）＝赤系、継続＝紫
+  const Aw = salesDealActual(cur.staff, cur.month);
+  const wonNew=Aw["粗利（新規）"]||0, wonExist=Aw["粗利（既存）"]||0;
+  const actualPanel=`
+    <div class="kpi" style="border-left:4px solid ${YOMI_COLOR.won};"><div class="name">受注（新規）</div><div class="val">${fmt(wonNew)} <small>千円</small></div></div>
+    <div class="kpi" style="border-left:4px solid ${YOMI_COLOR.won};"><div class="name">受注（既存）</div><div class="val">${fmt(wonExist)} <small>千円</small></div></div>
+    <div class="kpi" style="border-left:4px solid ${YOMI_COLOR.rec};"><div class="name">継続</div><div class="val">${fmt(L.rec)} <small>千円</small></div></div>`;
   const wrap=document.createElement("div");
   wrap.innerHTML=`
-    ${sec0("着地見込みのシナリオ（受注＋継続を土台に積み増し）")}
+    ${sec0(`今月の実績（受注＋継続）　合計 ${fmt(L.confirmed)} 千円`)}
+    <div class="month-summary">${actualPanel}</div>
+
+    ${sec("着地見込みのシナリオ（受注＋継続を土台に積み増し）")}
     <div class="month-summary">${scenarioPanel}</div>
 
     ${sec("ヨミ別の見込み（個人粗利）")}
