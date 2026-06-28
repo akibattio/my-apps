@@ -1782,71 +1782,110 @@ async function aiFeedback(notice, elements, currentFb){
   const j=await res.json();
   return (j.content||[]).map(b=>b.text||"").join("").trim();
 }
+function reportFor(staffId,date){ const k=staffId+"|"+date; return db.reports[k]||(db.reports[k]={notice:"",plan:"",fb:"",fbElements:""}); }
+// その月で日報・KPIのある日付（新しい順）
+function reportDatesOfMonth(staffId,ym){
+  const set=new Set();
+  Object.keys(db.reports).forEach(k=>{ const i=k.indexOf("|"); if(i<0) return; const sid=k.slice(0,i), date=k.slice(i+1);
+    if(sid===staffId && date.startsWith(ym)){ const r=db.reports[k]; if((r.notice||"").trim()||(r.plan||"").trim()||(r.fb||"").trim()) set.add(date); } });
+  db.pipeline.filter(p=>p.staffId===staffId).forEach(p=>{
+    [p.orderDate,p.proposalDate].forEach(d=>{ if(d&&(""+d).startsWith(ym)) set.add(""+d); });
+    (p.activities||[]).forEach(a=>{ if(a.date&&(""+a.date).startsWith(ym)) set.add(""+a.date); });
+  });
+  return [...set].sort().reverse();
+}
+function dowOf(date){ const [y,m,d]=date.split("-").map(Number); return ["日","月","火","水","木","金","土"][new Date(y,m-1,d).getDay()]; }
 function dailyReportCard(){
-  const c=card("日報（1日の報告）","DAILY");
-  const r=getReport();
-  const K=dailyKPI(cur.staff, cur.reportDate);
-  const wrap=document.createElement("div");
-  wrap.innerHTML=`
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
-      <div class="field" style="margin:0;max-width:200px;"><label>日付</label><input type="date" id="rDate" value="${esc(cur.reportDate)}"></div>
-      <button class="btn-ghost btn-mini" id="rToday">今日</button>
-      <button class="btn-ghost btn-mini" id="rKey" style="margin-left:auto;">AIキー設定</button>
-    </div>
+  const isAdmin=cur.role==="admin";
+  const staffName=(db.staff.find(s=>s.id===cur.staff)||{}).name||"";
+  const c=card(isAdmin?`日報レビュー（管理者）｜${esc(staffName)}`:"日報（1日の報告）","DAILY");
+  const ym=cur.month;
+  const wrap=document.createElement("div"); c.appendChild(wrap);
 
-    <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:8px;">本日のKPI振り返り（案件から自動集計）</div>
-    <div class="month-summary" style="margin-bottom:16px;">
-      <div class="kpi" style="border-left:4px solid ${YOMI_COLOR.won};"><div class="name">契約（受注）</div><div class="val">${K.keiyakuCnt} <small>件</small></div><div class="hint" style="margin-top:4px;">粗利 ${fmt(K.keiyakuGross)} 千円</div></div>
-      <div class="kpi" style="border-left:4px solid #1f5fb0;"><div class="name">案件化（提案）</div><div class="val">${K.caseCnt} <small>件</small></div></div>
-      <div class="kpi" style="border-left:4px solid var(--cyan);"><div class="name">アポ</div><div class="val">${K.apoCnt} <small>件</small></div></div>
-    </div>
-
-    <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">気づき・報告</div>
-    <textarea id="rNotice" placeholder="今日の気づき・うまくいったこと・課題・共有事項" style="min-height:90px;margin-bottom:14px;">${esc(r.notice)}</textarea>
-
-    <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">明日の計画</div>
-    <textarea id="rPlan" placeholder="明日やること・アポ予定・狙い" style="min-height:70px;margin-bottom:14px;">${esc(r.plan)}</textarea>
-
-    <div style="border-top:1px solid var(--line);padding-top:14px;">
-      <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">上司フィードバック</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
-        <button class="btn-primary btn-mini" id="rGen">気づきからFB案を生成</button>
-        <input id="rElements" placeholder="上司が盛り込む要素（例：代理店接触を増やす）" style="flex:1;min-width:220px;">
-        <button class="btn-mini" id="rRewrite">要素を反映してリライト</button>
+  if(!isAdmin){
+    // スタッフ：選択日の入力フォーム
+    const r=reportFor(cur.staff,cur.reportDate), K=dailyKPI(cur.staff,cur.reportDate);
+    const top=document.createElement("div");
+    top.style.cssText="border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px;background:#fafbfc;";
+    top.innerHTML=`
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+        <div class="field" style="margin:0;max-width:190px;"><label>日付</label><input type="date" id="rDate" value="${esc(cur.reportDate)}"></div>
+        <button class="btn-ghost btn-mini" id="rToday">今日</button>
       </div>
-      <textarea id="rFb" placeholder="AIの返信案がここに出ます。手動で変更もできます。" style="min-height:90px;">${esc(r.fb)}</textarea>
-      <div class="hint" id="rStatus" style="margin-top:4px;"></div>
-    </div>`;
-  c.appendChild(wrap);
+      <div class="month-summary" style="margin-bottom:14px;">
+        <div class="kpi" style="border-left:4px solid ${YOMI_COLOR.won};"><div class="name">契約（受注）</div><div class="val">${K.keiyakuCnt} <small>件</small></div><div class="hint" style="margin-top:4px;">粗利 ${fmt(K.keiyakuGross)} 千円</div></div>
+        <div class="kpi" style="border-left:4px solid #1f5fb0;"><div class="name">案件化（提案）</div><div class="val">${K.caseCnt} <small>件</small></div></div>
+        <div class="kpi" style="border-left:4px solid var(--cyan);"><div class="name">アポ</div><div class="val">${K.apoCnt} <small>件</small></div></div>
+      </div>
+      <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">気づき・報告</div>
+      <textarea id="rNotice" placeholder="今日の気づき・うまくいったこと・課題・共有事項" style="min-height:80px;margin-bottom:12px;">${esc(r.notice)}</textarea>
+      <div style="font-weight:700;color:var(--navy);font-size:13px;margin-bottom:6px;">明日の計画</div>
+      <textarea id="rPlan" placeholder="明日やること・アポ予定・狙い" style="min-height:60px;">${esc(r.plan)}</textarea>`;
+    wrap.appendChild(top);
+    const q=id=>top.querySelector(id);
+    q("#rDate").onchange=e=>{ cur.reportDate=e.target.value||todayStr(); render(); };
+    q("#rToday").onclick=()=>{ cur.reportDate=todayStr(); render(); };
+    q("#rNotice").oninput=e=>{ reportFor(cur.staff,cur.reportDate).notice=e.target.value; save(); };
+    q("#rPlan").oninput=e=>{ reportFor(cur.staff,cur.reportDate).plan=e.target.value; save(); };
+  }else{
+    const bar=document.createElement("div"); bar.style.cssText="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;";
+    bar.innerHTML=`<span class="hint">上のスタッフ・対象月を切り替えて、各日報にフィードバックできます。</span><button class="btn-ghost btn-mini" id="rKey" style="margin-left:auto;">AIキー設定</button>`;
+    wrap.appendChild(bar);
+    bar.querySelector("#rKey").onclick=()=>{ const v=prompt("Anthropic APIキー（このブラウザにのみ保存）", aiKey()); if(v!=null){ localStorage.setItem("anthropic_key",v.trim()); alert(v.trim()?"保存しました":"クリアしました"); } };
+  }
 
-  const $r=id=>wrap.querySelector(id);
-  $r("#rDate").onchange=e=>{ cur.reportDate=e.target.value||todayStr(); render(); };
-  $r("#rToday").onclick=()=>{ cur.reportDate=todayStr(); render(); };
-  $r("#rNotice").oninput=e=>{ getReport().notice=e.target.value; save(); };
-  $r("#rPlan").oninput=e=>{ getReport().plan=e.target.value; save(); };
-  $r("#rFb").oninput=e=>{ getReport().fb=e.target.value; save(); };
-  $r("#rElements").oninput=e=>{ getReport().fbElements=e.target.value; save(); };
-  $r("#rElements").value=r.fbElements||"";
-  $r("#rKey").onclick=()=>{
-    const cur0=aiKey();
-    const v=prompt("Anthropic APIキー（このブラウザにのみ保存されます）", cur0);
-    if(v!=null){ localStorage.setItem("anthropic_key", v.trim()); alert(v.trim()?"保存しました":"クリアしました"); }
-  };
-  const run=async(useElements)=>{
-    const st=$r("#rStatus");
-    if(!aiKey()){ st.textContent="先に「AIキー設定」でAnthropic APIキーを入れてください。"; st.style.color="var(--bad)"; return; }
-    st.style.color="var(--muted)"; st.textContent="生成中…";
-    try{
-      const out=await aiFeedback($r("#rNotice").value, useElements?$r("#rElements").value:"", $r("#rFb").value);
-      $r("#rFb").value=out; getReport().fb=out; save();
-      st.textContent="生成しました（手動で編集できます）。";
-    }catch(err){
-      st.style.color="var(--bad)";
-      st.textContent = err.message==="nokey" ? "APIキーが未設定です。" : ("生成に失敗しました："+err.message);
+  const head=document.createElement("div");
+  head.style.cssText="font-weight:800;color:var(--navy);font-size:14px;margin:6px 0 10px;border-top:1px solid var(--line);padding-top:14px;";
+  head.textContent=`${ym} の日報一覧`;
+  wrap.appendChild(head);
+
+  const dates=reportDatesOfMonth(cur.staff,ym);
+  if(!dates.length){ const e=document.createElement("div"); e.className="hint"; e.textContent="この月の日報はまだありません。"; wrap.appendChild(e); return c; }
+
+  dates.forEach(date=>{
+    const rr=reportFor(cur.staff,date), kk=dailyKPI(cur.staff,date);
+    const el=document.createElement("div"); el.className="week";
+    el.innerHTML=`
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px;">
+        <span style="font-weight:700;color:var(--navy);">${date}（${dowOf(date)}）</span>
+        <span class="hint">契約 ${kk.keiyakuCnt}（${fmt(kk.keiyakuGross)}千円）／案件化 ${kk.caseCnt}／アポ ${kk.apoCnt}</span>
+        ${!isAdmin?`<button class="btn-mini d-edit" style="margin-left:auto;">この日を編集</button>`:""}
+      </div>
+      <div style="font-size:13px;margin-bottom:6px;"><b>気づき：</b><span style="white-space:pre-wrap;">${rr.notice?esc(rr.notice):'<span class="hint">未記入</span>'}</span></div>
+      <div style="font-size:13px;margin-bottom:8px;"><b>明日の計画：</b><span style="white-space:pre-wrap;">${rr.plan?esc(rr.plan):'<span class="hint">未記入</span>'}</span></div>`;
+    if(!isAdmin){
+      const eb=el.querySelector(".d-edit"); if(eb) eb.onclick=()=>{ cur.reportDate=date; render(); window.scrollTo(0,0); };
     }
-  };
-  $r("#rGen").onclick=()=>run(false);
-  $r("#rRewrite").onclick=()=>run(true);
+    if(isAdmin){
+      const fbBox=document.createElement("div"); fbBox.style.cssText="border-top:1px dashed var(--line);padding-top:8px;";
+      fbBox.innerHTML=`
+        <div style="font-weight:700;color:var(--cyan);font-size:12px;margin-bottom:6px;">上司フィードバック</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+          <button type="button" class="btn-primary btn-mini d-gen">気づきからFB案</button>
+          <input class="d-elem" placeholder="盛り込む要素" style="flex:1;min-width:140px;" value="${esc(rr.fbElements||"")}">
+          <button type="button" class="btn-mini d-rewrite">要素を反映</button>
+        </div>
+        <textarea class="d-fb" placeholder="AIの返信案・手動編集可" style="min-height:70px;">${esc(rr.fb)}</textarea>
+        <div class="hint d-status" style="margin-top:4px;"></div>`;
+      el.appendChild(fbBox);
+      const fb=fbBox.querySelector(".d-fb"), elem=fbBox.querySelector(".d-elem"), stt=fbBox.querySelector(".d-status");
+      fb.oninput=e=>{ rr.fb=e.target.value; save(); };
+      elem.oninput=e=>{ rr.fbElements=e.target.value; save(); };
+      const runD=async(useEl)=>{
+        if(!aiKey()){ stt.style.color="var(--bad)"; stt.textContent="「AIキー設定」でAPIキーを入れてください。"; return; }
+        stt.style.color="var(--muted)"; stt.textContent="生成中…";
+        try{ const out=await aiFeedback(rr.notice, useEl?elem.value:"", fb.value); fb.value=out; rr.fb=out; save(); stt.textContent="生成しました（手動で編集できます）。"; }
+        catch(err){ stt.style.color="var(--bad)"; stt.textContent="生成に失敗："+err.message; }
+      };
+      fbBox.querySelector(".d-gen").onclick=()=>runD(false);
+      fbBox.querySelector(".d-rewrite").onclick=()=>runD(true);
+    }else{
+      const v=document.createElement("div"); v.style.cssText="border-left:3px solid var(--cyan);background:#f0fbfc;padding:8px 10px;border-radius:6px;font-size:13px;";
+      v.innerHTML=`<b style="color:var(--cyan);">上司FB：</b><span style="white-space:pre-wrap;">${rr.fb?esc(rr.fb):'<span class="hint">まだコメントはありません</span>'}</span>`;
+      el.appendChild(v);
+    }
+    wrap.appendChild(el);
+  });
   return c;
 }
 
