@@ -1116,8 +1116,8 @@ function salesGoalCard(m){
     cards+=`<div class="kpi-card">
       <div class="ttl">${cat.label}<small>（${cat.unit}）</small>${pace}</div>
       <div class="big">${fmt(aS)}<small>/ 目標 ${fmt(tS)}</small> <span class="ratebadge" style="background:${tS>0?col:'var(--muted)'};">${tS>0?rate+"%":"–"}</span></div>
-      ${(()=>{ const pN=tS>0?aN/tS*100:0, pE=tS>0?(aE+cont)/tS*100:0; const dN=Math.min(100,pN), dE=Math.min(Math.max(0,100-dN),pE);
-        return `<div class="pbar" title="新規 ${fmt(aN)}／既存 ${fmt(aE+cont)}（継続込み）／目標 ${fmt(tS)}"><span style="width:${dN}%;background:#1f5fb0;"></span><span style="width:${dE}%;background:#bd6f24;"></span></div>`; })()}
+      ${(()=>{ const W=tS>0?Math.min(100,rate):0; const wN=aS>0?W*aN/aS:0, wE=aS>0?W*(aE+cont)/aS:0;
+        return `<div class="pbar" title="新規 ${fmt(aN)}／既存 ${fmt(aE+cont)}（継続込み）／目標 ${fmt(tS)}"><span style="width:${wN}%;background:#1f5fb0;"></span><span style="width:${wE}%;background:#bd6f24;"></span></div>`; })()}
       <div class="bd">
         <div style="background:#eef5ff;border-left:3px solid #1f5fb0;border-radius:6px;padding:6px 8px;"><div class="lab" style="color:#1f5fb0;">新規</div><div class="nums">実績 <b>${fmt(aN)}</b> / 目標 ${fmt(tN)}</div></div>
         <div style="background:#fdf0e3;border-left:3px solid #bd6f24;border-radius:6px;padding:6px 8px;"><div class="lab" style="color:#bd6f24;">既存</div><div class="nums">実績 <b>${fmt(aE)}</b>${cont>0?` <small style="color:var(--muted);">+継続${fmt(cont)}</small>`:""} / 目標 ${fmt(tE)}</div></div>
