@@ -1343,9 +1343,29 @@ function newAnalysisCard(){
   const totWr=totProp>0?Math.round(totWon/totProp*100):0;
   const totGross=deals.filter(isWon).reduce((s,p)=>s+dealGross(p),0);
 
+  // 月次分析（新規案件・月別一覧）
+  const inM=(d,ym)=>!!d && (""+d).startsWith(ym);
+  const moLabels=months.map(ym=>Number(ym.split("-")[1])+"月");
+  const propArr=months.map(ym=>deals.filter(p=>inM(p.proposalDate,ym)).length);
+  const wonArr=months.map(ym=>deals.filter(p=>isWon(p)&&inM(p.orderDate,ym)).length);
+  const grossArr=months.map(ym=>deals.filter(p=>isWon(p)&&inM(p.orderDate,ym)).reduce((s,p)=>s+dealGross(p),0));
+  const sumA=a=>a.reduce((s,v)=>s+v,0);
+  const moHeader=`<tr><th class="l">　</th>${moLabels.map(l=>`<th>${l}</th>`).join("")}<th>合計</th></tr>`;
+  const monthTable=`
+    <div style="font-weight:800;color:var(--navy);font-size:14px;margin-bottom:6px;">月次分析（新規案件・一覧）</div>
+    <div class="scroll-x"><table class="sum-table" style="min-width:960px;">
+      ${moHeader}
+      <tr><td class="l">提案（件）</td>${propArr.map(v=>`<td>${v||"–"}</td>`).join("")}<td style="font-weight:700;">${sumA(propArr)}</td></tr>
+      <tr><td class="l">受注（件）</td>${wonArr.map(v=>`<td>${v||"–"}</td>`).join("")}<td style="font-weight:700;">${sumA(wonArr)}</td></tr>
+      <tr><td class="l">受注率</td>${propArr.map((p,i)=>`<td>${p>0?`<span class="ratebadge" style="background:${wonArr[i]>0?'var(--ok)':'#b0b6bf'};">${Math.round(wonArr[i]/p*100)}%</span>`:"–"}</td>`).join("")}<td>${sumA(propArr)>0?`<span class="ratebadge" style="background:${sumA(wonArr)>0?'var(--ok)':'#b0b6bf'};">${Math.round(sumA(wonArr)/sumA(propArr)*100)}%</span>`:"–"}</td></tr>
+      <tr><td class="l">受注粗利(千円)</td>${grossArr.map(v=>`<td>${v?fmt(v):"–"}</td>`).join("")}<td style="font-weight:700;">${fmt(sumA(grossArr))}</td></tr>
+    </table></div>
+    <div class="hint" style="margin:6px 0 16px;">提案＝その月に提案（案件化）した新規案件、受注＝その月に受注した新規案件。受注率は同月内の参考値。</div>`;
+
   const wrap=document.createElement("div");
   wrap.innerHTML=`
-    <div style="font-weight:700;color:var(--navy);margin-bottom:6px;">新規粗利の着地予想（通期）</div>
+    ${monthTable}
+    <div style="font-weight:700;color:var(--navy);margin:6px 0 6px;border-top:2px solid var(--line);padding-top:14px;">新規粗利の着地予想（通期）</div>
     <div class="hint" style="margin-bottom:8px;">着地予想 ＝ 受注確定 ＋ A案件（100%）＋ B案件（80%）。C・D案件は含めません。</div>
     <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
       <div style="font-size:30px;font-weight:800;color:${tcol};font-variant-numeric:tabular-nums;">${fmt(landing)}<span style="font-size:14px;font-weight:600;color:var(--muted);"> / 通期目標 ${fmt(target)} 千円</span></div>
