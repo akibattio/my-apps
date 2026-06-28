@@ -918,7 +918,15 @@ function weeksCard(m){
       </div>
       <div class="grid2" style="margin-top:12px;">
         <div class="col"><h4>振り返り</h4><textarea class="i-da" placeholder="今週のふりかえり（できたこと・できなかったこと）">${esc(w.doneAction)}</textarea></div>
-        <div class="col"><h4>フィードバック</h4><textarea class="i-fb" placeholder="上司FB・来週への打ち手">${esc(w.feedback)}</textarea></div>
+        <div class="col"><h4>フィードバック</h4>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+            <button type="button" class="btn-primary btn-mini wk-gen">振り返りからFB案</button>
+            <input class="wk-elem" placeholder="上司が盛り込む要素" style="flex:1;min-width:140px;" value="${esc(w.fbElements||"")}">
+            <button type="button" class="btn-mini wk-rewrite">要素を反映</button>
+          </div>
+          <textarea class="i-fb" placeholder="上司FB・来週への打ち手（AI生成・手動編集可）">${esc(w.feedback)}</textarea>
+          <div class="hint wk-status" style="margin-top:4px;"></div>
+        </div>
       </div>`;
     const pt=$(".i-pt",div),pa=$(".i-pa",div),ac=$(".i-ac",div),da=$(".i-da",div),fb=$(".i-fb",div);
     pt.oninput=e=>{w.planTarget=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);updateWeekCheck(m);};
@@ -926,6 +934,19 @@ function weeksCard(m){
     if(!isSales) ac.oninput=e=>{w.actual=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);div.classList.toggle("done",e.target.value!=="");};
     da.oninput=e=>{w.doneAction=e.target.value;save();};
     fb.oninput=e=>{w.feedback=e.target.value;save();};
+    const elem=$(".wk-elem",div), status=$(".wk-status",div);
+    elem.oninput=e=>{ w.fbElements=e.target.value; save(); };
+    const runWk=async(useElements)=>{
+      if(!aiKey()){ status.style.color="var(--bad)"; status.textContent="先に日報タブの「AIキー設定」でAPIキーを入れてください。"; return; }
+      status.style.color="var(--muted)"; status.textContent="生成中…";
+      try{
+        const out=await aiFeedback(da.value, useElements?elem.value:"", fb.value);
+        fb.value=out; w.feedback=out; save();
+        status.textContent="生成しました（手動で編集できます）。";
+      }catch(err){ status.style.color="var(--bad)"; status.textContent="生成に失敗しました："+err.message; }
+    };
+    $(".wk-gen",div).onclick=()=>runWk(false);
+    $(".wk-rewrite",div).onclick=()=>runWk(true);
     c.appendChild(div);
   });
   return c;
