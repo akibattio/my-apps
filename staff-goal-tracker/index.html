@@ -1119,8 +1119,8 @@ function salesGoalCard(m){
       <div class="big">${fmt(aS)}<small>/ 目標 ${fmt(tS)}</small> <span class="ratebadge" style="background:${tS>0?col:'var(--muted)'};">${tS>0?rate+"%":"–"}</span></div>
       <div class="pbar"><span style="width:${tS>0?Math.min(100,rate):0}%;background:${col};"></span></div>
       <div class="bd">
-        <div><div class="lab">新規</div><div class="nums">実績 <b>${fmt(aN)}</b> / 目標 ${fmt(tN)}</div></div>
-        <div><div class="lab">既存</div><div class="nums">実績 <b>${fmt(aE)}</b>${cont>0?` <small style="color:var(--muted);">+継続${fmt(cont)}</small>`:""} / 目標 ${fmt(tE)}</div></div>
+        <div style="background:#eef5ff;border-left:3px solid #1f5fb0;border-radius:6px;padding:6px 8px;"><div class="lab" style="color:#1f5fb0;">新規</div><div class="nums">実績 <b>${fmt(aN)}</b> / 目標 ${fmt(tN)}</div></div>
+        <div style="background:#fdf0e3;border-left:3px solid #bd6f24;border-radius:6px;padding:6px 8px;"><div class="lab" style="color:#bd6f24;">既存</div><div class="nums">実績 <b>${fmt(aE)}</b>${cont>0?` <small style="color:var(--muted);">+継続${fmt(cont)}</small>`:""} / 目標 ${fmt(tE)}</div></div>
       </div>
     </div>`;
   });
