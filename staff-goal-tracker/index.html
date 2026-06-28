@@ -140,7 +140,7 @@
   .kpi-card .ttl small{color:var(--muted);font-weight:400;font-size:11px;}
   .kpi-card .big{font-size:26px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
   .kpi-card .big small{font-size:13px;font-weight:600;color:var(--muted);}
-  .kpi-card .pbar{height:8px;background:#eef1f5;border-radius:5px;overflow:hidden;margin:10px 0;}
+  .kpi-card .pbar{height:8px;background:#eef1f5;border-radius:5px;overflow:hidden;margin:10px 0;display:flex;}
   .kpi-card .pbar span{display:block;height:100%;}
   .kpi-card .bd{display:flex;gap:8px;}
   .kpi-card .bd>div{flex:1;background:#fafbfc;border-radius:7px;padding:7px 9px;font-size:12px;}
@@ -1117,7 +1117,8 @@ function salesGoalCard(m){
     cards+=`<div class="kpi-card">
       <div class="ttl">${cat.label}<small>（${cat.unit}）</small>${pace}</div>
       <div class="big">${fmt(aS)}<small>/ 目標 ${fmt(tS)}</small> <span class="ratebadge" style="background:${tS>0?col:'var(--muted)'};">${tS>0?rate+"%":"–"}</span></div>
-      <div class="pbar"><span style="width:${tS>0?Math.min(100,rate):0}%;background:${col};"></span></div>
+      ${(()=>{ const pN=tS>0?aN/tS*100:0, pE=tS>0?(aE+cont)/tS*100:0; const dN=Math.min(100,pN), dE=Math.min(Math.max(0,100-dN),pE);
+        return `<div class="pbar" title="新規 ${fmt(aN)}／既存 ${fmt(aE+cont)}（継続込み）／目標 ${fmt(tS)}"><span style="width:${dN}%;background:#1f5fb0;"></span><span style="width:${dE}%;background:#bd6f24;"></span></div>`; })()}
       <div class="bd">
         <div style="background:#eef5ff;border-left:3px solid #1f5fb0;border-radius:6px;padding:6px 8px;"><div class="lab" style="color:#1f5fb0;">新規</div><div class="nums">実績 <b>${fmt(aN)}</b> / 目標 ${fmt(tN)}</div></div>
         <div style="background:#fdf0e3;border-left:3px solid #bd6f24;border-radius:6px;padding:6px 8px;"><div class="lab" style="color:#bd6f24;">既存</div><div class="nums">実績 <b>${fmt(aE)}</b>${cont>0?` <small style="color:var(--muted);">+継続${fmt(cont)}</small>`:""} / 目標 ${fmt(tE)}</div></div>
