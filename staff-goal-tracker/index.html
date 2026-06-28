@@ -864,16 +864,14 @@ function weeksCard(m){
         <div class="col plan-col" style="padding:10px;border-radius:7px;">
           <h4>① 今週の目標（立てる）</h4>
           <div class="num-line"><label>目標値</label><input type="number" class="i-pt" value="${w.planTarget}" placeholder="0"></div>
+          <h4 style="margin-top:12px;">行動予定</h4>
+          <textarea class="i-pa" placeholder="今週やる行動を書く">${esc(w.planAction)}</textarea>
         </div>
         <div class="col" style="padding:10px;">
           <h4>② 実績（自動）</h4>
           <div class="num-line"><label>実績値${isSales?"（自動）":""}</label><input type="number" class="i-ac" value="${w.actual}" placeholder="0" ${isSales?'readonly style="background:#f4f6f9;"':''}></div>
           ${isSales?`<div class="hint" style="margin:2px 0 0;">受注した粗利を案件から自動集計${i===0?'（第1週に継続案件も計上）':''}。</div>${weekContractHtml(items)}`:''}
         </div>
-      </div>
-      <div style="margin-top:12px;">
-        <h4>行動予定</h4>
-        <textarea class="i-pa" placeholder="今週やる行動を書く">${esc(w.planAction)}</textarea>
       </div>
       <div class="grid2" style="margin-top:12px;">
         <div class="col"><h4>振り返り</h4><textarea class="i-da" placeholder="今週のふりかえり（できたこと・できなかったこと）">${esc(w.doneAction)}</textarea></div>
