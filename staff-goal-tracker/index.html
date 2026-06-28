@@ -758,7 +758,7 @@ function monthMainTarget(m){
   }
   return (m.goals && m.goals[0]) ? Number(m.goals[0].target)||0 : 0;
 }
-// 週次の実績＝その週に受注した粗利の合計（案件のorderDateから自動集計／獲得目標と同じ基準＝継続は含まない）
+// 週次の実績＝その週に受注した粗利の合計（案件のorderDateから自動集計）
 function weekGrossActual(staffId, ym, period){
   let s=0;
   db.pipeline.filter(d=>d.staffId===staffId).forEach(d=>{
@@ -768,6 +768,32 @@ function weekGrossActual(staffId, ym, period){
     if(day>=period.start && day<=period.end) s+=dealGross(d);
   });
   return s;
+}
+// その週に受注した案件の明細（受注日・クライアント・案件名・受注粗利）
+function weekDeals(staffId, ym, period){
+  const out=[];
+  db.pipeline.filter(d=>d.staffId===staffId).forEach(d=>{
+    const od=""+(d.orderDate||"");
+    if(!od.startsWith(ym)) return;
+    const day=Number(od.split("-")[2]);
+    if(day>=period.start && day<=period.end) out.push({date:od, client:d.client||"", name:dealContent(d), gross:dealGross(d), kind:"受注"});
+  });
+  return out.sort((a,b)=>a.date.localeCompare(b.date));
+}
+// 該当月に有効な継続案件（第1週に計上）
+function recurringActiveList(staffId, ym){
+  return db.recurring.filter(r=>r.staffId===staffId && recurringActive(r,ym))
+    .map(r=>({date:"継続", client:r.client||"", name:r.name||"", gross:recIndividual(r), kind:"継続"}));
+}
+// 契約内容の明細リスト（実績の右に表示）
+function weekContractHtml(items){
+  if(!items.length) return `<div class="hint" style="margin-top:6px;">この週の受注はありません。</div>`;
+  const tot=items.reduce((s,it)=>s+it.gross,0);
+  return `<div class="scroll-x" style="margin-top:6px;"><table class="sum-table" style="font-size:12px;min-width:0;width:100%;">
+    <tr><th class="l">受注日</th><th class="l">クライアント</th><th class="l">案件名</th><th style="text-align:right;">粗利</th></tr>
+    ${items.map(it=>`<tr><td class="l">${it.kind==="継続"?'<span class="status-chip">継続</span>':esc(it.date.slice(5))}</td><td class="l">${esc(it.client)}</td><td class="l">${esc(it.name)}</td><td style="text-align:right;">${fmt(it.gross)}</td></tr>`).join("")}
+    <tr style="font-weight:700;border-top:1px solid var(--line);"><td class="l" colspan="3">合計</td><td style="text-align:right;">${fmt(tot)}</td></tr>
+  </table></div>`;
 }
 function weekCheckHtml(m){
   const need = weeksOfMonth(cur.month).length;
@@ -816,7 +842,8 @@ function weeksCard(m){
   }
   const periods = weeksOfMonth(cur.month);
   const isSales = cur.biz==="sales";
-  if(isSales){ periods.forEach((p,i)=>{ m.weeks[i].actual = weekGrossActual(cur.staff, cur.month, p); }); save(); }  // 実績は案件から自動反映
+  // 実績は案件から自動反映。継続案件は第1週に計上
+  if(isSales){ periods.forEach((p,i)=>{ let v=weekGrossActual(cur.staff,cur.month,p); if(i===0) v+=recurringMonthlyTotal(cur.staff,cur.month); m.weeks[i].actual=v; }); save(); }
   periods.forEach((p,i)=>{
     const w = m.weeks[i];
     const target = Number(w.planTarget)||0;
@@ -824,6 +851,8 @@ function weeksCard(m){
     const rate = target>0 ? Math.round(actual/target*100) : null;
     const div=document.createElement("div");
     div.className="week"+(w.actual!==""&&w.actual!=null?" done":"");
+    let items = isSales ? weekDeals(cur.staff, cur.month, p) : [];
+    if(isSales && i===0) items = recurringActiveList(cur.staff, cur.month).concat(items);   // 第1週に継続を計上
     div.innerHTML=`
       <div class="week-head">
         <span class="wk">${WEEK_LABELS[i]}</span>
@@ -835,20 +864,20 @@ function weeksCard(m){
         <div class="col plan-col" style="padding:10px;border-radius:7px;">
           <h4>① 今週の目標（立てる）</h4>
           <div class="num-line"><label>目標値</label><input type="number" class="i-pt" value="${w.planTarget}" placeholder="0"></div>
-          <h4>行動予定</h4>
-          <textarea class="i-pa" placeholder="今週やる行動を書く">${esc(w.planAction)}</textarea>
         </div>
         <div class="col" style="padding:10px;">
-          <h4>② 実績（ふりかえる）</h4>
+          <h4>② 実績（自動）</h4>
           <div class="num-line"><label>実績値${isSales?"（自動）":""}</label><input type="number" class="i-ac" value="${w.actual}" placeholder="0" ${isSales?'readonly style="background:#f4f6f9;"':''}></div>
-          ${isSales?'<div class="hint" style="margin:-4px 0 6px;">この週に受注した粗利を案件から自動集計（継続は含みません）。</div>':''}
-          <h4>できた行動</h4>
-          <textarea class="i-da" placeholder="実際にやれたこと">${esc(w.doneAction)}</textarea>
+          ${isSales?`<div class="hint" style="margin:2px 0 0;">受注した粗利を案件から自動集計${i===0?'（第1週に継続案件も計上）':''}。</div>${weekContractHtml(items)}`:''}
         </div>
       </div>
-      <div class="feedback">
-        <h4>③ フィードバック（次週へ）</h4>
-        <textarea class="i-fb" placeholder="良かった点・課題・来週の打ち手">${esc(w.feedback)}</textarea>
+      <div style="margin-top:12px;">
+        <h4>行動予定</h4>
+        <textarea class="i-pa" placeholder="今週やる行動を書く">${esc(w.planAction)}</textarea>
+      </div>
+      <div class="grid2" style="margin-top:12px;">
+        <div class="col"><h4>振り返り</h4><textarea class="i-da" placeholder="今週のふりかえり（できたこと・できなかったこと）">${esc(w.doneAction)}</textarea></div>
+        <div class="col"><h4>フィードバック</h4><textarea class="i-fb" placeholder="上司FB・来週への打ち手">${esc(w.feedback)}</textarea></div>
       </div>`;
     const pt=$(".i-pt",div),pa=$(".i-pa",div),ac=$(".i-ac",div),da=$(".i-da",div),fb=$(".i-fb",div);
     pt.oninput=e=>{w.planTarget=e.target.value;save();refreshWeekRate(div,w);updateSummary(m);updateWeekCheck(m);};
