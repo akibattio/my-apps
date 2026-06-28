@@ -631,7 +631,6 @@ function renderSummaryView(app){
   wrap1.innerHTML=`<table class="sum-table">${rows}</table>
     <div class="hint" style="margin-top:8px;">数値はすべて千円。受注と納品は別指標のため合算せず、指標ごとに小計します。達成バッジは実績÷目標（緑100%以上・黄70%以上・赤それ未満）。</div>`;
   c1.appendChild(wrap1);
-  app.appendChild(c1);
 
   // 2) 月別実績グリッド
   const months = fyMonths(fy);
@@ -653,12 +652,12 @@ function renderSummaryView(app){
   wrap2.innerHTML=`<table class="sum-table">${head}${body}</table>
     <div class="hint" style="margin-top:8px;">実績の入っていない月は「–」。各セルは実績（千円）と達成率。</div>`;
   c2.appendChild(wrap2);
-  app.appendChild(c2);
 
   // 2.5) 営業（受注）の月別達成率（粗利・継続込み）。スタッフ×月の個別達成率
   const salesStaff = db.staff.filter(s=>s.metric==="受注");
+  let c25=null;
   if(salesStaff.length){
-    const c25 = card("営業（受注）月別の達成率（粗利・継続込み）","受注月次");
+    c25 = card("営業（受注）月別の達成率（粗利・継続込み）","受注月次");
     const sHead = `<tr><th class="l">スタッフ</th>` +
       months.map(ym=>`<th>${Number(ym.split("-")[1])}月</th>`).join("") + `<th>通期</th></tr>`;
     let sBody="";
@@ -679,8 +678,12 @@ function renderSummaryView(app){
     wrap25.innerHTML=`<table class="sum-table">${sHead}${sBody}</table>
       <div class="hint" style="margin-top:8px;">各セルは粗利実績（千円・継続込み）と達成率。目標は「目標」タブ、実績は案件から自動集計。個別ページの年間タブと同じ集計です。</div>`;
     c25.appendChild(wrap25);
-    app.appendChild(c25);
   }
+
+  // 月次を上に、半期サマリーをその下に並べる
+  if(c25) app.appendChild(c25);
+  app.appendChild(c2);
+  app.appendChild(c1);
 
   // 3) メンバー管理（パス元の選択肢マスタ）
   app.appendChild(memberCard());
