@@ -1,0 +1,13 @@
+# 秘密情報（絶対に上げない）
+.env
+.env.local
+
+# Python のゴミ
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / ログ
+.DS_Store
+*.log
