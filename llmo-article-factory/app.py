@@ -153,18 +153,37 @@ if st.button("✍️ 記事を生成", type="primary", disabled=not theme_input)
     gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     with st.spinner("Tavilyでリサーチ中..."):
-        queries = [
+        # 実務的な具体策（ベンダー記事・実例など）
+        practical_queries = [
             f"{theme_input} 具体的な方法",
-            f"{theme_input} データ 統計",
             f"{search_topic} 成功事例 実践",
         ]
+        # 一次情報・公的データ（白書・官公庁・統計を優先的に拾う）
+        primary_queries = [
+            f"{theme_input} 調査 統計 データ",
+            f"{search_topic} 白書 厚生労働省 総務省 調査",
+        ]
+        seen_urls = set()
         all_results = []
-        for q in queries:
-            result = tavily.search(query=q, search_depth="advanced", max_results=5)
+
+        def collect(q, **kw):
+            result = tavily.search(query=q, search_depth="advanced", max_results=4, **kw)
             for r in result.get("results", []):
+                url = r.get("url", "")
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
                 all_results.append(
-                    f"【{r['title']}】\n{r['content']}\n出典URL: {r.get('url', '')}"
+                    f"【{r['title']}】\n{r['content']}\n出典URL: {url}"
                 )
+
+        for q in practical_queries + primary_queries:
+            collect(q)
+        # 官公庁・研究機関ドメインに絞って一次情報を追い込む（取れなければスキップ）
+        try:
+            collect(f"{search_topic} 統計 調査", include_domains=["go.jp", "or.jp", "ac.jp"])
+        except Exception:
+            pass
         research_content = "\n\n---\n\n".join(all_results)
 
     with st.spinner("Geminiで記事生成中（30秒ほどかかります）..."):
@@ -185,25 +204,41 @@ if st.button("✍️ 記事を生成", type="primary", disabled=not theme_input)
 2. 冒頭に「この記事の要点」ブロックを置く（箇条書き3〜5個。記事を読まなくても結論が分かる密度にする）。
 3. 具体性：抽象論を避け、数値・割合・手順・期間・金額などの定量情報を入れる。リサーチ結果に数値があれば積極的に使う。
 4. 出典の明示：リサーチ結果由来の事実・データには文末に「（出典：媒体名）」を付ける。出典URLが分かるものは末尾の「参考情報」に列挙する。リサーチに無い数字を捏造しない。
+   - 出典は公的統計・白書・官公庁・業界団体・研究機関などの一次情報を優先して使う。ベンダーや個人ブログ由来の数値は「ある企業の事例では」等と一次情報と区別できる書き方にする。
 5. 比較・選択肢の整理は必ずMarkdownの表で示す（手法の比較、メリット/デメリット等）。
 6. 記事末尾に「よくある質問（FAQ）」を5問。各回答は2〜3文で完結に言い切る（AIが一問一答で引用しやすい形にする）。
 7. 記事末尾に「この記事の監修者」として上記プロフィールを1〜2文で記載する。
 8. キーワード：{keywords_input} を文中に自然に織り込む（不自然な詰め込みはしない）。
 
 # 文体・出力ルール
-- 文字数：4,000〜6,000字
+- 文字数：5,000字前後（4,500〜5,500字に収める。最大でも5,500字を超えない）。長さより情報密度を優先し、冗長な繰り返しや言い換えで字数を稼がない。
 - 見出しはH2（##）・H3（###）で構成。記事タイトル（H1／#）は出力しない（システム側で付与するため）。
 - 「はい、承知しました」等の前置き・あいさつ・メタ発言は一切書かない。本文だけを出力する。
 - 伏せ字（〇〇など）や架空の固有名詞・架空の数値を使わない。
 - AIっぽい定型文や過度に整いすぎた表現を避け、実務家の語り口にする。
 - 出力はMarkdownのみ。
 """
-        response = generate_with_retry(
-            gemini_client,
-            "models/gemini-flash-latest",
-            prompt,
-            types.GenerateContentConfig(temperature=0.7),
-        )
+        from google.genai import errors as genai_errors
+        try:
+            response = generate_with_retry(
+                gemini_client,
+                "models/gemini-flash-latest",
+                prompt,
+                types.GenerateContentConfig(temperature=0.7),
+            )
+        except genai_errors.ClientError as e:
+            if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
+                st.error(
+                    "Gemini APIの無料枠の上限（1日あたりの生成回数）に達しました。"
+                    "翌日（太平洋時間の0時）にリセットされるまで待つか、"
+                    "Google AI Studioで対象プロジェクトの課金を有効化すると上限が上がります。"
+                )
+            else:
+                st.error(f"Gemini APIエラー：{e}")
+            st.stop()
+        except genai_errors.ServerError:
+            st.error("Geminiが混雑中です（503）。少し待って再度お試しください。")
+            st.stop()
         article_text = clean_article(response.text)
 
     os.makedirs("output/articles", exist_ok=True)
