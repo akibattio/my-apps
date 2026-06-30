@@ -34,27 +34,28 @@ def clean_article(text: str) -> str:
     return t.strip()
 
 
-def generate_with_retry(client, model, contents, config, retries=4):
-    """Geminiの一時的な503(高負荷)に備えて指数バックオフで再試行する"""
-    import time
-    from google.genai import errors as genai_errors
+def claude_generate(system: str, user: str, max_tokens: int = 16000, thinking: bool = True) -> str:
+    """Claude(Opus 4.8)でテキスト生成し、本文テキストだけを返す。
+    SDKが429/5xxを指数バックオフで自動リトライする。長い出力に備えてストリーミングを使う"""
+    import anthropic
 
-    last_err = None
-    for i in range(retries):
-        try:
-            return client.models.generate_content(
-                model=model, contents=contents, config=config
-            )
-        except genai_errors.ServerError as e:
-            last_err = e
-            if i < retries - 1:
-                time.sleep(2 ** i * 3)  # 3s, 6s, 12s
-    raise last_err
+    client = anthropic.Anthropic()  # ANTHROPIC_API_KEY を環境変数から読む
+    kwargs = {
+        "model": "claude-opus-4-8",
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if thinking:
+        kwargs["thinking"] = {"type": "adaptive"}  # Claudeが必要に応じて思考量を調整
+    with client.messages.stream(**kwargs) as stream:
+        message = stream.get_final_message()
+    return "".join(b.text for b in message.content if b.type == "text").strip()
 
 st.set_page_config(page_title="LLMO記事ファクトリー", page_icon="🏭", layout="wide")
 
 st.title("🏭 LLMO記事ファクトリー")
-st.caption("Tavily リサーチ → Gemini 記事生成 → Unsplash 画像 → WordPress 投稿")
+st.caption("Tavily リサーチ → Claude 記事生成 → Unsplash 画像 → WordPress 投稿")
 
 st.divider()
 
@@ -73,11 +74,9 @@ with col2:
 
 if st.button("🔍 リサーチしてテーマを生成", type="primary"):
     from tavily import TavilyClient
-    from google import genai
-    from google.genai import types
+    import anthropic
 
     tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     with st.spinner("Tavilyでリサーチ中..."):
         queries = [
@@ -92,25 +91,24 @@ if st.button("🔍 リサーチしてテーマを生成", type="primary"):
                 all_results.append(f"【{r['title']}】\n{r['content']}")
         research_content = "\n\n---\n\n".join(all_results)
 
-    with st.spinner("Geminiでテーマ生成中..."):
-        prompt = f"""
-以下のリサーチ結果を元に、採用担当者・経営者向けの記事テーマ案を{num_themes}個提案してください。
-テーマ：{search_topic}
+    with st.spinner("Claudeでテーマ生成中..."):
+        system_prompt = "あなたはLLMO（生成AI最適化）に精通した編集者です。生成AIが引用したくなる、具体的で実践的な記事テーマを考えます。"
+        user_prompt = f"""以下のリサーチ結果を元に、記事テーマ案を{num_themes}個提案してください。
+テーマ領域：{search_topic}
 
 リサーチ結果：
 {research_content}
 
 条件：
-- LLMに引用されやすいテーマ（LLMO対策）
-- 具体的で実践的なタイトル
+- LLM（ChatGPT・Claude・Geminiなど）に引用されやすいテーマ（LLMO対策）
+- 具体的で実践的なタイトル（数値・対象・課題を含める）
 - 出力形式：番号. 【タイトル】：説明（50字以内）
-"""
-        response = gemini_client.models.generate_content(
-            model="models/gemini-flash-latest",
-            contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.7),
-        )
-        themes_text = response.text
+- 前置きやまとめは書かず、リストだけを出力する"""
+        try:
+            themes_text = claude_generate(system_prompt, user_prompt, max_tokens=2000, thinking=False)
+        except anthropic.APIError as e:
+            st.error(f"Claude APIエラー：{e}\nANTHROPIC_API_KEY が .env に正しく設定されているか確認してください。")
+            st.stop()
 
     st.success("テーマ生成完了！")
     st.session_state["themes"] = themes_text
@@ -146,11 +144,9 @@ output_filename = st.text_input("出力ファイル名", placeholder="例：arti
 
 if st.button("✍️ 記事を生成", type="primary", disabled=not theme_input):
     from tavily import TavilyClient
-    from google import genai
-    from google.genai import types
+    import anthropic
 
     tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
     with st.spinner("Tavilyでリサーチ中..."):
         # 実務的な具体策（ベンダー記事・実例など）
@@ -186,18 +182,11 @@ if st.button("✍️ 記事を生成", type="primary", disabled=not theme_input)
             pass
         research_content = "\n\n---\n\n".join(all_results)
 
-    with st.spinner("Geminiで記事生成中（30秒ほどかかります）..."):
-        prompt = f"""あなたは次のプロフィールを持つ実務家です。この立場で一人称で書いてください。
+    with st.spinner("Claudeで記事生成中（30〜60秒ほどかかります）..."):
+        system_prompt = f"""あなたは次のプロフィールを持つ実務家であり、この立場で一人称で記事を書きます。
 監修者プロフィール：{persona}
 
-# 役割
-以下のテーマについて、検索エンジンと生成AI（ChatGPT・Claude・Geminiなど）の両方に「引用される」ことを狙ったLLMO最適化記事を書きます。
-
-## テーマ
-{theme_input}
-
-## Tavilyで収集したリサーチ結果（事実と出典の元ネタ）
-{research_content}
+検索エンジンと生成AI（ChatGPT・Claude・Geminiなど）の両方に「引用される」ことを狙った、LLMO最適化記事を書くのが役割です。
 
 # 記事の必須要件
 1. 結論ファースト：各H2見出しは「問い」に対する答えを最初の1〜2文で言い切る。理由・補足はその後。
@@ -208,38 +197,28 @@ if st.button("✍️ 記事を生成", type="primary", disabled=not theme_input)
 5. 比較・選択肢の整理は必ずMarkdownの表で示す（手法の比較、メリット/デメリット等）。
 6. 記事末尾に「よくある質問（FAQ）」を5問。各回答は2〜3文で完結に言い切る（AIが一問一答で引用しやすい形にする）。
 7. 記事末尾に「この記事の監修者」として上記プロフィールを1〜2文で記載する。
-8. キーワード：{keywords_input} を文中に自然に織り込む（不自然な詰め込みはしない）。
 
 # 文体・出力ルール
 - 文字数：5,000字前後（4,500〜5,500字に収める。最大でも5,500字を超えない）。長さより情報密度を優先し、冗長な繰り返しや言い換えで字数を稼がない。
 - 見出しはH2（##）・H3（###）で構成。記事タイトル（H1／#）は出力しない（システム側で付与するため）。
-- 「はい、承知しました」等の前置き・あいさつ・メタ発言は一切書かない。本文だけを出力する。
+- 前置き・あいさつ・メタ発言は一切書かず、本文だけを出力する。
 - 伏せ字（〇〇など）や架空の固有名詞・架空の数値を使わない。
 - AIっぽい定型文や過度に整いすぎた表現を避け、実務家の語り口にする。
-- 出力はMarkdownのみ。
-"""
-        from google.genai import errors as genai_errors
+- 出力はMarkdownのみ。"""
+        user_prompt = f"""## テーマ
+{theme_input}
+
+## 自然に織り込みたいキーワード（不自然な詰め込みはしない）
+{keywords_input}
+
+## Tavilyで収集したリサーチ結果（事実と出典の元ネタ）
+{research_content}"""
         try:
-            response = generate_with_retry(
-                gemini_client,
-                "models/gemini-flash-latest",
-                prompt,
-                types.GenerateContentConfig(temperature=0.7),
-            )
-        except genai_errors.ClientError as e:
-            if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
-                st.error(
-                    "Gemini APIの無料枠の上限（1日あたりの生成回数）に達しました。"
-                    "翌日（太平洋時間の0時）にリセットされるまで待つか、"
-                    "Google AI Studioで対象プロジェクトの課金を有効化すると上限が上がります。"
-                )
-            else:
-                st.error(f"Gemini APIエラー：{e}")
+            article_raw = claude_generate(system_prompt, user_prompt, max_tokens=16000)
+        except anthropic.APIError as e:
+            st.error(f"Claude APIエラー：{e}\nANTHROPIC_API_KEY が .env に正しく設定されているか確認してください。")
             st.stop()
-        except genai_errors.ServerError:
-            st.error("Geminiが混雑中です（503）。少し待って再度お試しください。")
-            st.stop()
-        article_text = clean_article(response.text)
+        article_text = clean_article(article_raw)
 
     os.makedirs("output/articles", exist_ok=True)
     fname = output_filename.strip() or "article_new"
