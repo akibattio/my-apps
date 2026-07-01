@@ -1,0 +1,23 @@
+{
+  "name": "Instagram Story",
+  "size": {"width": 1080, "height": 1920},
+  "background": {
+    "type": "ai",
+    "prompt": "{ai_prompt}, cinematic lighting, vibrant colors, advertising photography, vertical composition"
+  },
+  "variables": ["ai_prompt", "headline", "subtitle", "cta"],
+  "layers": [
+    {"type": "rect", "xy": [0, 1260, 1080, 1920], "fill": [0, 0, 0, 170]},
+    {"type": "text", "content": "{headline}",
+     "xy": [60, 1320], "max_width": 960,
+     "font_size": 92, "weight": "bold", "color": [255, 255, 255],
+     "line_spacing": 12, "stroke_width": 2, "stroke_color": [0, 0, 0]},
+    {"type": "text", "content": "{subtitle}",
+     "xy": [60, 1660], "max_width": 960,
+     "font_size": 40, "color": [240, 240, 240], "line_spacing": 8},
+    {"type": "rect", "xy": [60, 1790, 540, 1880], "fill": [255, 200, 0, 255], "radius": 24},
+    {"type": "text", "content": "{cta}",
+     "xy": [80, 1808], "max_width": 440,
+     "font_size": 44, "weight": "bold", "color": [20, 20, 20], "align": "left"}
+  ]
+}

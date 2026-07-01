@@ -1,0 +1,19 @@
+{
+  "name": "Display 160x600",
+  "size": {"width": 160, "height": 600},
+  "background": {
+    "type": "ai",
+    "prompt": "{ai_prompt}, vertical composition, clean background, soft bokeh, advertising photography"
+  },
+  "variables": ["ai_prompt", "headline", "cta"],
+  "layers": [
+    {"type": "rect", "xy": [0, 380, 160, 600], "fill": [0, 0, 0, 180]},
+    {"type": "text", "content": "{headline}",
+     "xy": [10, 396], "max_width": 140,
+     "font_size": 18, "weight": "bold", "color": [255, 255, 255], "line_spacing": 2},
+    {"type": "rect", "xy": [10, 540, 150, 580], "fill": [255, 200, 0, 255], "radius": 6},
+    {"type": "text", "content": "{cta}",
+     "xy": [10, 546], "max_width": 140,
+     "font_size": 18, "weight": "bold", "color": [20, 20, 20], "align": "center"}
+  ]
+}

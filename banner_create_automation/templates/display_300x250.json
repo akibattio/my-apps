@@ -1,0 +1,19 @@
+{
+  "name": "Display 300x250",
+  "size": {"width": 300, "height": 250},
+  "background": {
+    "type": "ai",
+    "prompt": "{ai_prompt}, clean background, soft bokeh, advertising photography"
+  },
+  "variables": ["ai_prompt", "headline", "cta"],
+  "layers": [
+    {"type": "rect", "xy": [0, 130, 300, 250], "fill": [0, 0, 0, 190]},
+    {"type": "text", "content": "{headline}",
+     "xy": [12, 140], "max_width": 276,
+     "font_size": 18, "weight": "bold", "color": [255, 255, 255], "line_spacing": 2},
+    {"type": "rect", "xy": [12, 210, 160, 240], "fill": [255, 200, 0, 255], "radius": 6},
+    {"type": "text", "content": "{cta}",
+     "xy": [12, 214], "max_width": 148,
+     "font_size": 16, "weight": "bold", "color": [20, 20, 20], "align": "center"}
+  ]
+}

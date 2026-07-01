@@ -1,0 +1,19 @@
+{
+  "name": "Display 728x90",
+  "size": {"width": 728, "height": 90},
+  "background": {
+    "type": "ai",
+    "prompt": "{ai_prompt}, panoramic, clean, soft bokeh background, advertising photography"
+  },
+  "variables": ["ai_prompt", "headline", "cta"],
+  "layers": [
+    {"type": "rect", "xy": [0, 0, 540, 90], "fill": [0, 0, 0, 170]},
+    {"type": "text", "content": "{headline}",
+     "xy": [16, 16], "max_width": 510,
+     "font_size": 22, "weight": "bold", "color": [255, 255, 255], "line_spacing": 4},
+    {"type": "rect", "xy": [560, 22, 712, 68], "fill": [255, 200, 0, 255], "radius": 10},
+    {"type": "text", "content": "{cta}",
+     "xy": [560, 32], "max_width": 152,
+     "font_size": 20, "weight": "bold", "color": [20, 20, 20], "align": "center"}
+  ]
+}
