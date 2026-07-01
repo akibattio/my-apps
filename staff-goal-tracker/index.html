@@ -329,6 +329,27 @@ function salesMonthAch(staffId, ym){
   const actual=(A["粗利（新規）"]||0)+(A["粗利（既存）"]||0)+recurringMonthlyTotal(staffId,ym);
   return {target, actual};
 }
+// 営業（受注）の通期サマリー：粗利・継続・案件化・アポ（目標/実績）＋ヨミ加重・見込み着地・パス貢献。管理者サマリー用
+function salesAnnualSummary(staffId, fy){
+  const months=fyMonths(fy);
+  let grossT=0,grossA=0,rec=0,caseT=0,caseA=0,apoT=0,apoA=0;
+  months.forEach(ym=>{
+    const mm=readSalesMonth(staffId,ym), kpi=mm&&mm.kpi?mm.kpi:[];
+    grossT+=kpiSum(kpi,GROSS_NAMES,"target");
+    caseT +=kpiSum(kpi,CASE_NAMES,"target");
+    apoT  +=kpiSum(kpi,APO_NAMES,"target");
+    const A=salesDealActual(staffId,ym);
+    const r=recurringMonthlyTotal(staffId,ym);
+    grossA+=(A["粗利（新規）"]||0)+(A["粗利（既存）"]||0)+r;
+    rec   +=r;
+    caseA +=(A["案件化（新規）"]||0)+(A["案件化（既存）"]||0);
+    apoA  +=(A["アポ（新規）"]||0)+(A["アポ（既存）"]||0);
+  });
+  const P=pipelineByYomi(staffId);   // 全期間のパイプライン（月非依存・受注/継続は含まない見込み）
+  const landing=grossA+P.weighted;
+  const pass=passStats(staffId, months);
+  return {grossT,grossA,rec,caseT,caseA,apoT,apoA,weighted:P.weighted,by:P.by,landing,pass};
+}
 
 let db = load();
 if(!db.deals) db.deals = [];   // CSV取込の案件データ（納品）
@@ -684,7 +705,74 @@ function renderSummaryView(app){
     c25.appendChild(wrap25);
   }
 
-  // 月次を上に、半期サマリーをその下に並べる
+  // 2.6) 営業サマリー（通期・全営業一覧）：粗利/継続/案件化/アポ/ヨミ加重/見込み着地/パス
+  let cSalesAll=null, cPipe=null;
+  if(salesStaff.length){
+    cSalesAll = card(`営業サマリー（通期・全営業／${fy}年10月〜${fy+1}年9月期）`,"営業通期");
+    const sd=[...new Set(salesStaff.map(s=>s.dept||"その他"))];
+    let r=`<tr>
+      <th class="l">スタッフ</th>
+      <th>粗利目標</th><th>粗利実績<br><small>継続込</small></th><th>達成</th>
+      <th>うち継続</th>
+      <th>ヨミ加重</th><th>見込み着地</th><th>着地達成</th>
+      <th>案件化<br><small>実/目</small></th><th>アポ<br><small>実/目</small></th>
+      <th>パス<br><small>件/粗利</small></th></tr>`;
+    const tot={grossT:0,grossA:0,rec:0,caseT:0,caseA:0,apoT:0,apoA:0,weighted:0,landing:0,passC:0,passG:0};
+    sd.forEach(d=>{
+      r+=`<tr class="dept"><td colspan="11">${esc(d)}</td></tr>`;
+      salesStaff.filter(s=>(s.dept||"その他")===d).forEach(s=>{
+        const x=salesAnnualSummary(s.id,fy);
+        tot.grossT+=x.grossT;tot.grossA+=x.grossA;tot.rec+=x.rec;tot.caseT+=x.caseT;tot.caseA+=x.caseA;
+        tot.apoT+=x.apoT;tot.apoA+=x.apoA;tot.weighted+=x.weighted;tot.landing+=x.landing;
+        tot.passC+=x.pass.count;tot.passG+=x.pass.gross;
+        r+=`<tr>
+          <td class="l nm">${esc(s.name)}</td>
+          <td>${fmt(x.grossT)}</td><td><b>${fmt(x.grossA)}</b></td><td>${ratebadge(rateOf(x.grossA,x.grossT))}</td>
+          <td>${fmt(x.rec)}</td>
+          <td>${fmt(x.weighted)}</td><td>${fmt(x.landing)}</td><td>${ratebadge(rateOf(x.landing,x.grossT))}</td>
+          <td>${fmt(x.caseA)}<small>/${fmt(x.caseT)}</small></td>
+          <td>${fmt(x.apoA)}<small>/${fmt(x.apoT)}</small></td>
+          <td>${x.pass.count?`${x.pass.count}<small>/${fmt(x.pass.gross)}</small>`:'<span class="mt">–</span>'}</td></tr>`;
+      });
+    });
+    r+=`<tr class="total">
+      <td class="l">全社 営業 計</td>
+      <td>${fmt(tot.grossT)}</td><td>${fmt(tot.grossA)}</td><td>${ratebadge(rateOf(tot.grossA,tot.grossT))}</td>
+      <td>${fmt(tot.rec)}</td>
+      <td>${fmt(tot.weighted)}</td><td>${fmt(tot.landing)}</td><td>${ratebadge(rateOf(tot.landing,tot.grossT))}</td>
+      <td>${fmt(tot.caseA)}<small>/${fmt(tot.caseT)}</small></td>
+      <td>${fmt(tot.apoA)}<small>/${fmt(tot.apoT)}</small></td>
+      <td>${tot.passC?`${tot.passC}<small>/${fmt(tot.passG)}</small>`:'–'}</td></tr>`;
+    const w=document.createElement("div"); w.className="scroll-x";
+    w.innerHTML=`<table class="sum-table" style="min-width:1120px;">${r}</table>
+      <div class="hint" style="margin-top:8px;">粗利・継続は千円。粗利実績＝案件（受注日）＋継続。ヨミ加重＝見込み案件のヨミ A×100%／B×80%／C×33%／D×0%。見込み着地＝粗利実績＋ヨミ加重。案件化・アポは通期の実績/目標（件）。パス＝自分が紹介元で受注した貢献（件/粗利・本人の数字には合算しない）。</div>`;
+    cSalesAll.appendChild(w);
+
+    // 2.7) ヨミ別パイプライン（全営業の見込み案件）
+    cPipe = card("ヨミ別パイプライン（全営業の見込み案件）","ヨミ");
+    let pr=`<tr><th class="l">スタッフ</th><th>ヨミA</th><th>ヨミB</th><th>ヨミC</th><th>ヨミD</th><th>見込み合計</th><th>加重見込み</th></tr>`;
+    const pt={A:0,B:0,C:0,D:0,w:0};
+    salesStaff.forEach(s=>{
+      const P=pipelineByYomi(s.id);
+      const sum=P.by.A+P.by.B+P.by.C+P.by.D;
+      pt.A+=P.by.A;pt.B+=P.by.B;pt.C+=P.by.C;pt.D+=P.by.D;pt.w+=P.weighted;
+      pr+=`<tr><td class="l nm">${esc(s.name)}</td>
+        <td>${P.by.A?fmt(P.by.A):'<span class="mt">–</span>'}</td><td>${P.by.B?fmt(P.by.B):'<span class="mt">–</span>'}</td>
+        <td>${P.by.C?fmt(P.by.C):'<span class="mt">–</span>'}</td><td>${P.by.D?fmt(P.by.D):'<span class="mt">–</span>'}</td>
+        <td>${fmt(sum)}</td><td><b>${fmt(P.weighted)}</b></td></tr>`;
+    });
+    pr+=`<tr class="total"><td class="l">全社 計</td>
+      <td>${fmt(pt.A)}</td><td>${fmt(pt.B)}</td><td>${fmt(pt.C)}</td><td>${fmt(pt.D)}</td>
+      <td>${fmt(pt.A+pt.B+pt.C+pt.D)}</td><td>${fmt(pt.w)}</td></tr>`;
+    const pw=document.createElement("div"); pw.className="scroll-x";
+    pw.innerHTML=`<table class="sum-table" style="min-width:760px;">${pr}</table>
+      <div class="hint" style="margin-top:8px;">各セルは見込み案件（ヨミ別）の個人粗利合計（千円）。受注・継続は含まず、ヨミA〜Dの案件のみ。加重見込み＝A×100%／B×80%／C×33%／D×0%。</div>`;
+    cPipe.appendChild(pw);
+  }
+
+  // 営業の通期サマリー・パイプラインを最上部、その下に月別・納品・半期
+  if(cSalesAll) app.appendChild(cSalesAll);
+  if(cPipe) app.appendChild(cPipe);
   if(c25) app.appendChild(c25);
   app.appendChild(c2);
   app.appendChild(c1);
