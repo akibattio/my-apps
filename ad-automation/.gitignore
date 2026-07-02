@@ -1,0 +1,28 @@
+# シークレット（絶対にコミットしない）
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*_token*
+*refresh_token*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# 取得データ・生成物（個社の実データはリポジトリに残さない）
+data/*.csv
+data/*.json
+!data/samples/
+out/
+*.log
+
+# OS / エディタ
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,9 @@
+{
+  "_comment": "ハルナ美容外科の個社しきい値。実運用値が決まったら haruna_thresholds.json にコピーして使う。全社既定値(CLAUDE.md §2)を上書きする項目だけ書けばよい。",
+  "target_cpa": 8000,
+  "target_roas": 3.0,
+  "cpa_warn_pct": 0.20,
+  "cpa_severe_pct": 0.50,
+  "learning_min_days": 7,
+  "learning_min_conv": 10
+}

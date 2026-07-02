@@ -1,0 +1,7 @@
+level,campaign,entity,status,spend_7d,conversions_7d,revenue_7d,impressions_7d,clicks_7d,daily_budget,days_active
+adset,カウンセリング予約_CV,二重整形_20-34女性,ACTIVE,84000,7,0,42000,900,12000,45
+adset,カウンセリング予約_CV,クマ取り_35-49女性,ACTIVE,96000,4,0,60000,720,12000,60
+adset,カウンセリング予約_CV,脂肪吸引_リタゲ,ACTIVE,38000,0,0,15000,140,10000,30
+adset,認知_リーチ,ブランド想起_広域,ACTIVE,52000,1,0,410000,610,8000,90
+adset,予約_ROAS,美肌治療_購入,ACTIVE,120000,20,780000,90000,1500,15000,50
+adset,予約_ROAS,ピーリング_新規,ACTIVE,45000,3,90000,30000,500,9000,5
