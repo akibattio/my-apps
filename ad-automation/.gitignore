@@ -29,3 +29,6 @@ out/
 .DS_Store
 .vscode/
 .idea/
+
+# コンソールの実データ（個社数値・Git管理外）
+console/data.json

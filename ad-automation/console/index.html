@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>広告運用コンソール（モック）</title>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?external=react",
+    "lucide-react": "https://esm.sh/lucide-react@0.407.0?external=react"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<style>
+  body { margin: 0; }
+  #root { min-height: 100vh; }
+  .boot { font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; padding: 40px; color: #64748b; }
+</style>
+</head>
+<body>
+<div id="root"><div class="boot">モックを読み込み中…（React / アイコンをCDN取得）</div></div>
+<script type="module">
+  try {
+    const src = await (await fetch('./ad_ops_console.jsx')).text();
+    const { code } = Babel.transform(src, { presets: ['react'], filename: 'app.jsx' });
+    const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+    const [mod, React, rd] = await Promise.all([
+      import(url), import('react'), import('react-dom/client')
+    ]);
+    rd.createRoot(document.getElementById('root')).render(React.createElement(mod.default));
+  } catch (e) {
+    document.getElementById('root').innerHTML =
+      '<div class="boot">読み込みエラー: ' + e.message +
+      '<br>（CDN接続が必要です。ネットワークをご確認ください）</div>';
+    console.error(e);
+  }
+</script>
+</body>
+</html>
