@@ -38,6 +38,7 @@ const SAMPLE_PROPOSALS = [
 ];
 
 const yen = (n) => (n == null ? "—" : "¥" + n.toLocaleString("ja-JP"));
+const num = (n) => (n == null ? "—" : n.toLocaleString("ja-JP"));
 const man = (n) => (n ? (n / 10000).toLocaleString("ja-JP") + "万" : "—");
 const SEV = {
   critical: { label: "要対応", dot: "#dc2626", chip: "#fef2f2", chipText: "#b91c1c" },
@@ -290,15 +291,17 @@ export default function AdOpsConsole() {
                       </div>
                       <div style={{ fontSize: 11.5, color: "#64748b", fontFamily: "monospace", marginBottom: 3 }}>{c.acct}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: tokC, fontWeight: 600, marginBottom: 12 }}>
-                        <KeyRound size={12} />トークン {tok} ・ 稼働 {c.cp}本 ・ 同期 {c.sync}</div>
+                        <KeyRound size={12} />トークン {tok} ・ 稼働 {c.cp}本{c.dailyBudget ? ` ・ 日予算 ${yen(c.dailyBudget)}` : ""} ・ 同期 {c.sync}</div>
+                      {c.metrics ? <AccountReport c={c} /> : (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12 }}>
                         <MiniStat label="消化" value={yen(c.spend)} />
-                        <MiniStat label="CPA/目標" value={(c.cpa ? yen(c.cpa) : "—") } bad={c.cpa > c.target * 1.15} />
+                        <MiniStat label="CPA/目標" value={(c.cpa ? yen(c.cpa) : "—") } bad={c.target && c.cpa > c.target * 1.15} />
                         <MiniStat label="ROAS" value={c.roas ? c.roas + "x" : "—"} />
                         <MiniStat label="CV" value={c.cv + "件"} />
                         <MiniStat label="CTR" value={c.ctr + "%"} />
                         <MiniStat label="状態" value={h === "good" ? "良好" : h === "warning" ? "注意" : "要対応"} bad={h !== "good"} />
                       </div>
+                      )}
                     </div>
                   );
                 })}
@@ -442,3 +445,78 @@ function MiniStat({ label, value, bad }) {
   return <div><div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0f2a1f" }}>{value}</div></div>;
 }
 function Empty({ text }) { return <div style={{ background: "#fff", border: "1px dashed #d7e0db", borderRadius: 10, padding: "18px 14px", fontSize: 12.5, color: "#94a3b8", textAlign: "center" }}>{text}</div>; }
+
+function DeltaTag({ v, dir }) {
+  if (v == null) return <span style={{ color: "#94a3b8" }}>—</span>;
+  const up = v >= 0;
+  const good = dir === 0 ? null : (dir === 1 ? up : !up);
+  const color = good == null ? "#64748b" : good ? "#047857" : "#dc2626";
+  return <span style={{ color, fontWeight: 700 }}>{up ? "▲" : "▼"}{Math.abs(v).toFixed(0)}%</span>;
+}
+
+// クライアント詳細の「レポート状態」：予算消化＋直近7日/先月/先月比
+function AccountReport({ c }) {
+  const d7 = c.metrics.d7, lm = c.metrics.lm;
+  const lmDays = c.lmDays || 30;
+  // rate=率(直接比較) / 総量は1日あたりに正規化して比較（7日÷7 vs 先月÷lmDays）
+  const chg = (a, b, rate) => {
+    if (a == null || b == null || b === 0) return null;
+    return rate ? (a / b - 1) * 100 : ((a / 7) / (b / lmDays) - 1) * 100;
+  };
+  const cap7 = c.dailyBudget ? c.dailyBudget * 7 : 0;
+  const pace = cap7 ? (d7.spend / cap7) * 100 : null;
+  const paceC = pace == null ? "#94a3b8" : pace > 110 ? "#dc2626" : pace >= 90 ? "#d97706" : "#047857";
+  const rows = [
+    { k: "費用", a: yen(d7.spend), b: yen(lm.spend), d: chg(d7.spend, lm.spend, false), dir: 0 },
+    { k: "表示回数", a: num(d7.imp), b: num(lm.imp), d: chg(d7.imp, lm.imp, false), dir: 1 },
+    { k: "クリック", a: num(d7.clk), b: num(lm.clk), d: chg(d7.clk, lm.clk, false), dir: 1 },
+    { k: "CTR", a: d7.ctr + "%", b: lm.ctr + "%", d: chg(d7.ctr, lm.ctr, true), dir: 1 },
+    { k: "CPC", a: yen(d7.cpc), b: yen(lm.cpc), d: chg(d7.cpc, lm.cpc, true), dir: -1 },
+    { k: "CV", a: d7.cv + "件", b: lm.cv + "件", d: chg(d7.cv, lm.cv, false), dir: 1 },
+    { k: "CPA", a: d7.cpa ? yen(d7.cpa) : "—", b: lm.cpa ? yen(lm.cpa) : "—", d: chg(d7.cpa, lm.cpa, true), dir: -1 },
+  ];
+  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  return (
+    <div>
+      {/* 予算消化（直近7日） */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 5 }}>
+          <span style={{ color: "#64748b" }}>予算消化（直近7日）</span>
+          {c.dailyBudget ? (
+            <span style={{ color: paceC, fontWeight: 700 }}>
+              {yen(d7.spend)} / 想定 {yen(cap7)}（{Math.round(pace)}%）
+            </span>
+          ) : <span style={{ color: "#94a3b8" }}>予算情報なし</span>}
+        </div>
+        {c.dailyBudget && (
+          <div style={{ height: 7, background: "#eef1f4", borderRadius: 999, overflow: "hidden" }}>
+            <div style={{ width: Math.min(pace, 100) + "%", height: "100%", background: paceC }} />
+          </div>
+        )}
+      </div>
+      {/* 指標テーブル（直近7日 / 先月 / 先月比） */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 300 }}>
+          <thead><tr>
+            <th style={{ ...head, textAlign: "left" }}>指標</th>
+            <th style={head}>直近7日</th>
+            <th style={head}>先月</th>
+            <th style={head}>先月比</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{r.k}</td>
+                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{r.a}</td>
+                <td style={{ ...cell, color: "#64748b" }}>{r.b}</td>
+                <td style={cell}><DeltaTag v={r.d} dir={r.dir} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6 }}>※「先月比」は<b>1日あたり</b>で比較（費用/表示/クリック/CVは 直近7日÷7 vs 先月÷{lmDays}日、CTR/CPC/CPAは率のため直接）。緑＝改善／赤＝悪化。目標CPA未設定のため対目標比は非表示。</div>
+    </div>
+  );
+}
