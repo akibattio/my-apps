@@ -48,7 +48,7 @@ def sum_action(actions, types):
 
 def metrics_for(acc, preset, tok):
     ins = get(f"{acc}/insights", {"level": "account", "date_preset": preset,
-              "fields": "spend,impressions,clicks,ctr,cpc,cpm,actions,action_values"}, tok)
+              "fields": "spend,impressions,reach,frequency,clicks,ctr,cpc,cpm,actions,action_values"}, tok)
     row = (ins.get("data") or [{}])[0] if "__error__" not in ins else {}
     spend = round(float(row.get("spend", 0) or 0))
     imp = int(float(row.get("impressions", 0) or 0))
@@ -56,12 +56,23 @@ def metrics_for(acc, preset, tok):
     ctr = round(float(row.get("ctr", 0) or 0), 2)
     cpc = round(float(row.get("cpc", 0) or 0), 1)
     cpm = round(float(row.get("cpm", 0) or 0))
+    freq = round(float(row.get("frequency", 0) or 0), 2)
     cv = int(sum_action(row.get("actions"), CV_ACTIONS))
     rev = sum_action(row.get("action_values"), CV_ACTIONS)
     cpa = round(spend / cv) if cv else None
     roas = round(rev / spend, 1) if spend and rev else None
     return {"spend": spend, "imp": imp, "clk": clk, "ctr": ctr, "cpc": cpc,
-            "cpm": cpm, "cv": cv, "cpa": cpa, "roas": roas}
+            "cpm": cpm, "freq": freq, "cv": cv, "cpa": cpa, "roas": roas}
+
+
+# 全社既定の基準（CLAUDE.md §2）。個社は clients/<社名> の目標で上書きする想定。
+DEFAULT_BENCH = {
+    "targetCpa": None, "targetRoas": None,
+    "ctrMin": 1.0, "freqMax": 3.5,
+    "cpaWarnPct": 0.20, "cpaSeverePct": 0.50,
+    "pacingLow": 0.7, "pacingHigh": 1.1,
+    "source": "全社既定（要確認）",
+}
 
 
 def daily_budget(acc, tok):
@@ -116,6 +127,7 @@ def main():
             # 詳細（レポート状態）用
             "dailyBudget": dbudget, "lmDays": lm_days,
             "metrics": {"d7": d7, "lm": lm},
+            "bench": dict(DEFAULT_BENCH),
         })
         if d30["cv"] == 0 and d30["spend"] > 0:
             proposals.append({

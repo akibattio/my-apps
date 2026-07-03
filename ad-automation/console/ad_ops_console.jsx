@@ -454,6 +454,91 @@ function DeltaTag({ v, dir }) {
   return <span style={{ color, fontWeight: 700 }}>{up ? "▲" : "▼"}{Math.abs(v).toFixed(0)}%</span>;
 }
 
+const JUDGE = {
+  good: { label: "良好", c: "#047857", bg: "#ecfdf5" },
+  warn: { label: "注意", c: "#d97706", bg: "#fffbeb" },
+  crit: { label: "要対応", c: "#dc2626", bg: "#fef2f2" },
+  none: { label: "未設定", c: "#94a3b8", bg: "#f1f5f4" },
+};
+
+// 各指標を基準と照合して判定（運用サポート）。直近7日の実績で評価。
+function BenchmarkChecks({ c }) {
+  const m = c.metrics.d7;
+  const b = c.bench || {};
+  const checks = [];
+
+  if (c.dailyBudget) {
+    const pace = (m.spend / (c.dailyBudget * 7)) * 100;
+    const hi = (b.pacingHigh ?? 1.1) * 100, lo = (b.pacingLow ?? 0.7) * 100;
+    checks.push({ name: "予算ペース", actual: Math.round(pace) + "%", std: `${Math.round(lo)}–${Math.round(hi)}%`,
+      gap: pace > hi ? `+${Math.round(pace - hi)}pt 超過` : pace < lo ? `${Math.round(pace - lo)}pt 未消化` : "適正",
+      j: pace > hi || pace < lo ? "warn" : "good" });
+  }
+  checks.push({ name: "コンバージョン", actual: m.cv + "件", std: "1件以上",
+    gap: m.cv === 0 && m.spend > 0 ? "費用消化中でCV0" : "—",
+    j: m.cv === 0 && m.spend > 0 ? "crit" : "good" });
+  checks.push({ name: "CTR", actual: m.ctr + "%", std: `≥ ${b.ctrMin ?? 1.0}%`,
+    gap: m.ctr < (b.ctrMin ?? 1.0) ? `${(m.ctr - (b.ctrMin ?? 1.0)).toFixed(2)}pt` : "基準クリア",
+    j: m.ctr < (b.ctrMin ?? 1.0) ? "warn" : "good" });
+  if (m.freq != null && m.freq > 0) {
+    const fmax = b.freqMax ?? 3.5;
+    checks.push({ name: "フリークエンシー", actual: m.freq.toFixed(2), std: `≤ ${fmax}`,
+      gap: m.freq > fmax ? `+${(m.freq - fmax).toFixed(2)} 超過` : "適正",
+      j: m.freq > fmax ? "warn" : "good" });
+  }
+  if (b.targetCpa) {
+    const over = m.cpa ? m.cpa / b.targetCpa - 1 : null;
+    checks.push({ name: "CPA", actual: m.cpa ? yen(m.cpa) : "—", std: `≤ ${yen(b.targetCpa)}`,
+      gap: over == null ? "—" : `${over >= 0 ? "+" : ""}${Math.round(over * 100)}%`,
+      j: over == null ? "none" : over >= (b.cpaSeverePct ?? 0.5) ? "crit" : over >= (b.cpaWarnPct ?? 0.2) ? "warn" : "good" });
+  } else {
+    checks.push({ name: "CPA", actual: m.cpa ? yen(m.cpa) : "—", std: "目標未設定", gap: "—", j: "none" });
+  }
+  if (b.targetRoas) {
+    const under = m.roas ? 1 - m.roas / b.targetRoas : null;
+    checks.push({ name: "ROAS", actual: m.roas ? m.roas + "x" : "—", std: `≥ ${b.targetRoas}x`,
+      gap: under == null ? "—" : `${under > 0 ? "-" : "+"}${Math.abs(Math.round(under * 100))}%`,
+      j: under == null ? "none" : under >= 0.2 ? "warn" : "good" });
+  } else {
+    checks.push({ name: "ROAS", actual: m.roas ? m.roas + "x" : "—", std: "目標未設定", gap: "—", j: "none" });
+  }
+
+  const cell = { padding: "7px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" };
+  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4", textAlign: "left" };
+  return (
+    <div style={{ marginTop: 4, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>
+        <ShieldCheck size={14} color="#047857" /> 基準チェック（直近7日 / 基準：{b.source || "全社既定"}）
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 320 }}>
+          <thead><tr>
+            <th style={head}>指標</th><th style={{ ...head, textAlign: "right" }}>実績</th>
+            <th style={{ ...head, textAlign: "right" }}>基準</th><th style={{ ...head, textAlign: "right" }}>ズレ</th>
+            <th style={{ ...head, textAlign: "center" }}>判定</th>
+          </tr></thead>
+          <tbody>
+            {checks.map((ch) => {
+              const jj = JUDGE[ch.j];
+              return (
+                <tr key={ch.name} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                  <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{ch.name}</td>
+                  <td style={{ ...cell, textAlign: "right", color: "#0f2a1f", fontWeight: 700 }}>{ch.actual}</td>
+                  <td style={{ ...cell, textAlign: "right", color: "#64748b" }}>{ch.std}</td>
+                  <td style={{ ...cell, textAlign: "right", color: jj.c }}>{ch.gap}</td>
+                  <td style={{ ...cell, textAlign: "center" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 9px", borderRadius: 999, background: jj.bg, color: jj.c }}>{jj.label}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // クライアント詳細の「レポート状態」：予算消化＋直近7日/先月/先月比
 function AccountReport({ c }) {
   const d7 = c.metrics.d7, lm = c.metrics.lm;
@@ -495,6 +580,8 @@ function AccountReport({ c }) {
           </div>
         )}
       </div>
+      {/* 基準チェック（運用サポート） */}
+      {c.bench && <BenchmarkChecks c={c} />}
       {/* 指標テーブル（直近7日 / 先月 / 先月比） */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 300 }}>
