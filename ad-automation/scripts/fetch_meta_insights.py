@@ -50,6 +50,17 @@ CSV_COLUMNS = [
 ]
 
 
+def load_dotenv(path: Path = Path(".env")) -> None:
+    """.env を os.environ に読み込む（既存の環境変数は上書きしない・簡易パーサ）。"""
+    import re
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^([A-Z0-9_]+)=(.*)$", line.strip())
+        if m and m.group(1) not in os.environ:
+            os.environ[m.group(1)] = m.group(2).strip()
+
+
 def _require_env(name: str) -> str:
     val = os.environ.get(name, "").strip()
     if not val:
@@ -107,7 +118,7 @@ def fetch(account_id: str, token: str, days: int, conversion_action: str) -> lis
     # 2) adset単位のインサイト（直近N日）
     insights_url = f"{GRAPH_BASE}/{account_id}/insights?" + urllib.parse.urlencode({
         "level": "adset",
-        "date_preset": f"last_{days}d" if days in (7, 14, 28, 30, 90) else "last_7d",
+        "date_preset": "maximum" if days == 0 else (f"last_{days}d" if days in (7, 14, 28, 30, 90) else "last_7d"),
         "fields": "adset_id,adset_name,spend,impressions,clicks,actions,action_values",
         "limit": "500",
         "access_token": token,
@@ -131,7 +142,7 @@ def fetch(account_id: str, token: str, days: int, conversion_action: str) -> lis
             "impressions_7d": float(ins.get("impressions", 0) or 0),
             "clicks_7d": float(ins.get("clicks", 0) or 0),
             "daily_budget": daily_budget,
-            "days_active": days,  # ※配信開始からの実日数はentity別に別途要取得。暫定でN。
+            "days_active": 999 if days == 0 else days,  # 0=全期間(maximum)。実日数はentity別に別途要取得・暫定値。
         })
     return rows
 
@@ -151,12 +162,13 @@ def main(argv: list[str] | None = None) -> int:
                    help="広告アカウントIDが入った環境変数名")
     p.add_argument("--token-env", default="HARUNA_META_ACCESS_TOKEN",
                    help="アクセストークンが入った環境変数名")
-    p.add_argument("--days", type=int, default=7, help="集計期間(日)")
+    p.add_argument("--days", type=int, default=7, help="集計期間(日)。0=全期間(maximum)")
     p.add_argument("--conversion-action", default="offsite_conversion.fb_pixel_lead",
                    help="CVとして数える action_type（クライアントのCVイベントに合わせる・要確認）")
     p.add_argument("--out", required=True, help="出力CSV（generate_proposals.py に渡す）")
     a = p.parse_args(argv)
 
+    load_dotenv()
     account_id = _require_env(a.account_env)
     token = _require_env(a.token_env)
     if not account_id.startswith("act_"):

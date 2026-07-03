@@ -131,13 +131,18 @@ def evaluate(rows: list[Row], t: dict) -> tuple[list[Finding], list[str]]:
     cpa_note = "" if target_cpa else "（目標CPA未設定＝全社既定値・要確認）"
 
     for r in rows:
+        # 配信中でないエンティティは判定対象外(停止済みに「停止提案」等の無意味な指摘を避ける)
+        if r.status.upper() not in ("ACTIVE", "ENABLED"):
+            skipped.append(f"{r.entity}（状態 {r.status}・配信中でないため除外）")
+            continue
+
         # 学習期間中は判定対象外(早すぎる判断を避ける — CLAUDE.md §2.1)
         if r.days_active < t["learning_min_days"]:
             skipped.append(f"{r.entity}（配信{r.days_active}日・学習期間中のため除外）")
             continue
 
-        # 無駄消化: CV=0 かつ 消化 > 日予算×N
-        if r.conversions_7d == 0 and r.spend_7d > r.daily_budget * t["wasted_spend_budget_mult"]:
+        # 無駄消化: CV=0 かつ 消化 > 日予算×N（日予算が取得できている場合のみ・0除算的な誤発火を防ぐ）
+        if r.daily_budget > 0 and r.conversions_7d == 0 and r.spend_7d > r.daily_budget * t["wasted_spend_budget_mult"]:
             findings.append(Finding(
                 entity=r.entity, campaign=r.campaign, severity="重度悪化",
                 fact=f"直近7日 CV=0 で消化 {yen(r.spend_7d)}（日予算 {yen(r.daily_budget)}×{t['wasted_spend_budget_mult']:.0f} 超）",
@@ -212,7 +217,7 @@ def render(client: str, rows: list[Row], findings: list[Finding],
     L.append("")
     # 1. サマリー
     L.append("## 1. サマリー")
-    L.append(f"- 対象 {len(rows)} 件 / 要対応 **{len(findings)}** 件（うち重度 {severe} 件）/ 学習除外 {len(skipped)} 件。")
+    L.append(f"- 対象 {len(rows)} 件 / 要対応 **{len(findings)}** 件（うち重度 {severe} 件）/ 判定除外 {len(skipped)} 件。")
     L.append(f"- 直近7日：費用 {yen(total_spend)}・CV {total_conv:.0f}・全体CPA {yen(overall_cpa)}・全体ROAS {overall_roas:.2f}" if overall_roas else
              f"- 直近7日：費用 {yen(total_spend)}・CV {total_conv:.0f}・全体CPA {yen(overall_cpa)}。")
     if not t["target_cpa"]:
@@ -245,7 +250,7 @@ def render(client: str, rows: list[Row], findings: list[Finding],
     L.append(f"- 使用しきい値：CPA悪化 +{t['cpa_warn_pct']*100:.0f}% / 重度 +{t['cpa_severe_pct']*100:.0f}%、"
              f"無駄消化 日予算×{t['wasted_spend_budget_mult']:.0f}、学習除外 <{t['learning_min_days']}日。")
     if skipped:
-        L.append(f"- 学習期間で除外：{', '.join(skipped)}")
+        L.append(f"- 判定から除外：{', '.join(skipped)}")
     if not t["target_cpa"]:
         L.append("- 目標CPA/ROAS が未設定の箇所は全社既定値を使用（要確認）。")
     L.append("")
