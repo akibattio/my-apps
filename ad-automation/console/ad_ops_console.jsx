@@ -37,7 +37,7 @@ const SAMPLE_PROPOSALS = [
   { id: "p5", client: "アオヤマ歯科クリニック", media: "meta", kind: "クリエイティブ差し替え", cur: "訴求A：CTR 1.1%（低下傾向）", next: "新コピー2案を下書き作成（PAUSED）", reason: "主力のCTRが2週間で1.6%→1.1%へ低下。トーン&マナーに沿った新案を提案。", severity: "info", twoStep: false },
 ];
 
-const yen = (n) => "¥" + n.toLocaleString("ja-JP");
+const yen = (n) => (n == null ? "—" : "¥" + n.toLocaleString("ja-JP"));
 const man = (n) => (n ? (n / 10000).toLocaleString("ja-JP") + "万" : "—");
 const SEV = {
   critical: { label: "要対応", dot: "#dc2626", chip: "#fef2f2", chipText: "#b91c1c" },
