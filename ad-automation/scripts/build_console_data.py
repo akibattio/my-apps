@@ -107,6 +107,15 @@ def main():
     _first_this = datetime.now(JST).replace(day=1)
     lm_days = (_first_this - timedelta(days=1)).day
 
+    # 個社基準（目標）の読み込み：全社既定を上書き
+    bench_cfg = {}
+    bpath = Path("clients/benchmarks.json")
+    if bpath.exists():
+        try:
+            bench_cfg = json.loads(bpath.read_text(encoding="utf-8")).get("byClient", {})
+        except Exception as e:
+            print("benchmarks.json 読み込み失敗（全社既定を使用）:", e)
+
     accounts, proposals = [], []
     for i, a in enumerate(accts, 1):
         acc = "act_" + a.get("account_id", "")
@@ -117,17 +126,24 @@ def main():
         dbudget = daily_budget(acc, tok)
         camps = get(f"{acc}/campaigns", {"fields": "status", "limit": "200"}, tok)
         cp = sum(1 for c in camps.get("data", []) if c.get("status") == "ACTIVE") if "__error__" not in camps else 0
+        # 基準：全社既定 ← 個社目標で上書き
+        bench = dict(DEFAULT_BENCH)
+        ov = bench_cfg.get(name)
+        if ov:
+            bench.update({k: v for k, v in ov.items() if not k.startswith("_")})
+            bench["source"] = "個社目標"
         accounts.append({
-            "id": i, "client": name, "tier": "mid", "monthly": None, "media": "meta",
+            "id": i, "client": name, "tier": ov.get("tier", "mid") if ov else "mid",
+            "monthly": ov.get("monthly") if ov else None, "media": "meta",
             "acct": acc, "status": "ok", "tokenDays": 60, "cp": cp,
             "sync": datetime.now(JST).strftime("%H:%M 取得"),
             # 概要/一覧用サマリ（直近30日）
-            "spend": d30["spend"], "cpa": d30["cpa"] or 0, "target": None,
+            "spend": d30["spend"], "cpa": d30["cpa"] or 0, "target": bench.get("targetCpa"),
             "roas": d30["roas"], "cv": d30["cv"], "ctr": d30["ctr"], "is": None,
             # 詳細（レポート状態）用
             "dailyBudget": dbudget, "lmDays": lm_days,
             "metrics": {"d7": d7, "lm": lm},
-            "bench": dict(DEFAULT_BENCH),
+            "bench": bench,
         })
         if d30["cv"] == 0 and d30["spend"] > 0:
             proposals.append({

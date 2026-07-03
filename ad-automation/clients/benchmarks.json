@@ -1,0 +1,20 @@
+{
+  "_comment": "個社の基準（目標）。全社既定(CLAUDE.md §2 / build_console_data.py DEFAULT_BENCH)を上書きする項目だけ書く。clients/<社名>.md のKPI目標と一致させること。キーはMeta広告アカウント名(=data.jsonのclient)。",
+  "byClient": {
+    "ハルナ美容外科": {
+      "targetCpa": 5500,
+      "targetRoas": 3.0,
+      "ctrMin": 2.0,
+      "freqMax": 3.5,
+      "cpaWarnPct": 0.15,
+      "cpaSeverePct": 0.30,
+      "tier": "large",
+      "monthly": 2800000
+    },
+    "【SC用】RiceLog2": {
+      "ctrMin": 1.5,
+      "freqMax": 3.0,
+      "_note": "暫定の基準（要調整）。CVが計測されるようになったら targetCpa/targetRoas を設定。"
+    }
+  }
+}
