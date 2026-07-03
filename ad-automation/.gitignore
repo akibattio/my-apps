@@ -5,8 +5,11 @@
 secrets/
 *.pem
 *.key
-*_token*
-*refresh_token*
+client_secret*.json
+*credentials*.json
+# トークンを「ファイルとして」保存した場合の保険（.txt/.json のみ。.py 等の実装は対象外）
+*token*.txt
+*token*.json
 
 # Python
 __pycache__/
