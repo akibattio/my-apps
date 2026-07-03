@@ -27,3 +27,23 @@
 ## 前提
 - Python 3.12+ / `.env` に接続情報（実値はGit管理外）。
 - 無人運用に進む場合、Metaは組織所有の System User Token（無期限）を使用。
+
+---
+
+## 実装：毎朝8:30の自動取得（cron）
+
+Meta実データ → `console/data.json` を毎朝更新（読み取りのみ）。
+
+- 実行ラッパー：`scripts/daily_refresh.sh`（cd→`build_console_data.py`→`logs/refresh.log`）
+- cron登録（重複回避・冪等）：
+  ```bash
+  CRON_LINE="30 8 * * * /Users/som-013/dev/ad-automation/scripts/daily_refresh.sh"
+  ( crontab -l 2>/dev/null | grep -v 'daily_refresh.sh' ; echo "$CRON_LINE" ) | crontab -
+  crontab -l | grep daily_refresh   # 確認
+  ```
+- ログ：`logs/refresh.log`（Git管理外）
+
+### 注意
+- Macが8:30に起動している必要あり（スリープ中は次回起動時に実行されないcronの仕様）。常時稼働機 or launchd化を推奨。
+- 初回はターミナル/cronに「フルディスクアクセス」許可が要る場合あり（システム設定→プライバシー）。
+- Metaトークンは60日失効。無人運用は Admin ロールの System User 無期限トークンへ切替を（§8）。
