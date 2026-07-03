@@ -139,10 +139,17 @@ canon対応: Phase 1
     `app/passport/[vehicleId]/`、`scripts/setup-storage.mjs`。
 canon対応: Phase 2（AI/Statusは後回し）
 
-### Step 2 — ログインして育てる
-作るもの: Auth（Supabase Auth）/ `/garage`（自分の車一覧）/ `/garage/[id]`（詳細+Timeline）
-/ `/garage/[id]/add-history`（写真・書類・テキストで履歴追加）
-完了条件: ログインしたオーナーが、自分の車に毎日Historyを足せる
+### Step 2 — ログインして育てる ✅ 完了（2026-07-03）
+作るもの: Auth（Supabase Auth・メールOTP）/ `/login` / `/garage`（自分の車一覧）
+/ `/garage/[id]`（詳細+Timeline）/ `/garage/[id]/add-history`（種類選択+写真+メモで履歴追加）
+完了条件: ログインしたオーナーが、自分の車に毎日Historyを足せる → 達成・動作確認済み
+実装メモ:
+  - メールOTP（6桁コード）ログイン。マジックリンクは `/auth/callback` で処理。
+  - `owners.auth_user_id` でユーザーとOwnerを1:1連携（migration 0002）。ログイン時に自動作成。
+  - RLS: authenticated は「自分のOwner/所有Vehicle/その履歴・写真」だけ読み書き可（deleteなし）。
+    読み取りはユーザーセッションのSSRクライアント（RLS適用）、書き込みは所有権をコードで確認のうえ service_role。
+  - 登録時にログイン中なら Vehicle に current_owner_id と Ownership を紐付ける。
+  - 主要ファイル: `middleware.ts`、`lib/auth.ts`、`app/login/`、`app/auth/`、`app/garage/`。
 canon対応: Phase 2（認証）+ Phase 3（My Garage）
 
 ### Step 3 — AIで入力を楽にする（最小から）
@@ -182,15 +189,16 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 
 ## 8. 今どこ / 次の一手
 
-今ここ: Step 1 まで完了（2026-07-03）。
+今ここ: Step 2 まで完了（2026-07-03）。
 - ✅ Step 0 土台: DBスキーマ適用 / Next.js雛形 / Supabase接続 / Storage
 - ✅ Step 1 登録して残る: 登録フロー（写真最大10枚）→ 永久Timeline、動作確認済み
+- ✅ Step 2 育てる: ログイン / マイガレージ / 履歴追加 / owner連携 + RLS、動作確認済み
 
-次の一手: Step 2（ログインして育てる）
-- Supabase Auth でログイン
-- `/garage`（自分の車一覧）/ `/garage/[id]`（詳細+Timeline）/ `/garage/[id]/add-history`
-- Vehicle と Owner を Ownership で結ぶ（今は登録に Owner が紐づいていない）
-- 書き込みを service_role から、ログインユーザー + RLSポリシーへ移す
+次の一手: Step 3（AIで入力を楽にする・最小版）
+- 写真から車種/メーターをAIが下書き（Vehicle Recognition + メーターOCR の2つから）
+- AIは断定せず証拠を見せる。保存は append-only（ai_analyses）。最終確認は人。
+- 未着手の宿題: メール送信（本番SMTP）/ ログイン後の登録動線を /garage 起点に統一 /
+  Step1で作った owner なし車両の「あとから紐付け（claim）」。
 
 進め方の指針:
 1つのStepが完全に動いてから次へ。Stepの途中で先の機能に手を出さない。

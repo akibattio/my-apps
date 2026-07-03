@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sofcom.adops.refresh</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/som-013/dev/ad-automation/scripts/daily_refresh.sh</string>
+  </array>
+
+  <!-- 毎日 8:30。スリープで取りこぼした場合は次回起動時に実行される。 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>8</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+
+  <key>RunAtLoad</key><false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/som-013/dev/ad-automation/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/som-013/dev/ad-automation/logs/launchd.err.log</string>
+</dict>
+</plist>

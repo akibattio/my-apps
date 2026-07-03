@@ -47,3 +47,24 @@ Meta実データ → `console/data.json` を毎朝更新（読み取りのみ）
 - Macが8:30に起動している必要あり（スリープ中は次回起動時に実行されないcronの仕様）。常時稼働機 or launchd化を推奨。
 - 初回はターミナル/cronに「フルディスクアクセス」許可が要る場合あり（システム設定→プライバシー）。
 - Metaトークンは60日失効。無人運用は Admin ロールの System User 無期限トークンへ切替を（§8）。
+
+---
+
+## 実装（推奨）：launchd で毎朝8:30（スリープ復帰対応）
+
+cronの弱点（8:30にスリープ中だと取りこぼす）を避けるため、**launchdに一本化**（cronは削除済み）。
+launchdは取りこぼし時に次回起動でまとめて実行する。
+
+- 定義：`routines/com.sofcom.adops.refresh.plist`（Labelは `com.sofcom.adops.refresh`）
+- インストール：
+  ```bash
+  cp routines/com.sofcom.adops.refresh.plist ~/Library/LaunchAgents/
+  launchctl unload ~/Library/LaunchAgents/com.sofcom.adops.refresh.plist 2>/dev/null || true
+  launchctl load -w ~/Library/LaunchAgents/com.sofcom.adops.refresh.plist
+  launchctl list | grep sofcom        # 登録確認
+  launchctl start com.sofcom.adops.refresh   # 手動テスト実行
+  ```
+- 解除：`launchctl unload ~/Library/LaunchAgents/com.sofcom.adops.refresh.plist`
+- ログ：`logs/refresh.log`（処理内容）／`logs/launchd.*.log`（launchd標準出力）
+
+※ Metaトークンは60日失効 → 無人運用は Admin ロールの System User 無期限トークンへ（§8）。

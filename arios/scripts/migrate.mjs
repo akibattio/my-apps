@@ -23,16 +23,36 @@ async function main() {
   await client.connect();
   console.log("接続OK。マイグレーションを適用します。\n");
 
+  // 適用済みマイグレーションを記録する台帳（未作成なら作る）
+  await client.query(
+    `create table if not exists schema_migrations (
+       filename    text primary key,
+       applied_at  timestamptz not null default now()
+     )`
+  );
+  const applied = new Set(
+    (await client.query("select filename from schema_migrations")).rows.map(
+      (r) => r.filename
+    )
+  );
+
   const files = (await readdir(MIGRATIONS_DIR))
     .filter((f) => f.endsWith(".sql"))
     .sort();
 
   for (const file of files) {
+    if (applied.has(file)) {
+      console.log(`→ ${file} ... 適用済み（スキップ）`);
+      continue;
+    }
     const sql = await readFile(path.join(MIGRATIONS_DIR, file), "utf8");
     process.stdout.write(`→ ${file} ... `);
     try {
       await client.query("begin");
       await client.query(sql);
+      await client.query("insert into schema_migrations (filename) values ($1)", [
+        file,
+      ]);
       await client.query("commit");
       console.log("OK");
     } catch (e) {

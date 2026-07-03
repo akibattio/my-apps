@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureOwner } from "@/lib/auth";
 
 const BUCKET = "vehicle-images";
 const MAX_PHOTOS = 10;
@@ -34,6 +35,9 @@ export async function registerVehicle(
 
   const supabase = createAdminClient();
 
+  // ログイン中なら所有者として紐付ける（未ログインなら owner なしで登録）
+  const owner = await ensureOwner();
+
   // 1. Vehicle（永久・削除不可）
   const { data: vehicle, error: vErr } = await supabase
     .from("vehicles")
@@ -42,6 +46,7 @@ export async function registerVehicle(
       model: model || null,
       year,
       status: "REGISTERED",
+      current_owner_id: owner?.ownerId ?? null,
     })
     .select("id")
     .single();
@@ -51,23 +56,35 @@ export async function registerVehicle(
   }
   const vehicleId = vehicle.id as string;
 
-  // 2. 最初の History（この車の Timeline の起点）
-  const today = new Date().toISOString().slice(0, 10);
+  // 2. Ownership（所有履歴。ログイン時のみ）
+  const today0 = new Date().toISOString().slice(0, 10);
+  if (owner) {
+    await supabase.from("ownerships").insert({
+      vehicle_id: vehicleId,
+      owner_id: owner.ownerId,
+      is_current: true,
+      start_date: today0,
+      source: "REGISTRATION",
+    });
+  }
+
+  // 3. 最初の History（この車の Timeline の起点）
   const { data: history } = await supabase
     .from("histories")
     .insert({
       vehicle_id: vehicleId,
+      owner_id: owner?.ownerId ?? null,
       history_type: "OTHER",
       title: "ARIOSに登録",
       description: "この車の記録がARIOSで始まりました。",
-      event_date: today,
+      event_date: today0,
       source: "PUBLIC_REGISTRATION",
       visibility: "PUBLIC",
     })
     .select("id")
     .single();
 
-  // 3. 写真を Storage にアップロードして images に記録（1枚失敗しても他は続行）
+  // 4. 写真を Storage にアップロードして images に記録（1枚失敗しても他は続行）
   for (let i = 0; i < photos.length; i++) {
     const file = photos[i];
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
