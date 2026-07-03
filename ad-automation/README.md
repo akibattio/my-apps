@@ -19,8 +19,10 @@ ad-automation/
 │   └── monthly-report/          月次レポート
 ├── routines/daily-check.md      毎朝の定期チェック定義
 ├── scripts/
-│   ├── fetch_meta_insights.py   Meta読み取り雛形 → CSV出力（書き込みしない）
-│   └── generate_proposals.py    提案(下書き)生成 — 媒体へ書き込まない
+│   ├── fetch_meta_insights.py            Meta読み取り雛形 → CSV出力（書き込みしない）
+│   ├── fetch_google_insights.py          Google読み取り雛形 → CSV出力（書き込みしない）
+│   ├── google_generate_refresh_token.py  Google OAuth Refresh Token 生成ヘルパー
+│   └── generate_proposals.py             提案(下書き)生成 — 媒体へ書き込まない
 ├── console/                     管理画面（プロトタイプ配置先）
 ├── data/samples/                サンプル数値（実データはGit管理外）
 ├── .env.example                 環境変数の見本（実値は .env へ）
