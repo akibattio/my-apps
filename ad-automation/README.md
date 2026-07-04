@@ -69,3 +69,8 @@ python3 scripts/generate_proposals.py \
 - [ ] Google 開発者トークン申請（審査待ち）→ 承認後に読み取り接続
 - [ ] Slack通知の要否判断
 - [ ] `console/ad_ops_console.jsx` の取り込み → 実データ接続（Phase 2）
+
+## 監査エンジン：Claude Ads（採用）
+広告監査の土台に OSS **Claude Ads**（MIT・読み取り/監査のみ）を採用。`/ads audit` 等で多媒体・250+チェック。
+- 詳細・再現手順・レイヤリング：[docs/claude-ads.md](docs/claude-ads.md)
+- **最上位ルールは CLAUDE.md**（医療広告・承認ゲート）。Claude Adsの出力は下書き扱い、書き込みは承認後のみ。
