@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARIOS 開発状況</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0c0b09; }
+  * { box-sizing: border-box; }
+  html, body, .page, .page * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page { margin: 10mm; }
+</style>
+</head>
+<body>
+<title>ARIOS 開発状況</title>
+<style>
+  :root {
+    --ground: #0c0b09;
+    --surface: #16140f;
+    --surface-2: #1e1b14;
+    --line: #34302a;
+    --gold: #c6a24e;
+    --gold-bright: #e2c078;
+    --text: #f2efe8;
+    --muted: #a29c8e;
+    --serif: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", Georgia, serif;
+    --sans: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  .page {
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.8;
+    padding: 0 24px 96px;
+    margin: 0 auto;
+    max-width: 820px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .eyebrow {
+    font-size: 12px; letter-spacing: 0.42em; color: var(--gold);
+    text-transform: uppercase; margin: 0;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 500; color: var(--text);
+    font-size: clamp(34px, 6vw, 52px); line-height: 1.28; letter-spacing: 0.01em;
+    text-wrap: balance; margin: 22px 0 0;
+  }
+  h2 {
+    font-family: var(--serif); font-weight: 500; font-size: 24px;
+    letter-spacing: 0.02em; margin: 0 0 4px;
+  }
+  .lead { color: var(--muted); font-size: 17px; max-width: 60ch; margin: 20px 0 0; }
+  .meta { color: var(--muted); font-size: 13px; letter-spacing: 0.06em; margin-top: 28px; }
+  .meta b { color: var(--gold-bright); font-weight: 500; }
+  hr.rule { border: none; border-top: 1px solid var(--line); margin: 64px 0; }
+  .sec-label { font-size: 12px; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; margin: 0 0 26px; }
+
+  header.hero { padding: 88px 0 8px; }
+  .hero-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); margin-right: 12px; vertical-align: middle; }
+
+  /* Roadmap timeline */
+  .tl { position: relative; margin: 0; padding: 0 0 0 34px; list-style: none; }
+  .tl::before { content: ""; position: absolute; left: 6px; top: 6px; bottom: 10px; width: 1px; background: var(--line); }
+  .tl li { position: relative; padding: 0 0 30px; }
+  .tl li:last-child { padding-bottom: 0; }
+  .tl .node { position: absolute; left: -34px; top: 4px; width: 13px; height: 13px; border-radius: 50%; }
+  .node.done { background: var(--gold); box-shadow: 0 0 0 4px rgba(198,162,78,0.14); }
+  .node.now { background: var(--ground); border: 2px solid var(--gold-bright); box-shadow: 0 0 0 4px rgba(226,192,120,0.16); }
+  .node.next { background: var(--ground); border: 1px solid var(--line); }
+  .tl .step { font-size: 12px; letter-spacing: 0.24em; color: var(--muted); text-transform: uppercase; }
+  .tl .ttl { font-family: var(--serif); font-size: 20px; margin: 2px 0 2px; }
+  .tl .now-ttl { color: var(--gold-bright); }
+  .tl .desc { color: var(--muted); font-size: 15px; }
+  .chip { display: inline-block; font-size: 11px; letter-spacing: 0.12em; padding: 2px 11px; border-radius: 999px; margin-left: 10px; vertical-align: middle; }
+  .chip.done { color: var(--gold-bright); border: 1px solid rgba(198,162,78,0.4); }
+  .chip.now { color: var(--ground); background: var(--gold-bright); font-weight: 500; }
+  .chip.next { color: var(--muted); border: 1px solid var(--line); }
+
+  /* Flow mockup */
+  .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .phone { background: #0a0908; border: 1px solid var(--line); border-radius: 18px; padding: 14px 12px; min-height: 240px; display: flex; flex-direction: column; }
+  .phone .plabel { font-size: 11px; letter-spacing: 0.2em; color: var(--gold); text-transform: uppercase; }
+  .phone .ptitle { font-size: 13px; color: var(--text); margin-top: 8px; line-height: 1.5; }
+  .phone .psub { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+  .pbtn { margin-top: auto; background: var(--gold); color: #0a0908; border-radius: 999px; text-align: center; font-size: 11px; padding: 8px; font-weight: 500; }
+  .upbox { border: 1px dashed #44403a; border-radius: 10px; height: 60px; display: flex; align-items: center; justify-content: center; color: var(--gold); font-size: 20px; margin: 10px 0 8px; }
+  .fld2 { border: 1px solid #2c2922; border-radius: 6px; font-size: 10px; color: #6b665c; padding: 6px 8px; margin-top: 6px; }
+  .tldot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); display: inline-block; margin-right: 7px; }
+  .flow-cap { color: var(--muted); font-size: 14px; margin-top: 20px; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; }
+  .card h3 { font-size: 14px; letter-spacing: 0.04em; margin: 0 0 12px; color: var(--gold-bright); font-weight: 500; }
+  .card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+  .card li { margin-bottom: 7px; }
+  .card li::marker { color: var(--gold); }
+
+  .next-box { background: var(--surface-2); border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 0 12px 12px 0; padding: 22px 26px; }
+  .next-box .desc { color: var(--muted); font-size: 15px; margin: 8px 0 0; }
+
+  footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; letter-spacing: 0.08em; }
+
+  @media (max-width: 640px) {
+    .flow { grid-template-columns: repeat(2, 1fr); }
+    .cols { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .fade { opacity: 0; transform: translateY(10px); animation: rise 0.7s ease forwards; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+  }
+</style>
+
+<main class="page">
+  <header class="hero fade">
+    <p class="eyebrow">ARIOS · Development Status</p>
+    <h1>一台ごとの歴史を、<br>100年残す。</h1>
+    <p class="lead">車の売買サイトではなく、一台の乗り物の人生を一本の時間軸（Vehicle Timeline）に記録し続ける信頼インフラ。売買は、歴史が育った結果として自然に生まれる——という順序を全設計の前提に置いています。</p>
+    <p class="meta"><span class="hero-dot"></span>最終更新 <b>2026年7月3日</b> ／ 現在 <b>Step 2 まで完了・実機で動作確認済み</b></p>
+  </header>
+
+  <hr class="rule">
+
+  <section>
+    <p class="sec-label">開発ロードマップ</p>
+    <h2 style="margin-bottom:26px;">シンプルに、一段ずつ積み上げる</h2>
+    <ol class="tl">
+      <li>
+        <span class="node done"></span>
+        <div class="step">Step 0</div>
+        <div class="ttl">土台<span class="chip done">完了</span></div>
+        <div class="desc">データベース設計・アプリ基盤・クラウド接続。「車の歴史を永久に保存する箱」を用意しました。</div>
+      </li>
+      <li>
+        <span class="node done"></span>
+        <div class="step">Step 1</div>
+        <div class="ttl">登録して残る<span class="chip done">完了</span></div>
+        <div class="desc">スマホで写真を撮って車を登録すると、その車の消えないTimelineが生まれる。ここまで実際に動きます。</div>
+      </li>
+      <li>
+        <span class="node done"></span>
+        <div class="step">Step 2</div>
+        <div class="ttl">育てる<span class="chip done">完了</span></div>
+        <div class="desc">ログインして「自分のガレージ」で車を管理し、整備や出来事を毎日書き足せる。ここまで実際に動きます。</div>
+      </li>
+      <li>
+        <span class="node now"></span>
+        <div class="step">Step 3</div>
+        <div class="ttl now-ttl">AIで楽にする<span class="chip now">次に着手</span></div>
+        <div class="desc">写真から車種やメーターをAIが読み取り、入力を自動で下書き。最終確認は人が行います。</div>
+      </li>
+      <li>
+        <span class="node next"></span>
+        <div class="step">Step 4</div>
+        <div class="ttl">信頼を見せる・公開する<span class="chip next">予定</span></div>
+        <div class="desc">証拠にもとづく信頼度と歴史を、URLひとつで第三者に見せられるパスポートに。</div>
+      </li>
+      <li>
+        <span class="node next"></span>
+        <div class="step">Step 5 以降</div>
+        <div class="ttl">ひろげる<span class="chip next">予定</span></div>
+        <div class="desc">売買のマッチング・外部パートナー連携・多言語 / 多通貨。土台は最初から想定済みです。</div>
+      </li>
+    </ol>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="sec-label">いま動くもの</p>
+    <h2 style="margin-bottom:26px;">Step 1 — 登録フロー</h2>
+    <p class="flow-cap" style="margin:0 0 20px;">まず、写真で車を登録するとその車の永久のTimelineが生まれます（下の4画面）。</p>
+    <div class="flow">
+      <div class="phone">
+        <div class="plabel">1 トップ</div>
+        <div class="ptitle">一台ごとの歴史を、100年残す。</div>
+        <div class="psub">入口はボタンひとつ。</div>
+        <div class="pbtn">愛車を登録する</div>
+      </div>
+      <div class="phone">
+        <div class="plabel">2 登録</div>
+        <div class="upbox">＋</div>
+        <div class="psub" style="margin:0 0 2px;">写真は最大10枚</div>
+        <div class="fld2">メーカー・モデル</div>
+        <div class="fld2">年式</div>
+        <div class="pbtn">登録する</div>
+      </div>
+      <div class="phone">
+        <div class="plabel">3 Timeline</div>
+        <div class="ptitle" style="font-size:12px;">スープラ A80 · 1994</div>
+        <div style="margin-top:14px; padding-left:12px; border-left:1px solid #2c2922;">
+          <div style="font-size:11px; color:var(--gold);"><span class="tldot"></span>2026.07</div>
+          <div class="psub" style="margin-top:4px;">この車の記録が始まった</div>
+        </div>
+        <div class="psub" style="margin-top:auto; color:#6b665c;">永久に消えない</div>
+      </div>
+      <div class="phone" style="align-items:center; justify-content:center; text-align:center;">
+        <div style="font-size:34px; color:var(--gold);">✓</div>
+        <div class="ptitle">登録ありがとうございます</div>
+        <div class="psub">Timelineが始まりました</div>
+      </div>
+    </div>
+    <p class="flow-cap" style="margin-bottom:40px;">Step 2 では、ここにログインが加わりました。自分専用の「マイガレージ」で車を管理し、整備・修理・旅などの出来事を写真つきで毎日書き足せます。他人の車は見えないアクセス制御も入っています。</p>
+
+    <h2 style="margin-bottom:26px;">Step 2 — 育てる</h2>
+    <div class="flow">
+      <div class="phone">
+        <div class="plabel">1 ログイン</div>
+        <div class="ptitle">ログインしてガレージを開く</div>
+        <div class="fld2" style="margin-top:12px;">メールアドレス</div>
+        <div class="pbtn" style="margin-top:10px;">メールでログイン</div>
+        <div class="psub" style="margin-top:auto;">初めてでもそのまま登録</div>
+      </div>
+      <div class="phone">
+        <div class="plabel">2 マイガレージ</div>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:34px; height:34px; border-radius:6px; background:#232326; flex:0 0 auto;"></span>
+            <span style="font-size:11px; color:#f5f5f4;">スープラ A80 · 1994</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:34px; height:34px; border-radius:6px; background:#232326; flex:0 0 auto;"></span>
+            <span style="font-size:11px; color:#f5f5f4;">CB750 · 1972</span>
+          </div>
+        </div>
+        <div class="pbtn" style="margin-top:auto;">＋ 車を登録</div>
+      </div>
+      <div class="phone">
+        <div class="plabel">3 車の詳細</div>
+        <div class="ptitle" style="font-size:12px;">スープラ A80</div>
+        <div style="margin-top:12px; padding-left:12px; border-left:1px solid #33322f; display:flex; flex-direction:column; gap:11px;">
+          <div>
+            <div style="font-size:10px; color:var(--gold);">2026.08</div>
+            <div style="font-size:11px; color:#f5f5f4;">整備・オイル交換</div>
+          </div>
+          <div>
+            <div style="font-size:10px; color:var(--gold);">2026.07</div>
+            <div style="font-size:11px; color:#f5f5f4;">ARIOSに登録</div>
+          </div>
+        </div>
+        <div class="pbtn" style="margin-top:auto;">＋ 出来事を追加</div>
+      </div>
+      <div class="phone">
+        <div class="plabel">4 出来事を追加</div>
+        <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:11px;">
+          <span style="font-size:10px; color:#0b0b0c; background:var(--gold); border-radius:999px; padding:3px 9px;">整備</span>
+          <span style="font-size:10px; color:var(--gold); border:0.5px solid #5a4c22; border-radius:999px; padding:3px 9px;">修理</span>
+          <span style="font-size:10px; color:var(--gold); border:0.5px solid #5a4c22; border-radius:999px; padding:3px 9px;">旅</span>
+        </div>
+        <div class="upbox" style="height:40px; margin:10px 0 0;">＋写真</div>
+        <div class="fld2">メモ（何をした？）</div>
+        <div class="pbtn" style="margin-top:auto;">Timelineに追加</div>
+      </div>
+    </div>
+    <p class="flow-cap">スマホだけで「登録して、育てる」までが実際に動く状態です。</p>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="sec-label">土台の考え方</p>
+    <div class="cols">
+      <div class="card">
+        <h3>100年壊さない3原則</h3>
+        <ul>
+          <li>記録は消さない。修正も追記で残す</li>
+          <li>車のIDは永久。持ち主が変わっても歴史は不変</li>
+          <li>個人情報と車両情報は分ける</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>技術</h3>
+        <ul>
+          <li>フロント: Next.js + TypeScript</li>
+          <li>データ / 認証 / 写真: Supabase</li>
+          <li>モバイル前提・写真ファースト設計</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <section>
+    <p class="sec-label">次にやること</p>
+    <div class="next-box">
+      <h2>Step 3 — AIで楽にする</h2>
+      <p class="desc">写真から車種やメーター・色をAIが読み取り、登録フォームを自動で下書き。入力の手間を大きく減らします。AIは断定せず候補を示し、最終確認は人が行う——という順序は崩しません。</p>
+    </div>
+  </section>
+
+  <footer>
+    ARIOS — Vehicle is permanent. Owner changes. History grows. Trust accumulates. History is never deleted.
+  </footer>
+</main>
+
+</body>
+</html>

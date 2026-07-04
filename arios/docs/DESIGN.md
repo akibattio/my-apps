@@ -152,11 +152,18 @@ canon対応: Phase 2（AI/Statusは後回し）
   - 主要ファイル: `middleware.ts`、`lib/auth.ts`、`app/login/`、`app/auth/`、`app/garage/`。
 canon対応: Phase 2（認証）+ Phase 3（My Garage）
 
-### Step 3 — AIで入力を楽にする（最小から）
-作るもの: 写真から車種/メーター/色を推定して登録フォームを下書き。人が確認して保存。
-まずは Vehicle Recognition と メーターOCR の2つだけ。
-完了条件: 写真を出すと入力欄が下書きで埋まる（最終確認は人）
-ポイント: AIは断定しない・証拠を見せる・保存は毎回追記（ai_analyses）。無くても Step 2 は回る。
+### Step 3 — AIで入力を楽にする（最小から）✅ 一部完了（2026-07-04）
+作るもの: 写真から車種を推定して登録フォームを下書き。人が確認して保存。
+完了条件: 写真を出すと入力欄が下書きで埋まる（最終確認は人）→ Vehicle Recognition は達成・動作確認済み
+実装メモ:
+  - Claude（claude-opus-4-8）の画像入力 + 構造化出力（json_schema）で
+    メーカー/モデル/年式/確信度/根拠を返す。`lib/ai/recognize.ts`。
+  - 登録フォームに「AIで下書き」ボタン（`app/register/recognize-action.ts` + RegisterForm）。
+    フィールドは controlled で、AIが下書き→人が編集して登録。
+  - AI Assists の原則を実装: 断定しない・確信度と根拠を返す・空なら埋めない。
+  - 解析は `ai_analyses` に append-only 保存（analysis_type=VEHICLE_RECOGNITION）。
+  - `.env` に ANTHROPIC_API_KEY が必要（未設定でも Step1/2 の手入力は動く）。
+  - 残り（後回し）: メーターOCR（走行距離）、重複・同一車両検出。
 canon対応: Phase 4（の最小版）
 
 ### Step 4 — 信頼を見せる・公開する
@@ -189,16 +196,16 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 
 ## 8. 今どこ / 次の一手
 
-今ここ: Step 2 まで完了（2026-07-03）。
+今ここ: Step 3 の Vehicle Recognition まで完了（2026-07-04）。
 - ✅ Step 0 土台: DBスキーマ適用 / Next.js雛形 / Supabase接続 / Storage
 - ✅ Step 1 登録して残る: 登録フロー（写真最大10枚）→ 永久Timeline、動作確認済み
 - ✅ Step 2 育てる: ログイン / マイガレージ / 履歴追加 / owner連携 + RLS、動作確認済み
+- ✅ Step 3(一部) AI下書き: 写真→車種推定でフォーム下書き、append-only保存、動作確認済み
 
-次の一手: Step 3（AIで入力を楽にする・最小版）
-- 写真から車種/メーターをAIが下書き（Vehicle Recognition + メーターOCR の2つから）
-- AIは断定せず証拠を見せる。保存は append-only（ai_analyses）。最終確認は人。
+次の一手: Step 4（信頼を見せる・公開する）、または Step 3 の残り（メーターOCR）
+- Step 4: TrustScore の表示（証拠ベース）/ 公開パスポートの拡充
 - 未着手の宿題: メール送信（本番SMTP）/ ログイン後の登録動線を /garage 起点に統一 /
-  Step1で作った owner なし車両の「あとから紐付け（claim）」。
+  Step1で作った owner なし車両の「あとから紐付け（claim）」/ AIコスト監視。
 
 進め方の指針:
 1つのStepが完全に動いてから次へ。Stepの途中で先の機能に手を出さない。

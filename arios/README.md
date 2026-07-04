@@ -52,6 +52,9 @@ Vehicle is permanent. Owner changes. History grows. Trust accumulates.
 - [x] Phase 1: Auth（Supabase Auth・メールOTP）。middleware / `/login` / `/auth/callback`。
 - [x] Step 2 育てる（2026-07-03）: ログイン → `/garage`（自分の車一覧）→ `/garage/[id]`（詳細+Timeline）
   → `/garage/[id]/add-history`（履歴追加）。owners↔auth連携 + RLS（migration 0002）。動作確認済み。
+- [x] Step 3(一部) AI下書き（2026-07-04）: `/register` の「AIで下書き」で写真→車種推定（claude-opus-4-8・
+  画像入力+構造化出力）。断定せず確信度/根拠を返し、`ai_analyses` に append-only 保存。
+  `.env` に `ANTHROPIC_API_KEY` が必要。`lib/ai/recognize.ts` / `app/register/recognize-action.ts`。
 - [ ] Phase 2: 公開登録（Top / Register / Photo Upload / AI / Timeline / Thank You）
 
 ### 開発コマンド
