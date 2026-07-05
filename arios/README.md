@@ -55,6 +55,8 @@ Vehicle is permanent. Owner changes. History grows. Trust accumulates.
 - [x] Step 3(一部) AI下書き（2026-07-04）: `/register` の「AIで下書き」で写真→車種推定（claude-opus-4-8・
   画像入力+構造化出力）。断定せず確信度/根拠を返し、`ai_analyses` に append-only 保存。
   `.env` に `ANTHROPIC_API_KEY` が必要。`lib/ai/recognize.ts` / `app/register/recognize-action.ts`。
+- [x] Step 4(一部) 信頼と公開（2026-07-04）: 公開パスポート `/passport/[id]` に証拠ベースの
+  TrustScore（レベル/スコア/根拠）を表示。`lib/trust.ts`。写真/書類/VIN/履歴の充実で上がる。
 - [ ] Phase 2: 公開登録（Top / Register / Photo Upload / AI / Timeline / Thank You）
 
 ### 開発コマンド

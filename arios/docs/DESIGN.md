@@ -166,10 +166,15 @@ canon対応: Phase 2（認証）+ Phase 3（My Garage）
   - 残り（後回し）: メーターOCR（走行距離）、重複・同一車両検出。
 canon対応: Phase 4（の最小版）
 
-### Step 4 — 信頼を見せる・公開する
-作るもの: TrustScore の表示（証拠ベース：写真あり/書類あり/VIN確認…でレベルが上がる）
+### Step 4 — 信頼を見せる・公開する ✅ 一部完了（2026-07-04）
+作るもの: TrustScore の表示（証拠ベース：写真/書類/VIN/履歴の充実でレベルが上がる）
 / `/passport/[vehicleId]` 公開パスポート
-完了条件: その車の信頼度と歴史が、URLひとつで第三者に見せられる
+完了条件: その車の信頼度と歴史が、URLひとつで第三者に見せられる → 達成・動作確認済み
+実装メモ:
+  - `lib/trust.ts` の computeTrust（純粋関数）で スコア0-100・verificationLevel・根拠リストを算出。
+  - passport に TRUST パネル（レベル/スコアバー/証拠チェックリスト）を表示。現時点の証拠を正直に反映。
+  - LEVEL_0(自己申告)〜LEVEL_3(車台番号確認)を扱う。Partner/Manufacturer確認(LEVEL5-6)は後Phase。
+  - 残り（後回し）: trust_scores への永続化スナップショット、garage詳細への表示、書類アップロードUI（LEVEL_2到達手段）。
 canon対応: Phase 5 + Passport
 
 ### Step 5 以降 — 後で（今は予約席のまま）
@@ -196,16 +201,18 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 
 ## 8. 今どこ / 次の一手
 
-今ここ: Step 3 の Vehicle Recognition まで完了（2026-07-04）。
+今ここ: Step 4 の TrustScore表示まで完了（2026-07-04）。芯の Step 0〜4 が一通り動く。
 - ✅ Step 0 土台: DBスキーマ適用 / Next.js雛形 / Supabase接続 / Storage
 - ✅ Step 1 登録して残る: 登録フロー（写真最大10枚）→ 永久Timeline、動作確認済み
 - ✅ Step 2 育てる: ログイン / マイガレージ / 履歴追加 / owner連携 + RLS、動作確認済み
 - ✅ Step 3(一部) AI下書き: 写真→車種推定でフォーム下書き、append-only保存、動作確認済み
+- ✅ Step 4(一部) 信頼と公開: 公開パスポートに証拠ベースTrust表示、動作確認済み
 
-次の一手: Step 4（信頼を見せる・公開する）、または Step 3 の残り（メーターOCR）
-- Step 4: TrustScore の表示（証拠ベース）/ 公開パスポートの拡充
-- 未着手の宿題: メール送信（本番SMTP）/ ログイン後の登録動線を /garage 起点に統一 /
-  Step1で作った owner なし車両の「あとから紐付け（claim）」/ AIコスト監視。
+次の一手: Step 5以降（広げる）に入る前に、V1公開に向けた地固めがおすすめ
+- 地固めの宿題: 書類アップロードUI（Trust LEVEL_2到達）/ メール送信（本番SMTP）/
+  ログイン後の登録動線を /garage 起点に統一 / owner なし車両の「あとから紐付け(claim)」/
+  trust_scores永続化 / メーターOCR / AIコスト監視 / 本番デプロイ。
+- Step 5以降（後で）: Marketplace / Dream Garage / Partner / Notification / Global。
 
 進め方の指針:
 1つのStepが完全に動いてから次へ。Stepの途中で先の機能に手を出さない。
