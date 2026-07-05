@@ -24,19 +24,24 @@ export default async function GarageVehiclePage({
 
   if (!vehicle) notFound();
 
-  const [{ data: histories }, { data: images }] = await Promise.all([
-    supabase
-      .from("histories")
-      .select("id, title, description, event_date, created_at")
-      .eq("vehicle_id", id)
-      .order("event_date", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("images")
-      .select("id, image_url, created_at")
-      .eq("vehicle_id", id)
-      .order("created_at", { ascending: true }),
-  ]);
+  const [{ data: histories }, { data: images }, { count: documentCount }] =
+    await Promise.all([
+      supabase
+        .from("histories")
+        .select("id, title, description, event_date, created_at")
+        .eq("vehicle_id", id)
+        .order("event_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("images")
+        .select("id, image_url, created_at")
+        .eq("vehicle_id", id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("documents")
+        .select("*", { count: "exact", head: true })
+        .eq("vehicle_id", id),
+    ]);
 
   const name =
     [vehicle.manufacturer, vehicle.model].filter(Boolean).join(" ") ||
@@ -95,6 +100,14 @@ export default async function GarageVehiclePage({
         className="mt-10 block rounded-full bg-accent px-6 py-4 text-center font-medium text-black"
       >
         ＋ 出来事を追加
+      </Link>
+
+      <Link
+        href={`/garage/${id}/add-document`}
+        className="mt-3 block rounded-full border border-neutral-700 px-6 py-4 text-center font-medium text-muted"
+      >
+        ＋ 書類を追加
+        {documentCount ? `（現在 ${documentCount} 件）` : "（車検証・整備記録など）"}
       </Link>
 
       <p className="mt-6 text-center text-xs text-muted">

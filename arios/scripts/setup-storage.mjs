@@ -1,4 +1,6 @@
-// Supabase Storage に車両写真用の公開バケットを作成する（冪等）。
+// Supabase Storage のバケットを作成する（冪等）。
+// - vehicle-images: 車両写真（公開）。パスポートに表示する。
+// - vehicle-documents: 車検証・整備記録など（非公開）。個人情報を含むため公開しない。
 // 使い方: node --env-file=.env scripts/setup-storage.mjs
 import { createClient } from "@supabase/supabase-js";
 
@@ -9,30 +11,51 @@ if (!url || !serviceRoleKey) {
   process.exit(1);
 }
 
-const BUCKET = "vehicle-images";
 const supabase = createClient(url, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const { data: buckets, error: listErr } = await supabase.storage.listBuckets();
+const BUCKETS = [
+  {
+    name: "vehicle-images",
+    public: true,
+    fileSizeLimit: "15MB",
+    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/heic"],
+  },
+  {
+    name: "vehicle-documents",
+    public: false, // 個人情報を含むため非公開。閲覧は署名URLで（後日）
+    fileSizeLimit: "25MB",
+    allowedMimeTypes: [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/heic",
+      "application/pdf",
+    ],
+  },
+];
+
+const { data: existing, error: listErr } = await supabase.storage.listBuckets();
 if (listErr) {
   console.error("バケット一覧の取得に失敗:", listErr.message);
   process.exit(1);
 }
+const existingNames = new Set(existing.map((b) => b.name));
 
-if (buckets.some((b) => b.name === BUCKET)) {
-  console.log(`バケット "${BUCKET}" は既に存在します。OK。`);
-  process.exit(0);
+for (const b of BUCKETS) {
+  if (existingNames.has(b.name)) {
+    console.log(`バケット "${b.name}" は既に存在します。OK。`);
+    continue;
+  }
+  const { error } = await supabase.storage.createBucket(b.name, {
+    public: b.public,
+    fileSizeLimit: b.fileSizeLimit,
+    allowedMimeTypes: b.allowedMimeTypes,
+  });
+  if (error) {
+    console.error(`バケット "${b.name}" 作成に失敗:`, error.message);
+    process.exit(1);
+  }
+  console.log(`バケット "${b.name}"（${b.public ? "公開" : "非公開"}）を作成しました。`);
 }
-
-const { error: createErr } = await supabase.storage.createBucket(BUCKET, {
-  public: true,
-  fileSizeLimit: "15MB",
-  allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/heic"],
-});
-
-if (createErr) {
-  console.error(`バケット作成に失敗:`, createErr.message);
-  process.exit(1);
-}
-console.log(`バケット "${BUCKET}"（公開）を作成しました。`);
