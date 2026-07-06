@@ -40,6 +40,38 @@ def perf_rows():
              f"<td class='num'>{num(k)}</td><td class='num'>{cv}</td><td class='num'>{yen(cpa)}</td></tr>")
     return "\n".join(r)
 
+# 目標CPA判定（担当合意値：有効問い合わせ ¥20,000/件）
+TARGET_CPA = 20000
+MBUDGET = 80000  # 同予算の月次目安（直近ペース）
+bym = {d["m"]: d for d in M}
+def target_section():
+    may, jun = bym.get("2026-05"), bym.get("2026-06")
+    rc = (may["cost"] + jun["cost"]) if may and jun else 0
+    rv = (may["cv"] + jun["cv"]) if may and jun else 0
+    recent = rc/rv if rv else None
+    jcpa = jun["cost"]/jun["cv"] if jun and jun["cv"] else None
+    scen = [("通年(YTD)平均", 449577/17, None), ("直近2ヶ月(5-6月)", recent, None),
+            ("6月単月", jcpa, None), ("改善後(推定・保守〜楽観)", None, "¥8,500〜11,000")]
+    rows = []
+    for name, cp, txt in scen:
+        if txt:
+            disp, ok = txt, True
+        else:
+            disp = yen(cp); ok = cp is not None and cp <= TARGET_CPA
+        diff = "" if txt or cp is None else f"{'+' if cp>TARGET_CPA else '−'}{abs(round((cp/TARGET_CPA-1)*100))}%"
+        pill = "<span class='pill p-pass'>達成</span>" if ok else "<span class='pill p-fail'>未達</span>"
+        rows.append(f"<tr><td class='kw'>{name}</td><td class='num'>{disp}</td><td class='num'>{diff}</td><td>{pill}</td></tr>")
+    be_cv = MBUDGET / TARGET_CPA
+    be_valid = (recent/TARGET_CPA*100) if recent else None
+    cards = (f"<div class='cards'>"
+             f"<div class='card'><div class='lab'>目標CPA（合意値）</div><div class='val num'>¥20,000</div><div class='sub'>有効問い合わせ/件</div></div>"
+             f"<div class='card'><div class='lab'>直近実績CPA</div><div class='val num'>{yen(recent)}</div><div class='sub'>5-6月・目標を下回る</div></div>"
+             f"<div class='card'><div class='lab'>損益分岐CV</div><div class='val num'>{be_cv:.1f}</div><div class='sub'>件/月（同予算¥8万）</div></div>"
+             f"<div class='card'><div class='lab'>必要な有効率</div><div class='val num'>{be_valid:.0f}%</div><div class='sub'>記録CVのうち有効なら達成</div></div></div>")
+    tbl = ("<div class='tbl'><table><thead><tr><th>局面</th><th>CPA</th><th>対目標</th><th>判定</th></tr></thead><tbody>"
+           + "\n".join(rows) + "</tbody></table></div>")
+    return cards + tbl
+
 # 月次推移
 CAMPS = [("検索", "#1E6B77"), ("デマンドジェネ", "#C98A3B"), ("P-MAX", "#4E9A6B")]
 months = [x["m"] for x in M]
@@ -206,11 +238,17 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
   <div class="tbl"><table>
     <thead><tr><th>キャンペーン</th><th>費用</th><th>表示</th><th>クリック</th><th>CV</th><th>CPA</th></tr></thead>
     <tbody>{perf_rows()}</tbody></table></div>
-  <p class="caption">※目標CPA未設定（全社既定値・要確認）。内部基準として同アカウントWeb広告LP系 CPA¥4〜6千を参照。</p>
+  <p class="caption">※内部基準として同アカウントWeb広告LP系 CPA¥4〜6千を参照。目標CPAは下記03で判定。</p>
 </section>
 
 <section>
-  <div class="sec-label">03 — 月次推移（2026年1〜6月）</div>
+  <div class="sec-label">03 — 目標CPA判定（有効問い合わせ ¥20,000/件）</div>
+  {target_section()}
+  <p class="caption">担当合意値 <b>¥20,000/件</b> に対し、<b>直近2ヶ月(5-6月)はCPA¥12,491で達成</b>。通年平均は序盤のデマンドジェネ浪費で未達だが、同予算（月約¥8万）なら<b>月4.0件で損益分岐</b>・直近は月約6.5件で上回る。ただし目標は「<b>有効</b>問い合わせ」のため、記録CVのうち有効が約63%以上なら現状効率で達成（改善後は50%でも可）。有効率の実測を推奨。信頼度：中。</p>
+</section>
+
+<section>
+  <div class="sec-label">04 — 月次推移（2026年1〜6月）</div>
   <div class="grid-sm">{mini_cards()}</div>
   <div class="wide">
     <div class="legend">{''.join(f'<span><i style="background:{c}"></i>{n}</span>' for n,c in CAMPS)}</div>
@@ -220,19 +258,19 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
 </section>
 
 <section>
-  <div class="sec-label">04 — 要対応（重要度順）</div>
+  <div class="sec-label">05 — 要対応（重要度順）</div>
   {issues_html()}
 </section>
 
 <section>
-  <div class="sec-label">05 — 提案（下書き・すべて未適用）</div>
+  <div class="sec-label">06 — 提案（下書き・すべて未適用）</div>
   <div class="tbl"><table>
     <thead><tr><th>#</th><th>提案</th><th>変更前 → 変更後</th><th>承認</th></tr></thead>
     <tbody>{props_html()}</tbody></table></div>
 </section>
 
 <section>
-  <div class="sec-label">06 — 除外キーワード候補（下書き）</div>
+  <div class="sec-label">07 — 除外キーワード候補（下書き）</div>
   <p class="caption" style="margin-top:0">競合ブランド名は無価値のため<b>除外推奨（安全）</b>：</p>
   <div class="chipwrap">{chips(EXCLUDE_SAFE, "safe")}</div>
   <p class="caption">以下は<b>要確認</b>（御社が該当サービスを提供するか等の業務判断が必要・§0.4）：</p>
@@ -240,13 +278,13 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
 </section>
 
 <section>
-  <div class="sec-label">07 — P-MAX クリエイティブ 現状</div>
+  <div class="sec-label">08 — P-MAX クリエイティブ 現状</div>
   {pmax_html()}
   <p class="caption">稼働アセットグループの実績・素材充足（○充足／△本数不足／✗未設定）と配信素材。<b>P-MAXは1素材ごとのCV/CPAをGoogleが公開していない</b>ため素材単位は有効性＋本数で評価。動画・ロゴ・縦型画像が未設定で、有効性が「未評価/不足」。</p>
 </section>
 
 <section>
-  <div class="sec-label">08 — 注記</div>
+  <div class="sec-label">09 — 注記</div>
   <p class="caption">実データ（Google Ads API・2025-01〜2026-07-06、採用SNS3キャンペーン抽出）。目標CPA未設定のため良否は内部相対＋全社既定しきい値で判定（要確認）。全キャンペーン停止中。本レポートは再開を前提とした改善<b>下書き</b>で、<b>適用は人間の承認後のみ</b>（CLAUDE.md §0）。医療・薬機の対象外。</p>
 </section>
 
