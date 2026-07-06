@@ -13,6 +13,9 @@ from pathlib import Path
 
 JST = timezone(timedelta(hours=9))
 BASE = "https://graph.facebook.com/v21.0"
+# 監視対象から外すアカウント（未使用など）。名前で完全一致。
+# ※これは自社システムの表示/取得除外。Meta側の権限解除は Business設定で別途行う。
+EXCLUDE_ACCOUNTS = {"【SC用】RiceLog2"}
 CV_ACTIONS = ("offsite_conversion.fb_pixel_lead", "lead", "complete_registration",
               "offsite_conversion.fb_pixel_complete_registration", "purchase",
               "offsite_conversion.fb_pixel_purchase")
@@ -102,6 +105,11 @@ def main():
     if not accts:
         print("読み取り可能な広告アカウントがありません:", accts_resp.get("__error__"))
         raise SystemExit(1)
+    # 除外アカウントをスキップ
+    excluded = [a.get("name") for a in accts if a.get("name") in EXCLUDE_ACCOUNTS]
+    accts = [a for a in accts if a.get("name") not in EXCLUDE_ACCOUNTS]
+    if excluded:
+        print("除外（監視対象外）:", ", ".join(excluded))
 
     # 先月の日数（1日あたり比較に使用）
     _first_this = datetime.now(JST).replace(day=1)
