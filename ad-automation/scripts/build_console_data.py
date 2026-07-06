@@ -93,6 +93,104 @@ def daily_budget(acc, tok):
     return round(total)
 
 
+# ---- Google Ads（MCC配下の稼働アカウント）----
+def _g_rows(ga, cid, preset):
+    q = (f"SELECT segments.date, metrics.cost_micros, metrics.impressions, metrics.clicks, "
+         f"metrics.conversions, metrics.conversions_value FROM customer "
+         f"WHERE segments.date DURING {preset} ORDER BY segments.date")
+    out = []
+    for r in ga.search(customer_id=cid, query=q):
+        m = r.metrics
+        out.append({"date": r.segments.date, "spend": (m.cost_micros or 0)/1e6,
+                    "imp": int(m.impressions or 0), "clk": int(m.clicks or 0),
+                    "cv": m.conversions or 0, "rev": m.conversions_value or 0})
+    return out
+
+
+def _g_agg(rows):
+    spend = sum(x["spend"] for x in rows); imp = sum(x["imp"] for x in rows)
+    clk = sum(x["clk"] for x in rows); cv = sum(x["cv"] for x in rows); rev = sum(x["rev"] for x in rows)
+    return {"spend": round(spend), "imp": imp, "clk": clk,
+            "ctr": round(clk/imp*100, 2) if imp else 0, "cpc": round(spend/clk) if clk else 0,
+            "cpm": round(spend/imp*1000) if imp else 0, "freq": 0, "cv": round(cv, 1),
+            "cpa": round(spend/cv) if cv else None, "roas": round(rev/spend, 1) if spend and rev else None}
+
+
+def pull_google(bench_cfg, lm_days, start_id):
+    """MCC配下の稼働(=直近90日か先月に費用あり)アカウントを取得。(accounts, proposals) を返す。読み取りのみ。"""
+    need = ["GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET",
+            "GOOGLE_ADS_REFRESH_TOKEN", "GOOGLE_LOGIN_CUSTOMER_ID"]
+    if not all(os.environ.get(k) for k in need):
+        print("Google接続情報が未設定のためGoogleはスキップ"); return [], []
+    try:
+        from google.ads.googleads.client import GoogleAdsClient
+    except Exception:
+        print("google-ads 未導入のためGoogleはスキップ"); return [], []
+    import re as _re
+    mcc = _re.sub(r"\D", "", os.environ["GOOGLE_LOGIN_CUSTOMER_ID"])
+    cli = GoogleAdsClient.load_from_dict({
+        "developer_token": os.environ["GOOGLE_ADS_DEVELOPER_TOKEN"].strip(),
+        "client_id": os.environ["GOOGLE_ADS_CLIENT_ID"].strip(),
+        "client_secret": os.environ["GOOGLE_ADS_CLIENT_SECRET"].strip(),
+        "refresh_token": os.environ["GOOGLE_ADS_REFRESH_TOKEN"].strip(),
+        "login_customer_id": mcc, "use_proto_plus": True})
+    ga = cli.get_service("GoogleAdsService")
+    clients = []
+    for r in ga.search(customer_id=mcc, query=(
+            "SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager "
+            "FROM customer_client WHERE customer_client.status='ENABLED'")):
+        c = r.customer_client
+        if c.manager:
+            continue
+        clients.append((str(c.id), c.descriptive_name or str(c.id)))
+    accounts, proposals = [], []
+    i = start_id
+    for cid, name in clients:
+        if name in EXCLUDE_ACCOUNTS:
+            continue
+        try:
+            r30 = _g_rows(ga, cid, "LAST_30_DAYS")
+            d30 = _g_agg(r30)
+            d7 = _g_agg(r30[-7:] if len(r30) >= 7 else r30)
+            lm = _g_agg(_g_rows(ga, cid, "LAST_MONTH"))
+        except Exception as e:
+            print(f"  Google取得失敗 {name}: {str(e)[:60]}")
+            continue
+        if d30["spend"] == 0 and lm["spend"] == 0:
+            continue  # 休止アカウントは除外
+        db, cp = 0.0, 0
+        try:
+            for r in ga.search(customer_id=cid, query=(
+                    "SELECT campaign.status, campaign_budget.amount_micros FROM campaign "
+                    "WHERE campaign.status='ENABLED'")):
+                db += (r.campaign_budget.amount_micros or 0)/1e6; cp += 1
+        except Exception:
+            pass
+        bench = dict(DEFAULT_BENCH); ov = bench_cfg.get(name)
+        if ov:
+            bench.update({k: v for k, v in ov.items() if not k.startswith("_")}); bench["source"] = "個社目標"
+        i += 1
+        accounts.append({
+            "id": i, "client": name, "tier": ov.get("tier", "mid") if ov else "mid",
+            "monthly": ov.get("monthly") if ov else None, "media": "google",
+            "acct": cid, "status": "ok", "tokenDays": None, "cp": cp,
+            "sync": datetime.now(JST).strftime("%H:%M 取得"),
+            "spend": d30["spend"], "cpa": d30["cpa"] or 0, "target": bench.get("targetCpa"),
+            "roas": d30["roas"], "cv": d30["cv"], "ctr": d30["ctr"], "is": None,
+            "dailyBudget": round(db), "lmDays": lm_days,
+            "metrics": {"d7": d7, "lm": lm}, "bench": bench,
+        })
+        if d30["cv"] == 0 and d30["spend"] > 0:
+            proposals.append({
+                "id": f"g-{i}", "client": name, "media": "google", "kind": "計測確認/配信見直し",
+                "cur": f"直近30日 CV0 で ¥{d30['spend']:,} 消化",
+                "next": "CV計測(コンバージョン設定)を確認、正常なら配信/KW見直し",
+                "reason": "コンバージョンが記録されていない。まず計測の健全性を確認（推測で断定せず計測担当へ）。",
+                "severity": "critical", "twoStep": False,
+            })
+    return accounts, proposals
+
+
 def main():
     load_env()
     tok = os.environ.get("SOFCOM_META_SYSTEM_USER_TOKEN", "").strip()
@@ -162,8 +260,15 @@ def main():
                 "severity": "critical", "twoStep": False,
             })
 
+    meta_n = len(accounts)
+    # Google（MCC配下の稼働アカウント）を統合
+    print("Google Ads を取得中…")
+    g_accounts, g_proposals = pull_google(bench_cfg, lm_days, len(accounts))
+    accounts += g_accounts
+    proposals += g_proposals
+
     out = {
-        "label": "Meta 実データ",
+        "label": "Meta＋Google 実データ",
         "period": "直近30日",
         "generatedAt": datetime.now(JST).strftime("%Y-%m-%d %H:%M JST"),
         "accounts": accounts,
@@ -171,10 +276,10 @@ def main():
     }
     Path("console").mkdir(exist_ok=True)
     Path("console/data.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"console/data.json を出力: {len(accounts)}アカウント / 提案{len(proposals)}件")
+    print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {len(accounts)-meta_n}） / 提案{len(proposals)}件")
     for a in accounts:
         m7, ml = a["metrics"]["d7"], a["metrics"]["lm"]
-        print(f"  {a['client'][:22]:24} 日予算¥{a['dailyBudget']:>6,}/日 | 7日:¥{m7['spend']:>7,} imp{m7['imp']:>6,} clk{m7['clk']:>5,} CPC¥{m7['cpc']:>5} | 先月:¥{ml['spend']:>7,}")
+        print(f"  [{a['media']:6}] {a['client'][:20]:22} 日予算¥{a['dailyBudget']:>6,}/日 | 30日:¥{a['spend']:>7,} CV{a['cv']:>4} | 7日:¥{m7['spend']:>7,} | 先月:¥{ml['spend']:>7,}")
 
 
 if __name__ == "__main__":

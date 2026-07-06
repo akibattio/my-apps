@@ -155,6 +155,40 @@ def pmax_html():
             f"<span>CPA <b>{cpa}</b></span></div><div class='cov-wrap'>{cov}</div>{gal}"
             f"<div class='txts'>{texts}</div></div>")
 
+# 着地ページ(LPO) 所見（https://www.sofcom.co.jp/business/sns/ を実取得して評価）
+LPO_URL = "https://www.sofcom.co.jp/business/sns/"
+LPO_SCORES = [
+    ("メッセージ一致", 55, "ブランド名は一致。ただし成果KW『sns 運用 外注』(汎用SNS外注)とLP(採用特化・H1「人事担当者をラクにするSNS運用代行」)で意図がズレ、離脱を招く。"),
+    ("フォーム", 35, "LP内に入力フォームがなく、CTAは別ページ /contact-sns/ へ遷移。1クリック余分でCV最大の漏れ。"),
+    ("信頼要素", 60, "事例3社(和田電気/セレスポ/マハロ)・自社SNS実績・会社概要あり。ただし定量成果(応募数等)の記載なし。"),
+    ("モバイル", 70, "tel:リンクあり◎。タップ領域・実速度は未検証。"),
+    ("表示速度", None, "未計測。アニメ付きヒーロー(スマホ画面複数)で重い可能性。PageSpeed Insightsでの実測が必要。"),
+]
+LPO_WINS = [
+    ("1", "LP内に短いフォーム(氏名・会社・連絡先の3項目)を設置し、別ページ遷移を廃止", "+10〜25% CVR"),
+    ("2", "広告↔LPの意図統一：採用狙いなら『採用 sns』系KWへ寄せ汎用語を除外／汎用も獲るなら汎用SNS運用LPを別途", "無駄クリック減・CV質↑"),
+    ("3", "CTA文言を行動喚起へ(「お問い合わせ」→「無料で相談する」)＋資料DLの軽いCVを追加", "上位ファネル(PMax/DG)の取りこぼし回収"),
+    ("4", "事例に定量成果(応募数・採用単価の改善幅)を付与", "信頼↑・CVR↑"),
+    ("5", "ヒーロー画像/アニメを軽量化(WebP・遅延読込) ※要速度実測", "表示改善"),
+]
+def lpo_section():
+    rows = []
+    for name, sc, note in LPO_SCORES:
+        if sc is None:
+            bar = "<span class='lpo-track'></span>"; valv = "—"
+        else:
+            col = "#3C7A52" if sc >= 75 else ("#B7791F" if sc >= 60 else "#AE4A26")
+            bar = f"<span class='lpo-track'><span class='lpo-fill' style='width:{sc}%;background:{col}'></span></span>"; valv = str(sc)
+        rows.append(f"<div class='lpo-row'><span class='lpo-lab'>{name}</span>{bar}<span class='lpo-val'>{valv}</span></div>"
+                    f"<div class='lpo-note'>{html.escape(note)}</div>")
+    wins = "".join(f"<tr><td class='pid'>{p}</td><td>{html.escape(a)}</td><td class='ap'>{html.escape(e)}</td></tr>" for p, a, e in LPO_WINS)
+    key = ("<div class='lpo-key'><b>核心：LPは採用特化なのに、費用を集めているKWは汎用SNS運用外注。</b>"
+           "この意図ズレがCPA¥15k・低CVの構造的原因と考えられます（推定）。検索語句に競合名や"
+           "『tiktok/instagram運用代行』等の汎用意図が多数混入し、採用特化LPと合わず0CVに。</div>")
+    return (f"<p class='caption' style='margin-top:0'>対象LP：<a href='{LPO_URL}' target='_blank'>{LPO_URL}</a>（実取得して評価）</p>"
+            f"<div class='lpo'>{''.join(rows)}</div>{key}"
+            f"<div class='tbl' style='margin-top:12px'><table><thead><tr><th>優先</th><th>クイックウィン（下書き）</th><th>期待効果</th></tr></thead><tbody>{wins}</tbody></table></div>")
+
 CSS = """
 :root{--ink:#18222E;--slate:#586374;--muted:#8b95a3;--line:#E5E8EC;--line-soft:#EEF1F4;--paper:#FBFBFC;--panel:#FFFFFF;--accent:#1E6B77;--accent-soft:#E7F0F1;--accent-ink:#134851;--warn:#AE4A26;--warn-soft:#FBECE4;--ok:#3C7A52;--jp:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Noto Sans JP","Meiryo",sans-serif;}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--jp);line-height:1.75;font-size:15px}
@@ -168,6 +202,14 @@ h1{font-size:26px;margin:.35em 0 .5em}
 section{margin-top:40px}.sec-label{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent-ink);font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .sec-label::after{content:"";height:1px;flex:1;background:var(--line)}
 .summary{background:var(--accent-soft);border:1px solid #CFE1E3;border-radius:12px;padding:16px 18px;font-size:14px;color:var(--accent-ink);line-height:1.9}
+.lpo{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
+.lpo-row{display:grid;grid-template-columns:118px 1fr 34px;align-items:center;gap:12px;margin-top:10px}
+.lpo-lab{font-size:12.5px;font-weight:600;color:var(--ink)}
+.lpo-track{background:var(--line-soft);border-radius:6px;height:10px;overflow:hidden}
+.lpo-fill{display:block;height:100%;border-radius:6px}
+.lpo-val{font-size:12.5px;font-weight:700;text-align:right;color:var(--ink)}
+.lpo-note{font-size:11.5px;color:var(--muted);margin:3px 0 0 130px;line-height:1.6}
+.lpo-key{background:var(--warn-soft);border:1px solid #EAC7B4;border-radius:10px;padding:12px 15px;margin-top:12px;font-size:13px;color:var(--ink);line-height:1.8}
 .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 15px}
 .card .lab{font-size:11.5px;color:var(--muted)}.card .val{font-size:22px;font-weight:700;margin-top:3px}.card .sub{font-size:11px;color:var(--muted);margin-top:3px}
@@ -284,7 +326,13 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
 </section>
 
 <section>
-  <div class="sec-label">09 — 注記</div>
+  <div class="sec-label">09 — 着地ページ（LPO）</div>
+  {lpo_section()}
+  <p class="caption">着地ページを実取得しCRO観点で評価（ads-landing 手法）。ヘルススコアは相対目安。<b>表示速度・モバイルのタップ領域は未計測</b>（PageSpeed Insights/実機推奨・推測で断定しない）。LP改修は自社サイト側の変更のため<b>実装は担当承認後</b>（本内容は下書き）。</p>
+</section>
+
+<section>
+  <div class="sec-label">10 — 注記</div>
   <p class="caption">実データ（Google Ads API・2025-01〜2026-07-06、採用SNS3キャンペーン抽出）。目標CPA未設定のため良否は内部相対＋全社既定しきい値で判定（要確認）。全キャンペーン停止中。本レポートは再開を前提とした改善<b>下書き</b>で、<b>適用は人間の承認後のみ</b>（CLAUDE.md §0）。医療・薬機の対象外。</p>
 </section>
 
