@@ -8,6 +8,11 @@ mkdir -p logs
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh start ==="
   /usr/bin/python3 scripts/build_console_data.py
+  # 日次時系列(過去35日)を取得＝急変検知(インプ急停止/消化大幅増減)のベースライン
+  /usr/bin/python3 scripts/fetch_daily_series.py
+  # 取得直後に監視チェック（読み取りのみ・外部送信なし＝ログとconsole/data.jsonのalertsへ反映）
+  # 通知(--send)は通知先(.env NOTIFY_CHANNEL)を設定してから有効化する
+  /usr/bin/python3 scripts/monitor.py
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh done (exit $?) ==="
   echo ""
 } >> logs/refresh.log 2>&1

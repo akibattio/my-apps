@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import {
   Bell, AlertTriangle, Check, X, Circle, TrendingUp, TrendingDown, Zap,
   ChevronRight, ShieldCheck, LayoutDashboard, Cable, Table2, KeyRound, Star,
-  Users, ArrowLeft,
+  Users, ArrowLeft, Target, Clock,
 } from "lucide-react";
 
 // ===== sample data (ダミー / 実データは Google Ads MCP・Meta Ads コネクタから供給) =====
@@ -73,6 +73,39 @@ export default function AdOpsConsole() {
   const [openClient, setOpenClient] = useState(null);
   const [DATA, setDATA] = useState(SAMPLE_DATA);
   const [dataInfo, setDataInfo] = useState(null);
+  const [targets, setTargets] = useState({});
+  const [history, setHistory] = useState([]);
+  const [operator, setOperator] = useState("");
+  useEffect(() => {
+    try {
+      setTargets(JSON.parse(localStorage.getItem("adops_targets") || "{}"));
+      setHistory(JSON.parse(localStorage.getItem("adops_targets_history") || "[]"));
+      setOperator(localStorage.getItem("adops_operator") || "");
+    } catch (e) {}
+  }, []);
+  const saveOperator = (v) => { setOperator(v); try { localStorage.setItem("adops_operator", v); } catch (e) {} };
+  const saveTargets = (t) => {
+    // 変更差分を履歴に記録（誰が・いつ・何を・変更前後の値）— CLAUDE.md §4
+    const at = new Date().toLocaleString("ja-JP");
+    const by = (operator || "").trim() || "担当";
+    const names = new Set([...Object.keys(targets), ...Object.keys(t)]);
+    const entries = [];
+    names.forEach((name) => {
+      [["targetCpa", "目標CPA"], ["monthly", "月予算"]].forEach(([f, jp]) => {
+        const o = targets[name] ? targets[name][f] : undefined;
+        const n = t[name] ? t[name][f] : undefined;
+        if ((o == null ? null : o) !== (n == null ? null : n))
+          entries.push({ at, by, client: name, field: jp, from: o == null ? null : o, to: n == null ? null : n });
+      });
+    });
+    setTargets(t);
+    try { localStorage.setItem("adops_targets", JSON.stringify(t)); } catch (e) {}
+    if (entries.length) {
+      const h = [...entries, ...history];
+      setHistory(h);
+      try { localStorage.setItem("adops_targets_history", JSON.stringify(h)); } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
@@ -87,20 +120,34 @@ export default function AdOpsConsole() {
       .catch(() => {});
   }, []);
 
-  const rows = useMemo(() => DATA.filter((c) => media === "all" || c.media === media), [media, DATA]);
+  // 手入力の目標(localStorage)を各アカウントに反映：target/monthly/bench.targetCpa を上書き
+  const A = useMemo(() => DATA.map((c) => {
+    const t = targets[c.client];
+    if (!t) return c;
+    return {
+      ...c,
+      target: t.targetCpa != null ? t.targetCpa : c.target,
+      monthly: t.monthly != null ? t.monthly : c.monthly,
+      bench: { ...(c.bench || {}), ...(t.targetCpa != null ? { targetCpa: t.targetCpa } : {}),
+        source: t.targetCpa != null ? "個社目標(手入力)" : (c.bench && c.bench.source) },
+    };
+  }), [DATA, targets]);
+
+  const rows = useMemo(() => A.filter((c) => media === "all" || c.media === media), [media, A]);
   const totals = useMemo(() => agg(rows), [rows]);
   const pending = proposals.filter((p) => p.status == null);
-  const connIssues = DATA.filter((c) => c.status !== "ok").length;
+  const connIssues = A.filter((c) => c.status !== "ok").length;
+  const noTargetCount = A.filter((c) => !c.target && (c.spend || 0) > 0).length;
   const decide = (id, status) => setProposals((ps) => ps.map((p) => (p.id === id ? { ...p, status } : p)));
 
   const clients = useMemo(() => {
     const m = {};
-    DATA.forEach((c) => {
+    A.forEach((c) => {
       if (!m[c.client]) m[c.client] = { client: c.client, tier: c.tier, monthly: c.monthly, accts: [] };
       m[c.client].accts.push(c);
     });
     return Object.values(m);
-  }, [DATA]);
+  }, [A]);
 
   const goClient = (name) => { setOpenClient(name); setView("client"); };
 
@@ -135,7 +182,7 @@ export default function AdOpsConsole() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700 }}>広告運用コンソール</div>
-            <div style={{ fontSize: 11.5, color: "#a7c4b5" }}>ソフコミ ・ {dataInfo ? `実データ（${dataInfo.period || ""}・${dataInfo.generatedAt || ""}）` : "サンプルデータ"} ・ {clients.length}社 / {DATA.length}連携</div>
+            <div style={{ fontSize: 11.5, color: "#a7c4b5" }}>ソフコミ ・ {dataInfo ? `実データ（${dataInfo.period || ""}・${dataInfo.generatedAt || ""}）` : "サンプルデータ"} ・ {clients.length}社 / {A.length}連携</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12.5 }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#f4c542" }}><Bell size={15} /><b>{pending.length}</b><span style={{ color: "#a7c4b5" }}>承認待ち</span></span>
@@ -148,6 +195,7 @@ export default function AdOpsConsole() {
           <NavBtn id="client" icon={<Users size={15} />} label="クライアント別" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧" />
+          <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
         </div>
       </div>
 
@@ -177,6 +225,25 @@ export default function AdOpsConsole() {
                 </Card>
               ))}
             </div>
+            {(() => {
+              const g = rows.filter((c) => healthOf(c) === "good").length;
+              const w = rows.filter((c) => healthOf(c) === "warning").length;
+              const cr = rows.filter((c) => healthOf(c) === "critical").length;
+              const nt = rows.filter((c) => !c.target && (c.spend || 0) > 0).length;
+              const pill = (label, n, color, bg, onClick) => (
+                <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 999,
+                  border: "1px solid " + bg, background: bg, color, fontSize: 12.5, fontWeight: 700, cursor: onClick ? "pointer" : "default" }}>
+                  <Circle size={9} fill={color} color={color} />{label} {n}</button>);
+              return (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
+                  <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>健全性（{rows.length}アカウント）</span>
+                  {pill("良好", g, "#047857", "#ecfdf5")}
+                  {pill("注意", w, "#d97706", "#fffbeb")}
+                  {pill("要対応", cr, "#dc2626", "#fef2f2")}
+                  {nt > 0 && pill("目標未設定", nt, "#64748b", "#f1f5f4", () => setView("targets"))}
+                </div>
+              );
+            })()}
             <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20 }}>
               <div>
                 <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ。" />
@@ -335,7 +402,7 @@ export default function AdOpsConsole() {
             <SectionTitle icon={<Cable size={16} color="#047857" />} title="接続ステータス" note="何がアクティブで、どのアカウントに繋がっているか。行クリックで社別に。" />
             <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
               <TableHead which="conn" cols={["クライアント", "連携先", "アカウントID", "接続状態", "トークン期限", "稼働CP", "最終同期"]} />
-              {DATA.map((c, i) => {
+              {A.map((c, i) => {
                 const s = CONN[c.status];
                 const tok = c.tokenDays >= 999 ? "無期限" : c.tokenDays === 0 ? "失効" : `残 ${c.tokenDays}日`;
                 const tokC = c.tokenDays >= 999 ? "#047857" : c.tokenDays === 0 ? "#dc2626" : c.tokenDays <= 7 ? "#d97706" : "#475569";
@@ -384,8 +451,24 @@ export default function AdOpsConsole() {
           </>
         )}
 
+        {/* ===== 目標設定 ===== */}
+        {view === "targets" && (
+          <>
+            <SectionTitle icon={<Target size={16} color="#047857" />} title="目標設定" note="各クライアントの目標CPA・月予算を登録。保存するとアラート/基準チェックに即反映（この端末に保存）。恒久保存はエクスポートして benchmarks.json へ。" />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 12.5, color: "#64748b" }}>担当者</span>
+              <input value={operator} onChange={(e) => saveOperator(e.target.value)} placeholder="名前（変更履歴に記録）"
+                style={{ padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, width: 200 }} />
+            </div>
+            <TargetEditor clients={clients} targets={targets} onSave={saveTargets} />
+            <TargetHistory history={history} />
+          </>
+        )}
+
         <div style={{ marginTop: 20, fontSize: 11, color: "#94a3b8", lineHeight: 1.7 }}>
-          ※ サンプルデータのプロトタイプ。実運用ではこの裏に Google Ads MCP / Meta Ads コネクタをつなぎ、毎朝のRoutinesで取得・分析・提案生成。判断基準はCLAUDE.mdルールブックに集約し、経験の浅い運用者でも同品質の提案が届く設計。書き込みは承認後にのみ実行。
+          {dataInfo
+            ? "実データ（Google Ads / Meta）。毎朝8:30に取得→監視。判断基準はCLAUDE.mdルールブック＋各社の目標設定に集約。書き込み（予算/入札/ON-OFF）は承認後にのみ実行。"
+            : "サンプルデータのプロトタイプ。実運用では Google Ads / Meta を接続し、毎朝取得・分析・提案生成。書き込みは承認後にのみ実行。"}
         </div>
       </div>
     </div>
@@ -445,6 +528,112 @@ function MiniStat({ label, value, bad }) {
   return <div><div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0f2a1f" }}>{value}</div></div>;
 }
 function Empty({ text }) { return <div style={{ background: "#fff", border: "1px dashed #d7e0db", borderRadius: 10, padding: "18px 14px", fontSize: 12.5, color: "#94a3b8", textAlign: "center" }}>{text}</div>; }
+
+// 目標入力ボックス：目標CPA(円)・月予算(万円)。保存=この端末(localStorage)へ→アラートに即反映。エクスポート=benchmarks.json用JSONをコピー。
+function TargetEditor({ clients, targets, onSave }) {
+  const [draft, setDraft] = useState(() => {
+    const d = {};
+    clients.forEach((cl) => { const t = targets[cl.client] || {};
+      d[cl.client] = { targetCpa: t.targetCpa ?? "", monthly: t.monthly != null ? t.monthly / 10000 : "" }; });
+    return d;
+  });
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const set = (name, key, val) => { setSaved(false); setDraft((p) => ({ ...p, [name]: { ...(p[name] || {}), [key]: val } })); };
+  const build = () => {
+    const out = {};
+    clients.forEach((cl) => {
+      const v = draft[cl.client] || {};
+      const tc = v.targetCpa === "" || v.targetCpa == null ? null : Number(v.targetCpa);
+      const mo = v.monthly === "" || v.monthly == null ? null : Math.round(Number(v.monthly) * 10000);
+      const o = {};
+      if (tc != null && !isNaN(tc)) o.targetCpa = tc;
+      if (mo != null && !isNaN(mo)) o.monthly = mo;
+      if (Object.keys(o).length) out[cl.client] = o;
+    });
+    return out;
+  };
+  const save = () => { onSave(build()); setSaved(true); };
+  const exportJson = () => {
+    const json = JSON.stringify({ _comment: "個社の基準（目標）。consoleの目標設定からエクスポート。キーは広告アカウント名(=client)。", byClient: build() }, null, 2);
+    if (navigator.clipboard) navigator.clipboard.writeText(json);
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+  const inp = { width: "90%", maxWidth: 120, padding: "6px 8px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const tmpl = "1.7fr 0.8fr 0.5fr 1fr 1fr";
+  const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={save} style={btnP}><Check size={15} /> 保存（この端末）</button>
+        <button onClick={exportJson} style={btnS}>{copied ? "コピー済" : "benchmarks.json をコピー"}</button>
+        {saved && <span style={{ fontSize: 12, color: "#047857", fontWeight: 700 }}>保存しました。アラート/基準チェックに反映されます。</span>}
+      </div>
+      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+        <div style={head}>
+          <span>クライアント</span><span style={{ textAlign: "right" }}>現CPA</span><span style={{ textAlign: "right" }}>CV</span>
+          <span style={{ textAlign: "right" }}>目標CPA(円)</span><span style={{ textAlign: "right" }}>月予算(万円)</span>
+        </div>
+        {clients.map((cl, i) => {
+          const a = agg(cl.accts); const v = draft[cl.client] || {};
+          return (
+            <div key={cl.client} style={{ display: "grid", gridTemplateColumns: tmpl, alignItems: "center", padding: "8px 12px", borderTop: i ? "1px solid #f1f5f4" : "none" }}>
+              <span style={{ fontWeight: 600, fontSize: 12.5 }}>{cl.client}{cl.tier === "large" && <LargePill />}</span>
+              <span style={{ textAlign: "right", color: "#475569", fontVariantNumeric: "tabular-nums" }}>{a.cpa ? yen(a.cpa) : "—"}</span>
+              <span style={{ textAlign: "right", color: "#94a3b8" }}>{a.cv}</span>
+              <span style={{ textAlign: "right" }}><input type="number" value={v.targetCpa ?? ""} onChange={(e) => set(cl.client, "targetCpa", e.target.value)} placeholder="—" style={inp} /></span>
+              <span style={{ textAlign: "right" }}><input type="number" value={v.monthly ?? ""} onChange={(e) => set(cl.client, "monthly", e.target.value)} placeholder="—" style={inp} /></span>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: 10, fontSize: 11, color: "#94a3b8", lineHeight: 1.7 }}>
+        ※「保存」はこの端末(ブラウザ)に保存し、アラート/基準チェックへ即反映。恒久保存は「benchmarks.json をコピー」→ <code>clients/benchmarks.json</code> に貼付けてコミット。目標CPAを入れると「+20%＝悪化／+50%＝重度」を自動判定します。
+      </div>
+    </div>
+  );
+}
+
+// 目標の変更履歴（誰が・いつ・何を・変更前→後）— CLAUDE.md §4 準拠
+function TargetHistory({ history }) {
+  const [copied, setCopied] = useState(false);
+  const fmt = (field, v) => (v == null ? "未設定" : field === "月予算" ? man(v) : yen(v));
+  const copyCsv = () => {
+    const rows = [["日時", "クライアント", "項目", "変更前", "変更後", "担当"],
+      ...history.map((h) => [h.at, h.client, h.field, h.from == null ? "未設定" : h.from, h.to == null ? "未設定" : h.to, h.by])];
+    const csv = rows.map((r) => r.map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n");
+    if (navigator.clipboard) navigator.clipboard.writeText(csv);
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+  const tmpl = "1.2fr 1.6fr 0.7fr 1.5fr 0.7fr";
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Clock size={16} color="#047857" /><span style={{ fontSize: 15, fontWeight: 700 }}>変更履歴</span></div>
+          <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>{history.length ? "目標の変更を記録（誰が・いつ・変更前→後）。" : "まだ変更履歴はありません。目標を保存すると記録されます。"}</div>
+        </div>
+        {history.length > 0 && <button onClick={copyCsv} style={btnS}>{copied ? "コピー済" : "履歴をCSVでコピー"}</button>}
+      </div>
+      {history.length > 0 && (
+        <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+            <span>日時</span><span>クライアント</span><span>項目</span><span>変更前 → 変更後</span><span>担当</span>
+          </div>
+          {history.slice(0, 100).map((h, i) => (
+            <div key={i} style={{ display: "grid", gridTemplateColumns: tmpl, alignItems: "center", padding: "8px 12px", fontSize: 12, borderTop: i ? "1px solid #f1f5f4" : "none" }}>
+              <span style={{ color: "#94a3b8" }}>{h.at}</span>
+              <span style={{ fontWeight: 600 }}>{h.client}</span>
+              <span style={{ color: "#475569" }}>{h.field}</span>
+              <span><span style={{ color: "#94a3b8" }}>{fmt(h.field, h.from)}</span> <span style={{ color: "#cbd5e1" }}>→</span> <span style={{ color: "#0f2a1f", fontWeight: 700 }}>{fmt(h.field, h.to)}</span></span>
+              <span style={{ color: "#475569" }}>{h.by}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DeltaTag({ v, dir }) {
   if (v == null) return <span style={{ color: "#94a3b8" }}>—</span>;
