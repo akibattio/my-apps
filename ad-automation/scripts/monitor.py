@@ -102,9 +102,9 @@ def _median(xs):
     return statistics.median(xs) if xs else 0
 
 
-def daily_checks(acct: dict, today) -> list[dict]:
-    """日次時系列(data/daily.json)から急変を検知。クレーム直結＝インプ急停止・消化大幅増減。
-    当日は部分データのため除外し、完全日(昨日まで)で判定。過去35日カレンダーを0埋め再構築。"""
+def daily_checks(acct: dict, today, cadence=None) -> list[dict]:
+    """日次時系列(data/daily.json)から急変を検知。クレーム直結＝インプ急停止・消化大幅増減、
+    改善＝CPC高騰。当日は部分データのため除外し、完全日(昨日まで)で判定。過去35日を0埋め再構築。"""
     out = []
     days = acct.get("days") or []
     if len(days) < 10:  # データ不足/学習期間は対象外（早すぎる判定を避ける）
@@ -114,14 +114,15 @@ def daily_checks(acct: dict, today) -> list[dict]:
     for i in range(35, 0, -1):
         ds = (today - timedelta(days=i)).isoformat()
         d = bydate.get(ds)
-        cal.append({"date": ds, "imp": (d["imp"] if d else 0), "cost": (d["cost"] if d else 0)})
+        cal.append({"date": ds, "imp": (d["imp"] if d else 0), "clk": (d["clk"] if d else 0), "cost": (d["cost"] if d else 0)})
     y = cal[-1]                       # 昨日（最新の完全日）
     prev14 = cal[-15:-1]             # 昨日の前14日
     imp_base = _median([d["imp"] for d in prev14])
     cost_base = _median([d["cost"] for d in prev14])
     active7 = sum(1 for d in cal[-8:-1] if d["imp"] > 0)
     active_days = sum(1 for d in cal if d["cost"] > 0)
-    cadence = "weekly" if active_days >= 21 else "daily"
+    if cadence is None:
+        cadence = "weekly" if active_days >= 21 else "daily"
     client, media = acct.get("client"), acct.get("media")
 
     def add(sev, kind, fact, approve):
@@ -154,6 +155,39 @@ def daily_checks(acct: dict, today) -> list[dict]:
                 add("critical", "消化" + ("増" if dev > 0 else "減") + "(週次)",
                     f"直近7日¥{this7:,}（前週¥{prev7:,}比 {'+' if dev > 0 else ''}{round(dev * 100)}%）",
                     "担当（予算/配信を確認）")
+
+    # ③ CPC高騰（改善・頻度準拠：日次は毎日／週次は月曜）
+    if cadence == "daily" or today.weekday() == 0:
+        clk7 = sum(d["clk"] for d in cal[-7:]); cost7 = sum(d["cost"] for d in cal[-7:])
+        clkB = sum(d["clk"] for d in cal[-21:-7]); costB = sum(d["cost"] for d in cal[-21:-7])
+        if clk7 >= 20 and clkB >= 20 and costB > 0:
+            cpc7 = cost7 / clk7; cpcB = costB / clkB
+            if cpcB > 0 and cpc7 / cpcB - 1 >= 0.4:
+                add("warn", "CPC高騰",
+                    f"直近7日CPC¥{round(cpc7):,}（前14日¥{round(cpcB):,}比 +{round((cpc7 / cpcB - 1) * 100)}%）",
+                    "担当（入札/KW見直し）")
+    return out
+
+
+def search_check(a: dict, cadence, today) -> list[dict]:
+    """Google検索の診断(data/search_diag.json)：IS大幅低下・不要検索クエリ。改善・頻度準拠。"""
+    out = []
+    if not (cadence == "daily" or today.weekday() == 0):
+        return out
+    client = a.get("client")
+
+    def add(sev, kind, fact, approve):
+        out.append({"client": client, "media": "google", "severity": sev, "kind": kind, "fact": fact, "approve": approve})
+
+    is7, isp = a.get("is7"), a.get("isPrev7")
+    if is7 is not None and isp is not None and (isp - is7) >= 15:
+        add("warn", "IS大幅低下", f"検索IS {isp}%→{is7}%（{round(is7 - isp)}pt）", "担当（予算/入札/競合を確認）")
+    w = a.get("waste") or []
+    if w and a.get("wasteTotal", 0) >= 10000:
+        top = max(w, key=lambda x: x["cost"])
+        add("info", "不要検索クエリ",
+            f"CV0×費用超 {len(w)}件・計¥{a['wasteTotal']:,}（最大「{top['text']}」¥{top['cost']:,}）",
+            "担当（除外KW追加を検討）")
     return out
 
 
@@ -216,16 +250,39 @@ def main():
     for a in data.get("accounts", []):
         alerts += check_account(a)
 
-    # 日次時系列による急変検知（クレーム直結：インプ急停止・消化大幅増減）
+    # cadence(日次/週次) 決定：benchmarks(=console bench.cadence)優先、無ければ配信日数で自動
+    bench_cad = {}
+    for a in data.get("accounts", []):
+        cd = (a.get("bench") or {}).get("cadence")
+        if cd:
+            bench_cad[a.get("client")] = cd
+    tdy = datetime.now(JST).date()
+    cadence_map = {}
+
+    # 日次時系列による急変検知（クレーム直結：インプ急停止・消化大幅増減／改善：CPC高騰）
     daily_path = PROJ / "data" / "daily.json"
     if daily_path.exists():
         try:
             dj = json.loads(daily_path.read_text(encoding="utf-8"))
-            tdy = datetime.now(JST).date()
             for acct in dj.get("accounts", []):
-                alerts += daily_checks(acct, tdy)
+                name = acct.get("client")
+                active_days = sum(1 for d in (acct.get("days") or []) if d.get("cost", 0) > 0)
+                cad = bench_cad.get(name) or ("weekly" if active_days >= 21 else "daily")
+                cadence_map[name] = cad
+                alerts += daily_checks(acct, tdy, cad)
         except Exception as e:
             print("daily.json 判定失敗:", str(e)[:80])
+
+    # Google検索の診断（改善：IS大幅低下・不要検索クエリ）
+    sd_path = PROJ / "data" / "search_diag.json"
+    if sd_path.exists():
+        try:
+            sd = json.loads(sd_path.read_text(encoding="utf-8"))
+            for a in sd.get("accounts", []):
+                cad = cadence_map.get(a.get("client")) or bench_cad.get(a.get("client")) or "daily"
+                alerts += search_check(a, cad, tdy)
+        except Exception as e:
+            print("search_diag.json 判定失敗:", str(e)[:80])
 
     generated = datetime.now(JST).strftime("%Y-%m-%d %H:%M JST")
     msg = build_message(alerts, data.get("period", "直近30日"), generated)

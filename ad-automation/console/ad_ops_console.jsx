@@ -91,7 +91,7 @@ export default function AdOpsConsole() {
     const names = new Set([...Object.keys(targets), ...Object.keys(t)]);
     const entries = [];
     names.forEach((name) => {
-      [["targetCpa", "目標CPA"], ["monthly", "月予算"]].forEach(([f, jp]) => {
+      [["targetCpa", "目標CPA"], ["monthly", "月予算"], ["cadence", "監視頻度"]].forEach(([f, jp]) => {
         const o = targets[name] ? targets[name][f] : undefined;
         const n = t[name] ? t[name][f] : undefined;
         if ((o == null ? null : o) !== (n == null ? null : n))
@@ -534,7 +534,7 @@ function TargetEditor({ clients, targets, onSave }) {
   const [draft, setDraft] = useState(() => {
     const d = {};
     clients.forEach((cl) => { const t = targets[cl.client] || {};
-      d[cl.client] = { targetCpa: t.targetCpa ?? "", monthly: t.monthly != null ? t.monthly / 10000 : "" }; });
+      d[cl.client] = { targetCpa: t.targetCpa ?? "", monthly: t.monthly != null ? t.monthly / 10000 : "", cadence: t.cadence ?? "" }; });
     return d;
   });
   const [saved, setSaved] = useState(false);
@@ -549,6 +549,7 @@ function TargetEditor({ clients, targets, onSave }) {
       const o = {};
       if (tc != null && !isNaN(tc)) o.targetCpa = tc;
       if (mo != null && !isNaN(mo)) o.monthly = mo;
+      if (v.cadence === "daily" || v.cadence === "weekly") o.cadence = v.cadence;
       if (Object.keys(o).length) out[cl.client] = o;
     });
     return out;
@@ -560,8 +561,9 @@ function TargetEditor({ clients, targets, onSave }) {
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
   const inp = { width: "90%", maxWidth: 120, padding: "6px 8px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const tmpl = "1.7fr 0.8fr 0.5fr 1fr 1fr";
+  const tmpl = "1.5fr 0.7fr 0.4fr 0.9fr 0.9fr 0.8fr";
   const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
+  const sel = { padding: "5px 6px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12, background: "#fff" };
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
@@ -572,7 +574,7 @@ function TargetEditor({ clients, targets, onSave }) {
       <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
         <div style={head}>
           <span>クライアント</span><span style={{ textAlign: "right" }}>現CPA</span><span style={{ textAlign: "right" }}>CV</span>
-          <span style={{ textAlign: "right" }}>目標CPA(円)</span><span style={{ textAlign: "right" }}>月予算(万円)</span>
+          <span style={{ textAlign: "right" }}>目標CPA(円)</span><span style={{ textAlign: "right" }}>月予算(万円)</span><span style={{ textAlign: "right" }}>監視頻度</span>
         </div>
         {clients.map((cl, i) => {
           const a = agg(cl.accts); const v = draft[cl.client] || {};
@@ -583,6 +585,11 @@ function TargetEditor({ clients, targets, onSave }) {
               <span style={{ textAlign: "right", color: "#94a3b8" }}>{a.cv}</span>
               <span style={{ textAlign: "right" }}><input type="number" value={v.targetCpa ?? ""} onChange={(e) => set(cl.client, "targetCpa", e.target.value)} placeholder="—" style={inp} /></span>
               <span style={{ textAlign: "right" }}><input type="number" value={v.monthly ?? ""} onChange={(e) => set(cl.client, "monthly", e.target.value)} placeholder="—" style={inp} /></span>
+              <span style={{ textAlign: "right" }}>
+                <select value={v.cadence ?? ""} onChange={(e) => set(cl.client, "cadence", e.target.value)} style={sel}>
+                  <option value="">自動</option><option value="daily">日次</option><option value="weekly">週次</option>
+                </select>
+              </span>
             </div>
           );
         })}
@@ -597,7 +604,8 @@ function TargetEditor({ clients, targets, onSave }) {
 // 目標の変更履歴（誰が・いつ・何を・変更前→後）— CLAUDE.md §4 準拠
 function TargetHistory({ history }) {
   const [copied, setCopied] = useState(false);
-  const fmt = (field, v) => (v == null ? "未設定" : field === "月予算" ? man(v) : yen(v));
+  const fmt = (field, v) => (v == null ? "未設定" : field === "月予算" ? man(v)
+    : field === "監視頻度" ? (v === "daily" ? "日次" : v === "weekly" ? "週次" : v) : yen(v));
   const copyCsv = () => {
     const rows = [["日時", "クライアント", "項目", "変更前", "変更後", "担当"],
       ...history.map((h) => [h.at, h.client, h.field, h.from == null ? "未設定" : h.from, h.to == null ? "未設定" : h.to, h.by])];
