@@ -191,7 +191,7 @@ export default function AdOpsConsole() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
-          <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="概要" badge={pending.length} />
+          <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={alerts.length} />
           <NavBtn id="client" icon={<Users size={15} />} label="クライアント別" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧" />
@@ -200,60 +200,56 @@ export default function AdOpsConsole() {
       </div>
 
       <div style={{ padding: 24, maxWidth: 1240, margin: "0 auto" }}>
-        {(view === "dash" || view === "list") && (
+        {(view === "summary" || view === "list") && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />
           </div>
         )}
 
-        {/* ===== 概要 ===== */}
+        {/* ===== ダッシュボード（全運用アカウント一望） ===== */}
         {view === "dash" && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 20 }}>
-              {[
-                { label: "総広告費", value: yen(totals.spend), sub: dataInfo ? dataInfo.period : "今月累計" },
-                { label: "平均CPA", value: totals.cpa ? yen(totals.cpa) : "—", sub: totals.cv ? "" : "CV0のため算出不可" },
-                { label: "合計CV", value: totals.cv + "件", sub: dataInfo ? dataInfo.period : "" },
-                { label: "平均ROAS", value: totals.roas ? totals.roas.toFixed(1) + "x" : "—", sub: "計測対象のみ" },
-                { label: "アラート", value: alerts.length + "件", sub: pending.length + "件が要判断", alert: true },
-              ].map((k) => (
-                <Card key={k.label}>
-                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{k.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: k.alert ? "#dc2626" : "#0f2a1f" }}>{k.value}</div>
-                  <div style={{ fontSize: 11, marginTop: 4, display: "flex", alignItems: "center", gap: 4, color: k.up ? "#047857" : k.down ? "#dc2626" : "#94a3b8" }}>
-                    {k.up && <TrendingUp size={12} />}{k.down && <TrendingDown size={12} />}{k.sub}</div>
-                </Card>
-              ))}
-            </div>
+            {/* 上部：全体集計(クリックで詳細ページ)・アラート・健全性 */}
             {(() => {
               const g = rows.filter((c) => healthOf(c) === "good").length;
               const w = rows.filter((c) => healthOf(c) === "warning").length;
               const cr = rows.filter((c) => healthOf(c) === "critical").length;
               const nt = rows.filter((c) => !c.target && (c.spend || 0) > 0).length;
-              const pill = (label, n, color, bg, onClick) => (
-                <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 999,
-                  border: "1px solid " + bg, background: bg, color, fontSize: 12.5, fontWeight: 700, cursor: onClick ? "pointer" : "default" }}>
-                  <Circle size={9} fill={color} color={color} />{label} {n}</button>);
+              const crit = alerts.filter((a) => a.sev === "critical").length;
               return (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
-                  <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>健全性（{rows.length}アカウント）</span>
-                  {pill("良好", g, "#047857", "#ecfdf5")}
-                  {pill("注意", w, "#d97706", "#fffbeb")}
-                  {pill("要対応", cr, "#dc2626", "#fef2f2")}
-                  {nt > 0 && pill("目標未設定", nt, "#64748b", "#f1f5f4", () => setView("targets"))}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 20 }}>
+                  <button onClick={() => setView("summary")} style={{ textAlign: "left", cursor: "pointer", background: "#0f2a1f", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px" }}>
+                    <div style={{ fontSize: 12, color: "#a7c4b5", marginBottom: 6 }}>全体集計</div>
+                    <div style={{ fontSize: 22, fontWeight: 700 }}>{yen(totals.spend)}</div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: "#a7c4b5", display: "flex", alignItems: "center", gap: 3 }}>総広告費・{clients.length}社 ／ 詳細を見る <ChevronRight size={12} /></div>
+                  </button>
+                  <Card>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>アラート</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: alerts.length ? "#dc2626" : "#047857" }}>{alerts.length}件</div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8" }}>{crit ? `うち要対応 ${crit}件` : "重大なし"}</div>
+                  </Card>
+                  <Card>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>健全性（{rows.length}アカウント）</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12, fontWeight: 700 }}>
+                      <span style={{ color: "#047857" }}>● 良好 {g}</span>
+                      <span style={{ color: "#d97706" }}>● 注意 {w}</span>
+                      <span style={{ color: "#dc2626" }}>● 要対応 {cr}</span>
+                      {nt > 0 && <button onClick={() => setView("targets")} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "#64748b", fontWeight: 700, fontSize: 12 }}>● 目標未設定 {nt}</button>}
+                    </div>
+                  </Card>
                 </div>
               );
             })()}
-            <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 20 }}>
+
+            {/* 運用アカウント一覧（全体が見える・健全性の低い順・クリックで社別詳細） */}
+            <SectionTitle icon={<Users size={16} color="#047857" />} title={`運用アカウント（${clients.length}社）`} note="健全性の低い順。クリックで社別の詳細（接続・成果・基準・アラート）へ。" />
+            <PortfolioGrid clients={clients} onOpen={goClient} />
+
+            {/* アラート一覧＋承認キュー */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 22 }}>
               <div>
-                <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ。" />
-                {pending.length === 0 && <Empty text="承認待ちはありません。" />}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} />)}
-                </div>
-              </div>
-              <div>
-                <SectionTitle icon={<AlertTriangle size={16} color="#d97706" />} title="アラート" note="しきい値超えの項目。" />
+                <SectionTitle icon={<AlertTriangle size={16} color="#d97706" />} title="アラート" note="しきい値超え・急変。クリックで社別へ。" />
+                {alerts.length === 0 && <Empty text="アラートはありません。" />}
                 <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
                   {alerts.map((a, i) => (
                     <div key={i} onClick={() => goClient(a.c.client)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px", borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
@@ -267,6 +263,56 @@ export default function AdOpsConsole() {
                   ))}
                 </div>
               </div>
+              <div>
+                <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ。" />
+                {pending.length === 0 && <Empty text="承認待ちはありません。" />}
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} />)}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ===== 全体集計（ダッシュボードからのクリックで表示） ===== */}
+        {view === "summary" && (
+          <>
+            <button onClick={() => setView("dash")} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, padding: 0 }}>
+              <ArrowLeft size={15} /> ダッシュボードに戻る
+            </button>
+            <SectionTitle icon={<LayoutDashboard size={16} color="#047857" />} title="全体集計" note={dataInfo ? `${dataInfo.period || ""}・${dataInfo.generatedAt || ""}（媒体タブで絞込み可）` : "サンプルデータ"} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 22 }}>
+              {[
+                { label: "総広告費", value: yen(totals.spend), sub: dataInfo ? dataInfo.period : "今月累計" },
+                { label: "平均CPA", value: totals.cpa ? yen(totals.cpa) : "—", sub: totals.cv ? "" : "CV0のため算出不可" },
+                { label: "合計CV", value: totals.cv + "件", sub: dataInfo ? dataInfo.period : "" },
+                { label: "平均ROAS", value: totals.roas ? totals.roas.toFixed(1) + "x" : "—", sub: "計測対象のみ" },
+                { label: "アラート", value: alerts.length + "件", sub: pending.length + "件が承認待ち", alert: alerts.length > 0 },
+              ].map((k) => (
+                <Card key={k.label}>
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{k.label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: k.alert ? "#dc2626" : "#0f2a1f" }}>{k.value}</div>
+                  <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8" }}>{k.sub}</div>
+                </Card>
+              ))}
+            </div>
+            <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体内訳" note="Google / Meta の合計。" />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
+              {[["google", "Google"], ["meta", "Meta"]].map(([mk, ml]) => {
+                const t = agg(A.filter((c) => c.media === mk));
+                const n = A.filter((c) => c.media === mk).length;
+                return (
+                  <Card key={mk}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}><MediaPill m={mk} /><span style={{ fontSize: 12, color: "#64748b" }}>{n}アカウント</span></div>
+                    <div style={{ display: "flex", gap: 16 }}>
+                      <MiniStat label="消化" value={yen(t.spend)} />
+                      <MiniStat label="CPA" value={t.cpa ? yen(t.cpa) : "—"} />
+                      <MiniStat label="CV" value={t.cv + "件"} />
+                      <MiniStat label="ROAS" value={t.roas ? t.roas.toFixed(1) + "x" : "—"} />
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           </>
         )}
@@ -476,12 +522,12 @@ export default function AdOpsConsole() {
 }
 
 function agg(list) {
-  const spend = list.reduce((s, c) => s + c.spend, 0);
-  const cv = list.reduce((s, c) => s + c.cv, 0);
-  const cpa = cv ? Math.round(spend / cv) : 0;
+  const spend = list.reduce((s, c) => s + (c.spend || 0), 0);
+  const cvRaw = list.reduce((s, c) => s + (c.cv || 0), 0);
+  const cpa = cvRaw ? Math.round(spend / cvRaw) : 0;
   const r = list.filter((c) => c.roas);
   const roas = r.length ? r.reduce((s, c) => s + c.roas, 0) / r.length : 0;
-  return { spend, cv, cpa, roas };
+  return { spend, cv: Math.round(cvRaw), cpa, roas };
 }
 const btnP = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "none", background: "#047857", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" };
 const btnS = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer" };
@@ -510,6 +556,50 @@ function ProposalCard({ p, decide, onClient, hideClient }) {
   );
 }
 function Card({ children }) { return <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: "14px 16px" }}>{children}</div>; }
+
+// 全運用アカウント（社）のカードグリッド。健全性の低い順・アラート表示・クリックで社別詳細。
+function PortfolioGrid({ clients, onOpen }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+      {[...clients].sort((x, y) => worstHealth(y.accts) - worstHealth(x.accts)).map((cl) => {
+        const a = agg(cl.accts);
+        const cAlerts = alertsOf(cl.accts);
+        const wh = worstHealth(cl.accts);
+        const hk = wh === 2 ? "critical" : wh === 1 ? "warning" : "good";
+        const hlabel = hk === "good" ? "良好" : hk === "warning" ? "注意" : "要対応";
+        return (
+          <button key={cl.client} onClick={() => onOpen(cl.client)} style={{ textAlign: "left", cursor: "pointer",
+            background: "#fff", border: "1px solid #e6ebe8", borderLeft: `3px solid ${HC[hk]}`, borderRadius: 12, padding: 15 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{cl.client}{cl.tier === "large" && <LargePill />}</div>
+              <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: HC[hk] }}>
+                <Circle size={8} fill={HC[hk]} color={HC[hk]} />{hlabel}</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: "#64748b", margin: "3px 0 10px" }}>月額規模 {man(cl.monthly)}/月</div>
+            <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
+              {cl.accts.map((x) => <MediaPill key={x.id} m={x.media} />)}
+            </div>
+            <div style={{ display: "flex", gap: 14, fontSize: 12, marginBottom: cAlerts.length ? 10 : 0 }}>
+              <MiniStat label="消化" value={yen(a.spend)} />
+              <MiniStat label="CPA" value={a.cpa ? yen(a.cpa) : "—"} bad={hk !== "good"} />
+              <MiniStat label="CV" value={a.cv + "件"} />
+            </div>
+            {cAlerts.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, borderTop: "1px solid #f1f5f4", paddingTop: 8 }}>
+                {cAlerts.map((al, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}>
+                    <Circle size={7} fill={SEV[al.sev].dot} color={SEV[al.sev].dot} />
+                    <MediaPill m={al.media} /><span style={{ color: "#475569" }}>{al.msg}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 function SectionTitle({ icon, title, note }) {
   return (<div style={{ marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 7 }}>{icon}<span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span></div>{note && <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>{note}</div>}</div>);
 }

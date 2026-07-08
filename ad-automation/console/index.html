@@ -24,7 +24,7 @@
 <div id="root"><div class="boot">モックを読み込み中…（React / アイコンをCDN取得）</div></div>
 <script type="module">
   try {
-    const src = await (await fetch('./ad_ops_console.jsx')).text();
+    const src = await (await fetch('./ad_ops_console.jsx', { cache: 'no-store' })).text();
     const { code } = Babel.transform(src, { presets: ['react'], filename: 'app.jsx' });
     const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
     const [mod, React, rd] = await Promise.all([
