@@ -1,0 +1,59 @@
+name: ad-automation daily
+
+# 毎朝8:30 JST（=前日23:30 UTC）に実行。手動実行(workflow_dispatch)も可。
+# 生成物 console/（index.html・ad_ops_console.jsx・data.json）を Cloudflare Pages へデプロイ。
+# 秘密情報は GitHub Secrets（リポジトリには入れない・CLAUDE.md §8）。書き込み系は一切呼ばない（読み取りのみ）。
+
+on:
+  schedule:
+    - cron: "30 23 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ad-automation-daily
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ad-automation
+    env:
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+      GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+      GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+      GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+      GOOGLE_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_LOGIN_CUSTOMER_ID }}
+      SOFCOM_META_SYSTEM_USER_TOKEN: ${{ secrets.SOFCOM_META_SYSTEM_USER_TOKEN }}
+      # 通知(Google Chat)は運用確立後に有効化：下2行のコメントを外し Secrets を登録
+      # NOTIFY_CHANNEL: googlechat
+      # GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 依存インストール
+        run: pip install -r requirements.txt
+
+      - name: 取得 → 日次時系列 → 検索診断 → 監視（読み取りのみ）
+        run: |
+          python3 scripts/build_console_data.py
+          python3 scripts/fetch_daily_series.py
+          python3 scripts/fetch_search_diagnostics.py
+          # 通知先(NOTIFY_CHANNEL)未設定なら送信されない。有効化時は「monitor.py --send」に変更
+          python3 scripts/monitor.py
+
+      - name: Cloudflare Pages へデプロイ（console/ を配信）
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ad-automation
+          command: pages deploy console --project-name=sofcom-adops --branch=main
