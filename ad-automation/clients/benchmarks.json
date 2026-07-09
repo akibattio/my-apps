@@ -1,5 +1,5 @@
 {
-  "_comment": "個社の基準（目標）。全社既定(CLAUDE.md §2 / build_console_data.py DEFAULT_BENCH)を上書きする項目だけ書く。clients/<社名>.md のKPI目標と一致させること。キーはMeta広告アカウント名(=data.jsonのclient)。",
+  "_comment": "個社の基準（目標）。全社既定(CLAUDE.md §2 / build_console_data.py DEFAULT_BENCH)を上書きする項目だけ書く。キーは広告アカウント名(=data.jsonのclient)。cpcMax=クリック単価の上限(円)。",
   "byClient": {
     "ハルナ美容外科": {
       "targetCpa": 5500,
@@ -10,6 +10,18 @@
       "cpaSeverePct": 0.30,
       "tier": "large",
       "monthly": 2800000
+    },
+    "【EM生活】公式オンラインショップ": {
+      "targetCpa": 800,
+      "cpcMax": 100
+    },
+    "【展示会ブース装飾】": {
+      "targetCpa": 40000,
+      "cpcMax": 1000
+    },
+    "【東海グランド】TOOGU": {
+      "targetCpa": 6000,
+      "cpcMax": 300
     }
   }
 }

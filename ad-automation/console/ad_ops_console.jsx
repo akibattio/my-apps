@@ -51,7 +51,9 @@ const CONN = {
   error: { label: "エラー", c: "#dc2626", bg: "#fef2f2" },
 };
 const HC = { good: "#047857", warning: "#d97706", critical: "#dc2626" };
-const healthOf = (c) => (c.cv === 0 && c.spend > 0 ? "critical" : (c.target && c.cpa > c.target * 1.15) ? "warning" : "good");
+const cpcOf = (c) => (c.metrics && c.metrics.d7 ? c.metrics.d7.cpc : null);
+const cpcOver = (c) => { const mx = c.bench && c.bench.cpcMax, v = cpcOf(c); return mx && v && v > mx; };
+const healthOf = (c) => (c.cv === 0 && c.spend > 0 ? "critical" : (c.target && c.cpa > c.target * 1.15) || cpcOver(c) ? "warning" : "good");
 const RANK = { good: 0, warning: 1, critical: 2 };
 function alertsOf(accts) {
   const out = [];
@@ -59,6 +61,7 @@ function alertsOf(accts) {
     if (c.cv === 0 && c.spend > 0) out.push({ sev: "critical", media: c.media, msg: `CV 0件で ${yen(c.spend)} 消化` });
     else if (c.target && c.cpa > c.target * 1.15) out.push({ sev: "warning", media: c.media, msg: `CPA ${yen(c.cpa)}（+${Math.round((c.cpa / c.target - 1) * 100)}%）` });
     else if (c.is != null && c.is < 50) out.push({ sev: "warning", media: c.media, msg: `IS ${c.is}%（機会損失大）` });
+    if (cpcOver(c)) out.push({ sev: "warning", media: c.media, msg: `CPC ${yen(cpcOf(c))}（上限${yen(c.bench.cpcMax)}超）` });
     if (c.status === "error") out.push({ sev: "critical", media: c.media, msg: "接続エラー（トークン失効）" });
     else if (c.status === "warn") out.push({ sev: "warning", media: c.media, msg: `トークン期限接近（残${c.tokenDays}日）` });
   });
@@ -91,7 +94,7 @@ export default function AdOpsConsole() {
     const names = new Set([...Object.keys(targets), ...Object.keys(t)]);
     const entries = [];
     names.forEach((name) => {
-      [["targetCpa", "目標CPA"], ["monthly", "月予算"], ["cadence", "監視頻度"]].forEach(([f, jp]) => {
+      [["targetCpa", "目標CPA"], ["cpcMax", "CPC上限"], ["monthly", "月予算"], ["cadence", "監視頻度"]].forEach(([f, jp]) => {
         const o = targets[name] ? targets[name][f] : undefined;
         const n = t[name] ? t[name][f] : undefined;
         if ((o == null ? null : o) !== (n == null ? null : n))
@@ -154,6 +157,7 @@ export default function AdOpsConsole() {
   const alerts = rows.map((c) => {
     if (c.cv === 0 && c.spend > 0) return { c, sev: "critical", msg: `CV 0件のまま ${yen(c.spend)} を消化` };
     if (c.target && c.cpa > c.target * 1.15) return { c, sev: "warning", msg: `CPA ${yen(c.cpa)}（目標比 +${Math.round((c.cpa / c.target - 1) * 100)}%）` };
+    if (cpcOver(c)) return { c, sev: "warning", msg: `CPC ${yen(cpcOf(c))}（上限${yen(c.bench.cpcMax)}超）` };
     if (c.is != null && c.is < 50) return { c, sev: "warning", msg: `IS ${c.is}%（機会損失大）` };
     return null;
   }).filter(Boolean);
@@ -369,6 +373,7 @@ export default function AdOpsConsole() {
           const cAlerts = cl.accts.map((c) => {
             if (c.cv === 0 && c.spend > 0) return { c, sev: "critical", msg: `CV 0件のまま ${yen(c.spend)} を消化` };
             if (c.target && c.cpa > c.target * 1.15) return { c, sev: "warning", msg: `CPA ${yen(c.cpa)}（目標比 +${Math.round((c.cpa / c.target - 1) * 100)}%）` };
+            if (cpcOver(c)) return { c, sev: "warning", msg: `CPC ${yen(cpcOf(c))}（上限${yen(c.bench.cpcMax)}超）` };
             if (c.is != null && c.is < 50) return { c, sev: "warning", msg: `IS ${c.is}%（機会損失大）` };
             return null;
           }).filter(Boolean);
@@ -623,8 +628,17 @@ function Empty({ text }) { return <div style={{ background: "#fff", border: "1px
 function TargetEditor({ clients, targets, onSave }) {
   const [draft, setDraft] = useState(() => {
     const d = {};
-    clients.forEach((cl) => { const t = targets[cl.client] || {};
-      d[cl.client] = { targetCpa: t.targetCpa ?? "", monthly: t.monthly != null ? t.monthly / 10000 : "", cadence: t.cadence ?? "" }; });
+    clients.forEach((cl) => {
+      const t = targets[cl.client] || {};
+      const bench = (cl.accts[0] && cl.accts[0].bench) || {};   // benchmarks.json 由来の現行値
+      const mo = t.monthly != null ? t.monthly : cl.monthly;
+      d[cl.client] = {
+        targetCpa: t.targetCpa ?? bench.targetCpa ?? "",
+        cpcMax: t.cpcMax ?? bench.cpcMax ?? "",
+        monthly: mo != null ? mo / 10000 : "",
+        cadence: t.cadence ?? bench.cadence ?? "",
+      };
+    });
     return d;
   });
   const [saved, setSaved] = useState(false);
@@ -636,8 +650,10 @@ function TargetEditor({ clients, targets, onSave }) {
       const v = draft[cl.client] || {};
       const tc = v.targetCpa === "" || v.targetCpa == null ? null : Number(v.targetCpa);
       const mo = v.monthly === "" || v.monthly == null ? null : Math.round(Number(v.monthly) * 10000);
+      const cm = v.cpcMax === "" || v.cpcMax == null ? null : Number(v.cpcMax);
       const o = {};
       if (tc != null && !isNaN(tc)) o.targetCpa = tc;
+      if (cm != null && !isNaN(cm)) o.cpcMax = cm;
       if (mo != null && !isNaN(mo)) o.monthly = mo;
       if (v.cadence === "daily" || v.cadence === "weekly") o.cadence = v.cadence;
       if (Object.keys(o).length) out[cl.client] = o;
@@ -651,7 +667,7 @@ function TargetEditor({ clients, targets, onSave }) {
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
   const inp = { width: "90%", maxWidth: 120, padding: "6px 8px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const tmpl = "1.5fr 0.7fr 0.4fr 0.9fr 0.9fr 0.8fr";
+  const tmpl = "1.35fr 0.6fr 0.35fr 0.8fr 0.8fr 0.8fr 0.75fr";
   const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
   const sel = { padding: "5px 6px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12, background: "#fff" };
   return (
@@ -664,7 +680,7 @@ function TargetEditor({ clients, targets, onSave }) {
       <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
         <div style={head}>
           <span>クライアント</span><span style={{ textAlign: "right" }}>現CPA</span><span style={{ textAlign: "right" }}>CV</span>
-          <span style={{ textAlign: "right" }}>目標CPA(円)</span><span style={{ textAlign: "right" }}>月予算(万円)</span><span style={{ textAlign: "right" }}>監視頻度</span>
+          <span style={{ textAlign: "right" }}>目標CPA(円)</span><span style={{ textAlign: "right" }}>CPC上限(円)</span><span style={{ textAlign: "right" }}>月予算(万円)</span><span style={{ textAlign: "right" }}>監視頻度</span>
         </div>
         {clients.map((cl, i) => {
           const a = agg(cl.accts); const v = draft[cl.client] || {};
@@ -674,6 +690,7 @@ function TargetEditor({ clients, targets, onSave }) {
               <span style={{ textAlign: "right", color: "#475569", fontVariantNumeric: "tabular-nums" }}>{a.cpa ? yen(a.cpa) : "—"}</span>
               <span style={{ textAlign: "right", color: "#94a3b8" }}>{a.cv}</span>
               <span style={{ textAlign: "right" }}><input type="number" value={v.targetCpa ?? ""} onChange={(e) => set(cl.client, "targetCpa", e.target.value)} placeholder="—" style={inp} /></span>
+              <span style={{ textAlign: "right" }}><input type="number" value={v.cpcMax ?? ""} onChange={(e) => set(cl.client, "cpcMax", e.target.value)} placeholder="—" style={inp} /></span>
               <span style={{ textAlign: "right" }}><input type="number" value={v.monthly ?? ""} onChange={(e) => set(cl.client, "monthly", e.target.value)} placeholder="—" style={inp} /></span>
               <span style={{ textAlign: "right" }}>
                 <select value={v.cadence ?? ""} onChange={(e) => set(cl.client, "cadence", e.target.value)} style={sel}>
@@ -767,6 +784,11 @@ function BenchmarkChecks({ c }) {
   checks.push({ name: "CTR", actual: m.ctr + "%", std: `≥ ${b.ctrMin ?? 1.0}%`,
     gap: m.ctr < (b.ctrMin ?? 1.0) ? `${(m.ctr - (b.ctrMin ?? 1.0)).toFixed(2)}pt` : "基準クリア",
     j: m.ctr < (b.ctrMin ?? 1.0) ? "warn" : "good" });
+  if (b.cpcMax) {
+    checks.push({ name: "CPC", actual: yen(m.cpc), std: `≤ ${yen(b.cpcMax)}`,
+      gap: m.cpc > b.cpcMax ? `+${Math.round((m.cpc / b.cpcMax - 1) * 100)}%` : "基準クリア",
+      j: m.cpc > b.cpcMax * 1.3 ? "crit" : m.cpc > b.cpcMax ? "warn" : "good" });
+  }
   if (m.freq != null && m.freq > 0) {
     const fmax = b.freqMax ?? 3.5;
     checks.push({ name: "フリークエンシー", actual: m.freq.toFixed(2), std: `≤ ${fmax}`,

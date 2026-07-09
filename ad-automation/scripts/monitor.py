@@ -81,6 +81,14 @@ def check_account(a: dict) -> list[dict]:
     if b.get("ctrMin") and ctr is not None and ctr > 0 and ctr < b["ctrMin"]:
         add("info", "CTR低下", f"CTR {ctr}%（基準{b['ctrMin']}%未満）", "担当（クリエイティブ差替検討）")
 
+    # 4b) CPC上限超過（クリック単価が目標上限を超える）
+    cpc7 = (a.get("metrics") or {}).get("d7", {}).get("cpc")
+    if b.get("cpcMax") and cpc7:
+        if cpc7 > b["cpcMax"] * 1.3:
+            add("warn", "CPC上限超過", f"CPC ¥{cpc7:,}（上限¥{b['cpcMax']:,}・+{round((cpc7 / b['cpcMax'] - 1) * 100)}%）", "担当（入札/KW見直し）")
+        elif cpc7 > b["cpcMax"]:
+            add("info", "CPC上限超え", f"CPC ¥{cpc7:,}（上限¥{b['cpcMax']:,}・+{round((cpc7 / b['cpcMax'] - 1) * 100)}%）", "担当（入札/KW確認）")
+
     # 5) 予算ペース逸脱（日予算がある場合の目安）
     if daily > 0:
         expected = daily * 30
