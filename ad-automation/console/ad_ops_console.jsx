@@ -127,10 +127,10 @@ export default function AdOpsConsole() {
       .then((j) => { if (j && Array.isArray(j.accounts)) setDaily(j); })
       .catch(() => {});
   }, []);
-  // 日次時系列を client|media で引けるマップに（Googleのみ・Metaは空配列）
+  // 日次時系列を client|media で引けるマップに（{days, byType}。Googleのみ・Metaは空）
   const dailyMap = useMemo(() => {
     const m = {};
-    if (daily && daily.accounts) daily.accounts.forEach((a) => { m[`${a.client}|${a.media}`] = a.days || []; });
+    if (daily && daily.accounts) daily.accounts.forEach((a) => { m[`${a.client}|${a.media}`] = { days: a.days || [], byType: a.byType || {} }; });
     return m;
   }, [daily]);
 
@@ -430,7 +430,7 @@ export default function AdOpsConsole() {
                       <div style={{ fontSize: 11.5, color: "#64748b", fontFamily: "monospace", marginBottom: 3 }}>{c.acct}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: tokC, fontWeight: 600, marginBottom: 12 }}>
                         <KeyRound size={12} />トークン {tok} ・ 稼働 {c.cp}本{c.dailyBudget ? ` ・ 日予算 ${yen(c.dailyBudget)}` : ""} ・ 同期 {c.sync}</div>
-                      {c.metrics ? <AccountReport c={c} days={dailyMap[`${c.client}|${c.media}`]} /> : (
+                      {c.metrics ? <AccountReport c={c} days={(dailyMap[`${c.client}|${c.media}`] || {}).days} byType={(dailyMap[`${c.client}|${c.media}`] || {}).byType} /> : (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12 }}>
                         <MiniStat label="消化" value={yen(c.spend)} />
                         <MiniStat label="CPA/目標" value={(c.cpa ? yen(c.cpa) : "—") } bad={c.target && c.cpa > c.target * 1.15} />
@@ -472,12 +472,12 @@ export default function AdOpsConsole() {
           <>
             <SectionTitle icon={<Clock size={16} color="#047857" />} title="月次レポート（週次分解）" note="当月の週別（第1週〜）推移と前月比。クライアント提出・月初レポート用。日次データのあるGoogleアカウントが対象。" />
             {(() => {
-              const list = A.filter((c) => (dailyMap[`${c.client}|${c.media}`] || []).length >= 7);
+              const list = A.filter((c) => ((dailyMap[`${c.client}|${c.media}`] || {}).days || []).length >= 7);
               if (!list.length) return <Empty text="日次データのあるアカウントがありません（Meta は日次未取得）。" />;
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   {list.map((c) => (
-                    <MonthlyReport key={c.id} c={c} days={dailyMap[`${c.client}|${c.media}`]} />
+                    <MonthlyReport key={c.id} c={c} days={(dailyMap[`${c.client}|${c.media}`] || {}).days} byType={(dailyMap[`${c.client}|${c.media}`] || {}).byType} />
                   ))}
                 </div>
               );
@@ -939,8 +939,8 @@ function BenchmarkChecks({ c }) {
   );
 }
 
-// クライアント詳細の「レポート状態」：予算消化＋直近7日/先月/先月比
-function AccountReport({ c, days }) {
+// クライアント詳細の「レポート状態」：予算消化＋直近7日/前7日/手法別
+function AccountReport({ c, days, byType }) {
   const d7 = c.metrics.d7, lm = c.metrics.lm;
   const lmDays = c.lmDays || 30;
   // rate=率(直接比較) / 総量は1日あたりに正規化して比較（7日÷7 vs 先月÷lmDays）
@@ -1008,8 +1008,8 @@ function AccountReport({ c, days }) {
           <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6 }}>※日次データが無いため<b>先月</b>と比較（<b>1日あたり</b>換算：費用/表示/クリック/CVは 直近7日÷7 vs 先月÷{lmDays}日、CTR/CPC/CPAは率のため直接）。緑＝改善／赤＝悪化。</div>
         </>
       )}
-      {/* ② 週次：直近7日 vs 前7日（同じ長さ）＋14/28日＋日次推移グラフ（Googleのみ日次あり） */}
-      {days && days.length >= 7 && <TrendReport days={days} bench={c.bench} />}
+      {/* ② 週次：直近7日 vs 前7日（同じ長さ）＋手法別＋14/28日＋日次推移グラフ（Googleのみ日次あり） */}
+      {days && days.length >= 7 && <TrendReport days={days} byType={byType} bench={c.bench} />}
     </div>
   );
 }
@@ -1034,8 +1034,8 @@ function aggList(list) {
   return t;
 }
 
-// ③ 月次：当月を週別（第1週〜）に分解＋前月比＋目標CPA照合。月初レポート・振り返り用。
-function MonthlyReport({ c, days }) {
+// ③ 月次：当月を週別（第1週〜）に分解＋前月比＋目標CPA照合＋手法別。月初レポート・振り返り用。
+function MonthlyReport({ c, days, byType }) {
   const months = [...new Set(days.map((d) => d.date.slice(0, 7)))].sort();
   const curM = months[months.length - 1];
   const prevM = months.length > 1 ? months[months.length - 2] : null;
@@ -1081,7 +1081,40 @@ function MonthlyReport({ c, days }) {
           </div>
         ))}
       </div>
+      {/* 当月の手法別（検索/PMax等） */}
+      {byType && Object.keys(byType).length > 0 && (() => {
+        const mrows = Object.keys(byType).map((label) => {
+          const a = aggList((byType[label] || []).filter((d) => d.date.slice(0, 7) === curM));
+          return { label, ...a };
+        }).filter((r) => r.cost > 0).sort((a, b) => b.cost - a.cost);
+        if (!mrows.length) return null;
+        return (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>当月の手法別</div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 340 }}>
+                <thead><tr>
+                  <th style={{ ...head, textAlign: "left" }}>手法</th><th style={head}>費用</th><th style={head}>構成比</th><th style={head}>CV</th><th style={head}>CPA</th>
+                </tr></thead>
+                <tbody>
+                  {mrows.map((r) => (
+                    <tr key={r.label} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                      <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 700 }}>{r.label}</td>
+                      <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{yen(r.cost)}</td>
+                      <td style={{ ...cell, color: "#94a3b8" }}>{cur.cost ? Math.round((r.cost / cur.cost) * 100) : 0}%</td>
+                      <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
+                      <td style={{ ...cell, color: cpaJudge(r.cpa), fontWeight: 600 }}>{r.cpa ? yen(r.cpa) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 週次分解 */}
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>週次分解（合計）</div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420 }}>
           <thead><tr>
@@ -1112,8 +1145,59 @@ function MonthlyReport({ c, days }) {
   );
 }
 
-// ② 期間比較（7/14/28日）＋日次推移グラフ。運用者が「本物の悪化か」を判断し急変を目視できる。
-function TrendReport({ days, bench }) {
+// 指定した日付集合に含まれる日次レコードを合計
+function sumSet(arr, dateSet) {
+  const t = (arr || []).reduce((a, d) => dateSet.has(d.date) ? { imp: a.imp + (d.imp || 0), clk: a.clk + (d.clk || 0), cost: a.cost + (d.cost || 0), cv: a.cv + (d.cv || 0) } : a, { imp: 0, clk: 0, cost: 0, cv: 0 });
+  t.cpa = t.cv ? Math.round(t.cost / t.cv) : null;
+  t.cpc = t.clk ? Math.round(t.cost / t.clk) : null;
+  return t;
+}
+
+// 手法別（検索/PMax/デマンドジェン等）の直近7日サマリー＋前7日比。Googleの合計は手法ミックスで歪むため必須。
+function MethodBreakdown({ days, byType }) {
+  const labels = Object.keys(byType || {});
+  if (!labels.length) return null;
+  const dset7 = new Set(days.slice(-7).map((d) => d.date));
+  const dsetp7 = new Set(days.slice(-14, -7).map((d) => d.date));
+  const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
+  let rows = labels.map((label) => {
+    const c7 = sumSet(byType[label], dset7), cp = sumSet(byType[label], dsetp7);
+    return { label, cost: c7.cost, cv: c7.cv, cpa: c7.cpa, cpc: c7.cpc, costD: pct(c7.cost, cp.cost), cpaD: pct(c7.cpa, cp.cpa) };
+  }).sort((a, b) => b.cost - a.cost);
+  const tot = sumSet(days, dset7), totp = sumSet(days, dsetp7);
+  rows.push({ label: "合計", cost: tot.cost, cv: tot.cv, cpa: tot.cpa, cpc: tot.cpc, costD: pct(tot.cost, totp.cost), cpaD: pct(tot.cpa, totp.cpa), total: true });
+  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>手法別（直近7日／前7日比）</div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 380 }}>
+          <thead><tr>
+            <th style={{ ...head, textAlign: "left" }}>手法</th>
+            <th style={head}>費用</th><th style={head}>費用比</th><th style={head}>CV</th><th style={head}>CPA</th><th style={head}>CPA比</th><th style={head}>CPC</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label} style={{ borderBottom: "1px solid #f6f8f7", background: r.total ? "#f8faf9" : "transparent" }}>
+                <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 700 }}>{r.label}</td>
+                <td style={{ ...cell, color: "#0f2a1f", fontWeight: r.total ? 700 : 600 }}>{yen(r.cost)}</td>
+                <td style={cell}><DeltaTag v={r.costD} dir={0} /></td>
+                <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
+                <td style={{ ...cell, color: "#0f2a1f" }}>{r.cpa ? yen(r.cpa) : "—"}</td>
+                <td style={cell}><DeltaTag v={r.cpaD} dir={-1} /></td>
+                <td style={{ ...cell, color: "#475569" }}>{yen(r.cpc)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ② 期間比較（7/14/28日）＋手法別＋日次推移グラフ。運用者が「本物の悪化か」を判断し急変を目視できる。
+function TrendReport({ days, byType, bench }) {
   const d7 = sumDays(days, 7, 0), p7 = sumDays(days, 7, 7), d14 = sumDays(days, 14, 0), d28 = sumDays(days, 28, 0);
   const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
   const cols = [
@@ -1154,7 +1238,8 @@ function TrendReport({ days, bench }) {
           </tbody>
         </table>
       </div>
-      <DailyChart days={days.slice(-30)} target={bench && bench.targetCpa} />
+      <MethodBreakdown days={days} byType={byType} />
+      <div style={{ marginTop: 14 }}><DailyChart days={days.slice(-30)} target={bench && bench.targetCpa} /></div>
     </div>
   );
 }

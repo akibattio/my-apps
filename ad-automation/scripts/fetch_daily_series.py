@@ -41,17 +41,48 @@ def google_service():
     return _GA["svc"]
 
 
+# Google 広告の配信手法(advertising_channel_type)→ 表示用ラベル
+CH_LABEL = {
+    "SEARCH": "検索", "PERFORMANCE_MAX": "PMax", "DISPLAY": "ディスプレイ",
+    "VIDEO": "動画", "SHOPPING": "ショッピング", "DEMAND_GEN": "デマンドジェン",
+    "DISCOVERY": "デマンドジェン", "LOCAL": "ローカル", "LOCAL_SERVICES": "ローカルサービス",
+    "SMART": "スマート", "MULTI_CHANNEL": "その他", "HOTEL": "ホテル", "TRAVEL": "旅行",
+    "UNKNOWN": "不明", "UNSPECIFIED": "不明",
+}
+
+
+def _acc(bucket, date, imp, clk, cost, cv):
+    e = bucket.setdefault(date, {"imp": 0, "clk": 0, "cost": 0, "cv": 0.0})
+    e["imp"] += imp; e["clk"] += clk; e["cost"] += cost; e["cv"] += cv
+
+
+def _to_list(bucket):
+    return [{"date": d, "imp": v["imp"], "clk": v["clk"], "cost": round(v["cost"]),
+             "cv": round(v["cv"], 1)} for d, v in sorted(bucket.items())]
+
+
 def google_daily(cid, start, end):
+    """合計の日次時系列と、手法別(検索/PMax等)の日次時系列を返す。"""
     ga = google_service()
-    rows = []
+    total = {}          # date -> agg
+    by_type = {}        # label -> {date -> agg}
     for r in ga.search(customer_id=re.sub(r"\D", "", cid), query=f"""
-        SELECT segments.date, metrics.impressions, metrics.clicks, metrics.cost_micros,
-               metrics.conversions FROM customer
-        WHERE segments.date BETWEEN '{start}' AND '{end}' ORDER BY segments.date"""):
+        SELECT segments.date, campaign.advertising_channel_type,
+               metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
+        FROM campaign
+        WHERE segments.date BETWEEN '{start}' AND '{end}'"""):
         m = r.metrics
-        rows.append({"date": r.segments.date, "imp": int(m.impressions or 0), "clk": int(m.clicks or 0),
-                     "cost": round((m.cost_micros or 0) / 1e6), "cv": round(m.conversions or 0, 1)})
-    return rows
+        try:
+            ct = r.campaign.advertising_channel_type.name
+        except Exception:
+            ct = str(r.campaign.advertising_channel_type)
+        label = CH_LABEL.get(ct, ct)
+        imp, clk = int(m.impressions or 0), int(m.clicks or 0)
+        cost = (m.cost_micros or 0) / 1e6
+        cv = float(m.conversions or 0)
+        _acc(total, r.segments.date, imp, clk, cost, cv)
+        _acc(by_type.setdefault(label, {}), r.segments.date, imp, clk, cost, cv)
+    return _to_list(total), {lab: _to_list(v) for lab, v in by_type.items()}
 
 
 def sum_action(actions, types):
@@ -93,9 +124,10 @@ def main():
     out = []
     for a in accounts:
         media, acct, client = a.get("media"), a.get("acct"), a.get("client")
+        by_type = {}
         try:
             if media == "google":
-                series = google_daily(acct, start, end)
+                series, by_type = google_daily(acct, start, end)
             elif media == "meta":
                 series = meta_daily(acct, tok, start, end) if tok else {"__error__": "no meta token"}
             else:
@@ -104,9 +136,9 @@ def main():
             series = {"__error__": str(e)[:80]}
         if isinstance(series, dict) and "__error__" in series:
             print(f"  取得失敗 {client}({media}): {series['__error__']}")
-            out.append({"client": client, "media": media, "acct": acct, "days": [], "error": series["__error__"]})
+            out.append({"client": client, "media": media, "acct": acct, "days": [], "byType": {}, "error": series["__error__"]})
             continue
-        out.append({"client": client, "media": media, "acct": acct, "days": series})
+        out.append({"client": client, "media": media, "acct": acct, "days": series, "byType": by_type})
 
     (PROJ / "data").mkdir(exist_ok=True)
     payload = {"generated": today.isoformat(), "range": f"{start}〜{end}", "accounts": out}
