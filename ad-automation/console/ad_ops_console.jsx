@@ -1272,7 +1272,7 @@ function TrendReport({ days, byType, bench }) {
         <TrendingUp size={14} color="#047857" /> 期間比較・推移（日次データより）
       </div>
       <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 8 }}>各期間は<b>同じ長さの直前期間</b>と比較（7日比=前7日／14日比=前14日／28日比=前28日）。緑＝改善／赤＝悪化。データ不足の期間は「—」。</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(430px,1fr))", gap: 18 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>全体（期間比較）</div>
           <div style={{ overflowX: "auto" }}>
