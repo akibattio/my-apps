@@ -283,10 +283,6 @@ export default function AdOpsConsole() {
               );
             })()}
 
-            {/* 運用アカウント一覧（全体が見える・健全性の低い順・クリックで社別詳細） */}
-            <SectionTitle icon={<Users size={16} color="#047857" />} title={`運用アカウント（${clients.length}社）`} note="健全性の低い順。クリックで社別の詳細（接続・成果・基準・アラート）へ。" />
-            <PortfolioGrid clients={clients} onOpen={goClient} />
-
             {/* 承認キュー（全幅）— 提案を確認して適用。適用は承認分のみ。 */}
             <div style={{ marginTop: 22 }}>
               <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ（書き込みは承認後のみ）。" />
@@ -345,13 +341,17 @@ export default function AdOpsConsole() {
         {view === "client" && !openClient && (
           <>
             <SectionTitle icon={<Users size={16} color="#047857" />} title="クライアント別" note="社をクリックすると、その社の接続・費用・成果・承認待ちがまとまって見えます。" />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
               {[...clients].sort((x, y) => worstHealth(y.accts) - worstHealth(x.accts)).map((cl) => {
                 const a = agg(cl.accts);
                 const cAlerts = alertsOf(cl.accts);
                 const wh = worstHealth(cl.accts);
                 const hk = wh === 2 ? "critical" : wh === 1 ? "warning" : "good";
                 const hlabel = hk === "good" ? "良好" : hk === "warning" ? "注意" : "要対応";
+                // 前月（先月）実績＝各アカウントの metrics.lm を合算して前月比を出す
+                const lm = cl.accts.reduce((s, c) => { const m = (c.metrics && c.metrics.lm) || {}; return { spend: s.spend + (m.spend || 0), cv: s.cv + (m.cv || 0) }; }, { spend: 0, cv: 0 });
+                const lmCpa = lm.cv ? Math.round(lm.spend / lm.cv) : null;
+                const pct = (x, y) => (x == null || y == null || y === 0 ? null : Math.round((x / y - 1) * 100));
                 return (
                   <button key={cl.client} onClick={() => setOpenClient(cl.client)} style={{ textAlign: "left", cursor: "pointer",
                     background: "#fff", border: "1px solid #e6ebe8", borderLeft: `3px solid ${HC[hk]}`, borderRadius: 12, padding: 15 }}>
@@ -360,14 +360,14 @@ export default function AdOpsConsole() {
                       <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: HC[hk] }}>
                         <Circle size={8} fill={HC[hk]} color={HC[hk]} />{hlabel}</span>
                     </div>
-                    <div style={{ fontSize: 11.5, color: "#64748b", margin: "3px 0 10px" }}>月額規模 {man(cl.monthly)}/月</div>
-                    <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
-                      {cl.accts.map((x) => <MediaPill key={x.id} m={x.media} />)}
+                    <div style={{ fontSize: 11.5, color: "#64748b", margin: "3px 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>月額規模 {man(cl.monthly)}/月</span>
+                      <span style={{ display: "flex", gap: 4 }}>{cl.accts.map((x) => <MediaPill key={x.id} m={x.media} />)}</span>
                     </div>
-                    <div style={{ display: "flex", gap: 14, fontSize: 12, marginBottom: cAlerts.length ? 10 : 0 }}>
-                      <MiniStat label="消化" value={yen(a.spend)} />
-                      <MiniStat label="CPA" value={a.cpa ? yen(a.cpa) : "—"} bad={hk !== "good"} />
-                      <MiniStat label="CV" value={a.cv + "件"} />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12, marginBottom: cAlerts.length ? 10 : 0 }}>
+                      <StatCell label="消化" value={yen(a.spend)} d={pct(a.spend, lm.spend)} dir={0} />
+                      <StatCell label="CPA" value={a.cpa ? yen(a.cpa) : "—"} d={pct(a.cpa, lmCpa)} dir={-1} bad={hk !== "good"} />
+                      <StatCell label="CV" value={a.cv + "件"} d={pct(a.cv, lm.cv)} dir={1} />
                     </div>
                     {cAlerts.length > 0 && (
                       <div style={{ display: "flex", flexDirection: "column", gap: 5, borderTop: "1px solid #f1f5f4", paddingTop: 8 }}>
@@ -712,6 +712,16 @@ function LargePill() {
 }
 function MiniStat({ label, value, bad }) {
   return <div><div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0f2a1f" }}>{value}</div></div>;
+}
+// 値＋前月比つきのセル（クライアント別カード用・列が揃うようgridで使う）
+function StatCell({ label, value, d, dir, bad }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0f2a1f" }}>{value}</div>
+      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 1 }}>前月 <DeltaTag v={d} dir={dir} /></div>
+    </div>
+  );
 }
 function Empty({ text }) { return <div style={{ background: "#fff", border: "1px dashed #d7e0db", borderRadius: 10, padding: "18px 14px", fontSize: 12.5, color: "#94a3b8", textAlign: "center" }}>{text}</div>; }
 
