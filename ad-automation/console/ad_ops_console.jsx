@@ -674,11 +674,11 @@ function TodayActions({ items, onClient, generatedAt }) {
           {generatedAt && <span style={{ color: "#94a3b8", fontWeight: 400 }}>監視 {generatedAt}</span>}
         </div>
       </div>
-      <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
         {items.map((a, i) => {
           const s = SEV[a.severity] || SEV.warning;
           return (
-            <div key={i} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 4px", borderTop: i ? "1px solid #f4f6f5" : "none", cursor: onClient ? "pointer" : "default" }}>
+            <div key={i} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", border: "1px solid #eef1f0", borderLeft: `3px solid ${s.dot}`, borderRadius: 8, background: "#fcfdfc", cursor: onClient ? "pointer" : "default" }}>
               <span style={{ flexShrink: 0, marginTop: 1, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText, minWidth: 44, textAlign: "center" }}>{s.label}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1f" }}>
