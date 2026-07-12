@@ -110,7 +110,7 @@ def meta_daily(acc, tok, start, end):
 
 
 def main():
-    days = int(sys.argv[1]) if len(sys.argv) > 1 else 35
+    days = int(sys.argv[1]) if len(sys.argv) > 1 else 56  # 28日 vs 前28日 の比較に56日必要
     load_env()
     dpath = PROJ / "console" / "data.json"
     if not dpath.exists():

@@ -415,8 +415,8 @@ export default function AdOpsConsole() {
                 <Card><MiniStat label="接続" value={cl.accts.every((x) => x.status === "ok") ? "正常" : "要確認"} bad={!cl.accts.every((x) => x.status === "ok")} /></Card>
               </div>
 
-              <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体別" note="この社の各アカウントの接続と成果。" />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 12, marginBottom: 22 }}>
+              <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体別" note="この社の各アカウントの接続と成果。手法別（検索/PMax等）・週次も表示。" />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
                 {cl.accts.map((c) => {
                   const s = CONN[c.status]; const h = healthOf(c);
                   const tok = c.tokenDays >= 999 ? "無期限" : c.tokenDays === 0 ? "失効" : `残 ${c.tokenDays}日`;
@@ -1034,6 +1034,54 @@ function aggList(list) {
   return t;
 }
 
+// 目標CPAに対する色（緑=目標内／橙=+20%超／赤=+50%超）
+function cpaColor(cpa, target, bench) {
+  if (!target || cpa == null) return "#475569";
+  const over = cpa / target - 1;
+  const sev = bench && bench.cpaSeverePct != null ? bench.cpaSeverePct : 0.5;
+  const warn = bench && bench.cpaWarnPct != null ? bench.cpaWarnPct : 0.2;
+  return over >= sev ? "#dc2626" : over >= warn ? "#d97706" : "#047857";
+}
+
+// 週次分解（当月の第1週〜）。社別詳細・月次の両方で使う。
+function WeeklyBreakdown({ days, target, bench }) {
+  const months = [...new Set(days.map((d) => d.date.slice(0, 7)))].sort();
+  const curM = months[months.length - 1];
+  const curDays = days.filter((d) => d.date.slice(0, 7) === curM);
+  const weeks = {};
+  curDays.forEach((d) => { const w = Math.ceil(parseInt(d.date.slice(8, 10), 10) / 7); (weeks[w] = weeks[w] || []).push(d); });
+  const rows = Object.keys(weeks).map((w) => { const ds = weeks[w]; return { w: +w, from: ds[0].date.slice(5), to: ds[ds.length - 1].date.slice(5), ...aggList(ds) }; }).sort((a, b) => a.w - b.w);
+  if (!rows.length) return null;
+  const maxW = Math.max(1, ...rows.map((r) => r.cost));
+  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  return (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>週次分解（当月 {+curM.slice(5, 7)}月）</div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 300 }}>
+          <thead><tr>
+            <th style={{ ...head, textAlign: "left" }}>週</th><th style={{ ...head, textAlign: "left" }}>期間</th>
+            <th style={head}>費用</th><th style={head}>CV</th><th style={head}>CPA</th><th style={{ ...head, textAlign: "left", width: "24%" }}>推移</th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.w} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                <td style={{ ...cell, textAlign: "left", fontWeight: 700, color: "#0f2a1f" }}>第{r.w}週</td>
+                <td style={{ ...cell, textAlign: "left", color: "#94a3b8" }}>{r.from}〜{r.to}</td>
+                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{yen(r.cost)}</td>
+                <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
+                <td style={{ ...cell, color: cpaColor(r.cpa, target, bench), fontWeight: 600 }}>{r.cpa ? yen(r.cpa) : "—"}</td>
+                <td style={{ padding: "6px 8px" }}><div style={{ height: 8, background: "#eef1f4", borderRadius: 999, overflow: "hidden" }}><div style={{ width: (r.cost / maxW) * 100 + "%", height: "100%", background: "#9ec7b4" }} /></div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ③ 月次：当月を週別（第1週〜）に分解＋前月比＋目標CPA照合＋手法別。月初レポート・振り返り用。
 function MonthlyReport({ c, days, byType }) {
   const months = [...new Set(days.map((d) => d.date.slice(0, 7)))].sort();
@@ -1198,16 +1246,23 @@ function MethodBreakdown({ days, byType }) {
 
 // ② 期間比較（7/14/28日）＋手法別＋日次推移グラフ。運用者が「本物の悪化か」を判断し急変を目視できる。
 function TrendReport({ days, byType, bench }) {
-  const d7 = sumDays(days, 7, 0), p7 = sumDays(days, 7, 7), d14 = sumDays(days, 14, 0), d28 = sumDays(days, 28, 0);
+  const d7 = sumDays(days, 7, 0), p7 = sumDays(days, 7, 7);
+  const d14 = sumDays(days, 14, 0), p14 = sumDays(days, 14, 14);
+  const d28 = sumDays(days, 28, 0), p28 = sumDays(days, 28, 28);
+  const enough14 = days.length >= 28, enough28 = days.length >= 56;
   const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
-  const cols = [
-    { k: "費用", d7: yen(d7.cost), p7: yen(p7.cost), d14: yen(d14.cost), d28: yen(d28.cost), delta: pct(d7.cost, p7.cost), dir: 0 },
-    { k: "表示回数", d7: num(d7.imp), p7: num(p7.imp), d14: num(d14.imp), d28: num(d28.imp), delta: pct(d7.imp, p7.imp), dir: 1 },
-    { k: "クリック", d7: num(d7.clk), p7: num(p7.clk), d14: num(d14.clk), d28: num(d28.clk), delta: pct(d7.clk, p7.clk), dir: 1 },
-    { k: "CTR", d7: (d7.ctr ?? "—") + "%", p7: (p7.ctr ?? "—") + "%", d14: (d14.ctr ?? "—") + "%", d28: (d28.ctr ?? "—") + "%", delta: pct(d7.ctr, p7.ctr), dir: 1 },
-    { k: "CPC", d7: yen(d7.cpc), p7: yen(p7.cpc), d14: yen(d14.cpc), d28: yen(d28.cpc), delta: pct(d7.cpc, p7.cpc), dir: -1 },
-    { k: "CV", d7: Math.round(d7.cv) + "件", p7: Math.round(p7.cv) + "件", d14: Math.round(d14.cv) + "件", d28: Math.round(d28.cv) + "件", delta: pct(d7.cv, p7.cv), dir: 1 },
-    { k: "CPA", d7: d7.cpa ? yen(d7.cpa) : "—", p7: p7.cpa ? yen(p7.cpa) : "—", d14: d14.cpa ? yen(d14.cpa) : "—", d28: d28.cpa ? yen(d28.cpa) : "—", delta: pct(d7.cpa, p7.cpa), dir: -1 },
+  const cvfmt = (v) => Math.round(v) + "件";
+  const ctrfmt = (v) => (v == null ? "—" : v + "%");
+  const cpafmt = (v) => (v ? yen(v) : "—");
+  // 指標定義：値の取り出し(get)・表示(fmt)・良し悪し方向(dir)
+  const metrics = [
+    { k: "費用", get: (o) => o.cost, fmt: yen, dir: 0 },
+    { k: "表示回数", get: (o) => o.imp, fmt: num, dir: 1 },
+    { k: "クリック", get: (o) => o.clk, fmt: num, dir: 1 },
+    { k: "CTR", get: (o) => o.ctr, fmt: ctrfmt, dir: 1 },
+    { k: "CPC", get: (o) => o.cpc, fmt: yen, dir: -1 },
+    { k: "CV", get: (o) => o.cv, fmt: cvfmt, dir: 1 },
+    { k: "CPA", get: (o) => o.cpa, fmt: cpafmt, dir: -1 },
   ];
   const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
@@ -1216,30 +1271,42 @@ function TrendReport({ days, byType, bench }) {
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 2 }}>
         <TrendingUp size={14} color="#047857" /> 期間比較・推移（日次データより）
       </div>
-      <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 8 }}>「7日→前7日」は<b>同じ長さ（7日 vs その前の7日）</b>で比較。緑＝改善／赤＝悪化。14日・28日は傾向確認用。</div>
-      <div style={{ overflowX: "auto", marginBottom: 12 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 340 }}>
-          <thead><tr>
-            <th style={{ ...head, textAlign: "left" }}>指標</th>
-            <th style={head}>直近7日</th><th style={head}>前7日</th><th style={head}>7日→前7日</th>
-            <th style={head}>直近14日</th><th style={head}>直近28日</th>
-          </tr></thead>
-          <tbody>
-            {cols.map((r) => (
-              <tr key={r.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{r.k}</td>
-                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{r.d7}</td>
-                <td style={{ ...cell, color: "#64748b" }}>{r.p7}</td>
-                <td style={cell}><DeltaTag v={r.delta} dir={r.dir} /></td>
-                <td style={{ ...cell, color: "#64748b" }}>{r.d14}</td>
-                <td style={{ ...cell, color: "#64748b" }}>{r.d28}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 8 }}>各期間は<b>同じ長さの直前期間</b>と比較（7日比=前7日／14日比=前14日／28日比=前28日）。緑＝改善／赤＝悪化。データ不足の期間は「—」。</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(430px,1fr))", gap: 18 }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>全体（期間比較）</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
+              <thead><tr>
+                <th style={{ ...head, textAlign: "left" }}>指標</th>
+                <th style={head}>直近7日</th><th style={head}>前7日</th><th style={head}>7日比</th>
+                <th style={head}>直近14日</th><th style={head}>14日比</th>
+                <th style={head}>直近28日</th><th style={head}>28日比</th>
+              </tr></thead>
+              <tbody>
+                {metrics.map((m) => (
+                  <tr key={m.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                    <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{m.k}</td>
+                    <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{m.fmt(m.get(d7))}</td>
+                    <td style={{ ...cell, color: "#64748b" }}>{m.fmt(m.get(p7))}</td>
+                    <td style={cell}><DeltaTag v={pct(m.get(d7), m.get(p7))} dir={m.dir} /></td>
+                    <td style={{ ...cell, color: "#64748b" }}>{m.fmt(m.get(d14))}</td>
+                    <td style={cell}>{enough14 ? <DeltaTag v={pct(m.get(d14), m.get(p14))} dir={m.dir} /> : <span style={{ color: "#cbd5e1" }}>—</span>}</td>
+                    <td style={{ ...cell, color: "#64748b" }}>{m.fmt(m.get(d28))}</td>
+                    <td style={cell}>{enough28 ? <DeltaTag v={pct(m.get(d28), m.get(p28))} dir={m.dir} /> : <span style={{ color: "#cbd5e1" }}>—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <MethodBreakdown days={days} byType={byType} />
+        <WeeklyBreakdown days={days} target={bench && bench.targetCpa} bench={bench} />
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>日次推移（直近30日）</div>
+          <DailyChart days={days.slice(-30)} target={bench && bench.targetCpa} />
+        </div>
       </div>
-      <MethodBreakdown days={days} byType={byType} />
-      <div style={{ marginTop: 14 }}><DailyChart days={days.slice(-30)} target={bench && bench.targetCpa} /></div>
     </div>
   );
 }
