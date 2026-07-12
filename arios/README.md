@@ -60,8 +60,8 @@ Vehicle is permanent. Owner changes. History grows. Trust accumulates.
 - [x] 地固め: 書類アップロード（2026-07-05）: `/garage/[id]/add-document` で車検証等を**非公開**バケット
   `vehicle-documents` に保管。documents追加でパスポートのTrustがLEVEL_2「書類で確認」に上がる（動作確認済み）。
   公開ページには「書類あり」の事実だけ反映し、中身は非公開。
-  - migration 0003（documents RLS）は作成済み。**未適用**（DB直結が現在IPv6で不通のため）。
-    適用するとガレージの「現在N件」表示が有効化される。パスポート側はadmin経由なので適用前でも正しく動く。
+  - migration 0003（documents RLS）は**適用済み**（2026-07-12、SQL Editorで適用・台帳に記録）。
+    ガレージの「現在N件」表示が有効。※DB直結がIPv6不通のため `npm run migrate` は使わずSQL Editorで適用した。
 - [ ] Phase 2: 公開登録（Top / Register / Photo Upload / AI / Timeline / Thank You）
 
 ### 開発コマンド

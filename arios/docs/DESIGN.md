@@ -176,7 +176,7 @@ canon対応: Phase 4（の最小版）
   - LEVEL_0(自己申告)〜LEVEL_3(車台番号確認)を扱う。Partner/Manufacturer確認(LEVEL5-6)は後Phase。
   - 書類アップロードUI（LEVEL_2到達手段）は実装済み（2026-07-05・地固め）:
     `/garage/[id]/add-document` → 非公開バケット `vehicle-documents` に保管、documents追加でTrust上昇。
-    migration 0003（documents RLS）は作成済み・未適用（DB直結がIPv6で不通のため）。
+    migration 0003（documents RLS）は適用済み（2026-07-12・SQL Editorで適用）。
   - 残り（後回し）: trust_scores への永続化スナップショット、garage詳細へのTrust表示、書類の署名URL閲覧。
 canon対応: Phase 5 + Passport
 
@@ -213,8 +213,9 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 
 次の一手: V1公開に向けた地固めの続き
 - ✅ 書類アップロードUI（Trust LEVEL_2到達）— 2026-07-05 完了
-- 直近の要対応: migration 0003 の適用（DB直結がIPv6で不通。Session poolerのIPv4接続文字列を
-  SUPABASE_DB_URL に設定し直すか、SQL Editorで適用）。
+- ✅ migration 0003 適用（documents RLS）— 2026-07-12 SQL Editorで適用
+- 本番デプロイ: Netlifyでアカウント全体がデプロイ403（ビルド枠/請求/保留の可能性）。要アカウント確認、
+  または別ホスト。※DB直結はIPv6不通のまま → 今後のマイグレーションはSUPABASE_DB_URLをSession pooler(IPv4)へ。
 - 地固めの宿題: メール送信（本番SMTP）/ ログイン後の登録動線を /garage 起点に統一 /
   owner なし車両の「あとから紐付け(claim)」/ trust_scores永続化 / メーターOCR / AIコスト監視 / 本番デプロイ。
 - Step 5以降（後で）: Marketplace / Dream Garage / Partner / Notification / Global。
