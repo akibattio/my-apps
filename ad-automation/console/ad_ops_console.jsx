@@ -982,29 +982,33 @@ function AccountReport({ c, days }) {
       </div>
       {/* 基準チェック（運用サポート） */}
       {c.bench && <BenchmarkChecks c={c} />}
-      {/* 指標テーブル（直近7日 / 先月 / 先月比） */}
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 300 }}>
-          <thead><tr>
-            <th style={{ ...head, textAlign: "left" }}>指標</th>
-            <th style={head}>直近7日</th>
-            <th style={head}>先月</th>
-            <th style={head}>先月比</th>
-          </tr></thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{r.k}</td>
-                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{r.a}</td>
-                <td style={{ ...cell, color: "#64748b" }}>{r.b}</td>
-                <td style={cell}><DeltaTag v={r.d} dir={r.dir} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6 }}>※「先月比」は<b>1日あたり</b>で比較（費用/表示/クリック/CVは 直近7日÷7 vs 先月÷{lmDays}日、CTR/CPC/CPAは率のため直接）。緑＝改善／赤＝悪化。目標CPA未設定のため対目標比は非表示。</div>
-      {/* ② 週次：期間比較（7/14/28日）＋日次推移グラフ（Googleのみ日次あり） */}
+      {/* 指標テーブル（直近7日 / 先月 / 先月比）— 日次データが無いアカウント(Meta)のみ表示 */}
+      {(!days || days.length < 7) && (
+        <>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 300 }}>
+              <thead><tr>
+                <th style={{ ...head, textAlign: "left" }}>指標</th>
+                <th style={head}>直近7日</th>
+                <th style={head}>先月</th>
+                <th style={head}>先月比</th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                    <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{r.k}</td>
+                    <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{r.a}</td>
+                    <td style={{ ...cell, color: "#64748b" }}>{r.b}</td>
+                    <td style={cell}><DeltaTag v={r.d} dir={r.dir} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6 }}>※日次データが無いため<b>先月</b>と比較（<b>1日あたり</b>換算：費用/表示/クリック/CVは 直近7日÷7 vs 先月÷{lmDays}日、CTR/CPC/CPAは率のため直接）。緑＝改善／赤＝悪化。</div>
+        </>
+      )}
+      {/* ② 週次：直近7日 vs 前7日（同じ長さ）＋14/28日＋日次推移グラフ（Googleのみ日次あり） */}
       {days && days.length >= 7 && <TrendReport days={days} bench={c.bench} />}
     </div>
   );
@@ -1114,17 +1118,21 @@ function TrendReport({ days, bench }) {
   const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
   const cols = [
     { k: "費用", d7: yen(d7.cost), p7: yen(p7.cost), d14: yen(d14.cost), d28: yen(d28.cost), delta: pct(d7.cost, p7.cost), dir: 0 },
+    { k: "表示回数", d7: num(d7.imp), p7: num(p7.imp), d14: num(d14.imp), d28: num(d28.imp), delta: pct(d7.imp, p7.imp), dir: 1 },
+    { k: "クリック", d7: num(d7.clk), p7: num(p7.clk), d14: num(d14.clk), d28: num(d28.clk), delta: pct(d7.clk, p7.clk), dir: 1 },
+    { k: "CTR", d7: (d7.ctr ?? "—") + "%", p7: (p7.ctr ?? "—") + "%", d14: (d14.ctr ?? "—") + "%", d28: (d28.ctr ?? "—") + "%", delta: pct(d7.ctr, p7.ctr), dir: 1 },
+    { k: "CPC", d7: yen(d7.cpc), p7: yen(p7.cpc), d14: yen(d14.cpc), d28: yen(d28.cpc), delta: pct(d7.cpc, p7.cpc), dir: -1 },
     { k: "CV", d7: Math.round(d7.cv) + "件", p7: Math.round(p7.cv) + "件", d14: Math.round(d14.cv) + "件", d28: Math.round(d28.cv) + "件", delta: pct(d7.cv, p7.cv), dir: 1 },
     { k: "CPA", d7: d7.cpa ? yen(d7.cpa) : "—", p7: p7.cpa ? yen(p7.cpa) : "—", d14: d14.cpa ? yen(d14.cpa) : "—", d28: d28.cpa ? yen(d28.cpa) : "—", delta: pct(d7.cpa, p7.cpa), dir: -1 },
-    { k: "CPC", d7: yen(d7.cpc), p7: yen(p7.cpc), d14: yen(d14.cpc), d28: yen(d28.cpc), delta: pct(d7.cpc, p7.cpc), dir: -1 },
   ];
   const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 2 }}>
         <TrendingUp size={14} color="#047857" /> 期間比較・推移（日次データより）
       </div>
+      <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 8 }}>「7日→前7日」は<b>同じ長さ（7日 vs その前の7日）</b>で比較。緑＝改善／赤＝悪化。14日・28日は傾向確認用。</div>
       <div style={{ overflowX: "auto", marginBottom: 12 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 340 }}>
           <thead><tr>
