@@ -15,6 +15,8 @@ mkdir -p logs
   # 取得直後に監視チェック（読み取りのみ・外部送信なし＝ログとconsole/data.jsonのalertsへ反映）
   # 通知(--send)は通知先(.env NOTIFY_CHANNEL)を設定してから有効化する
   /usr/bin/python3 scripts/monitor.py
+  # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
+  cp data/daily.json console/daily.json 2>/dev/null || true
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh done (exit $?) ==="
   echo ""
 } >> logs/refresh.log 2>&1

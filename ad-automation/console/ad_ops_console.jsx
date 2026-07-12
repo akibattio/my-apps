@@ -110,6 +110,7 @@ export default function AdOpsConsole() {
     }
   };
 
+  const [daily, setDaily] = useState(null);
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -121,7 +122,17 @@ export default function AdOpsConsole() {
         }
       })
       .catch(() => {});
+    fetch("./daily.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && Array.isArray(j.accounts)) setDaily(j); })
+      .catch(() => {});
   }, []);
+  // 日次時系列を client|media で引けるマップに（Googleのみ・Metaは空配列）
+  const dailyMap = useMemo(() => {
+    const m = {};
+    if (daily && daily.accounts) daily.accounts.forEach((a) => { m[`${a.client}|${a.media}`] = a.days || []; });
+    return m;
+  }, [daily]);
 
   // 手入力の目標(localStorage)を各アカウントに反映：target/monthly/bench.targetCpa を上書き
   const A = useMemo(() => DATA.map((c) => {
@@ -162,6 +173,29 @@ export default function AdOpsConsole() {
     return null;
   }).filter(Boolean);
 
+  // ① 今日の要対応：monitor.py が出したサーバー側アラート（急変検知・対応先つき）を最優先で表示。
+  //   接続/トークンの問題（サーバー未検知）はクライアント側で補い、重要度順に並べる。
+  const SEVRANK = { critical: 0, warning: 1, info: 2 };
+  const serverAlerts = useMemo(() => {
+    const hasServer = dataInfo && Array.isArray(dataInfo.alerts);
+    let items;
+    if (hasServer) {
+      items = dataInfo.alerts.map((a) => ({
+        client: a.client, media: a.media, kind: a.kind || "",
+        fact: a.fact || a.msg || "", severity: a.severity || "warning", action: a.approve || null,
+      }));
+      A.forEach((c) => {
+        if (c.status === "error") items.push({ client: c.client, media: c.media, kind: "接続エラー", fact: `トークン失効（最終同期 ${c.sync}）`, severity: "critical", action: "接続担当へ即連絡" });
+        else if (c.status === "warn") items.push({ client: c.client, media: c.media, kind: "トークン期限接近", fact: `残 ${c.tokenDays}日`, severity: "warning", action: "担当（トークン更新）" });
+      });
+    } else {
+      items = alerts.map((a) => ({ client: a.c.client, media: a.c.media, kind: "", fact: a.msg, severity: a.sev, action: null }));
+    }
+    return items
+      .filter((a) => media === "all" || a.media === media)
+      .sort((x, y) => (SEVRANK[x.severity] ?? 3) - (SEVRANK[y.severity] ?? 3));
+  }, [dataInfo, A, media, alerts]);
+
   const NavBtn = ({ id, icon, label, badge }) => (
     <button onClick={() => { setView(id); if (id !== "client") setOpenClient(null); }} style={{
       display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 8, border: "none",
@@ -195,8 +229,9 @@ export default function AdOpsConsole() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
-          <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={alerts.length} />
+          <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={serverAlerts.length} />
           <NavBtn id="client" icon={<Users size={15} />} label="クライアント別" />
+          <NavBtn id="monthly" icon={<Clock size={15} />} label="月次（週次分解）" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧" />
           <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
@@ -213,13 +248,16 @@ export default function AdOpsConsole() {
         {/* ===== ダッシュボード（全運用アカウント一望） ===== */}
         {view === "dash" && (
           <>
+            {/* ① 今日の要対応（画面トップ固定・最優先）— 運用者はまずここだけ見れば良い */}
+            <TodayActions items={serverAlerts} onClient={goClient} generatedAt={dataInfo && dataInfo.alertsGeneratedAt} />
+
             {/* 上部：全体集計(クリックで詳細ページ)・アラート・健全性 */}
             {(() => {
               const g = rows.filter((c) => healthOf(c) === "good").length;
               const w = rows.filter((c) => healthOf(c) === "warning").length;
               const cr = rows.filter((c) => healthOf(c) === "critical").length;
               const nt = rows.filter((c) => !c.target && (c.spend || 0) > 0).length;
-              const crit = alerts.filter((a) => a.sev === "critical").length;
+              const crit = serverAlerts.filter((a) => a.severity === "critical").length;
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 20 }}>
                   <button onClick={() => setView("summary")} style={{ textAlign: "left", cursor: "pointer", background: "#0f2a1f", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px" }}>
@@ -228,8 +266,8 @@ export default function AdOpsConsole() {
                     <div style={{ fontSize: 11, marginTop: 4, color: "#a7c4b5", display: "flex", alignItems: "center", gap: 3 }}>総広告費・{clients.length}社 ／ 詳細を見る <ChevronRight size={12} /></div>
                   </button>
                   <Card>
-                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>アラート</div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: alerts.length ? "#dc2626" : "#047857" }}>{alerts.length}件</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>今日の要対応</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: serverAlerts.length ? "#dc2626" : "#047857" }}>{serverAlerts.length}件</div>
                     <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8" }}>{crit ? `うち要対応 ${crit}件` : "重大なし"}</div>
                   </Card>
                   <Card>
@@ -249,30 +287,12 @@ export default function AdOpsConsole() {
             <SectionTitle icon={<Users size={16} color="#047857" />} title={`運用アカウント（${clients.length}社）`} note="健全性の低い順。クリックで社別の詳細（接続・成果・基準・アラート）へ。" />
             <PortfolioGrid clients={clients} onOpen={goClient} />
 
-            {/* アラート一覧＋承認キュー */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginTop: 22 }}>
-              <div>
-                <SectionTitle icon={<AlertTriangle size={16} color="#d97706" />} title="アラート" note="しきい値超え・急変。クリックで社別へ。" />
-                {alerts.length === 0 && <Empty text="アラートはありません。" />}
-                <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
-                  {alerts.map((a, i) => (
-                    <div key={i} onClick={() => goClient(a.c.client)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px", borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
-                      <Circle size={9} fill={SEV[a.sev].dot} color={SEV[a.sev].dot} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 12.5 }}>{a.c.client}<MediaPill m={a.c.media} /></div>
-                        <div style={{ fontSize: 11.5, color: "#64748b" }}>{a.msg}</div>
-                      </div>
-                      <ChevronRight size={14} color="#cbd5e1" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ。" />
-                {pending.length === 0 && <Empty text="承認待ちはありません。" />}
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} />)}
-                </div>
+            {/* 承認キュー（全幅）— 提案を確認して適用。適用は承認分のみ。 */}
+            <div style={{ marginTop: 22 }}>
+              <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ（書き込みは承認後のみ）。" />
+              {pending.length === 0 && <Empty text="承認待ちはありません。" />}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 10 }}>
+                {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} />)}
               </div>
             </div>
           </>
@@ -410,7 +430,7 @@ export default function AdOpsConsole() {
                       <div style={{ fontSize: 11.5, color: "#64748b", fontFamily: "monospace", marginBottom: 3 }}>{c.acct}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: tokC, fontWeight: 600, marginBottom: 12 }}>
                         <KeyRound size={12} />トークン {tok} ・ 稼働 {c.cp}本{c.dailyBudget ? ` ・ 日予算 ${yen(c.dailyBudget)}` : ""} ・ 同期 {c.sync}</div>
-                      {c.metrics ? <AccountReport c={c} /> : (
+                      {c.metrics ? <AccountReport c={c} days={dailyMap[`${c.client}|${c.media}`]} /> : (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12 }}>
                         <MiniStat label="消化" value={yen(c.spend)} />
                         <MiniStat label="CPA/目標" value={(c.cpa ? yen(c.cpa) : "—") } bad={c.target && c.cpa > c.target * 1.15} />
@@ -446,6 +466,24 @@ export default function AdOpsConsole() {
             </>
           );
         })()}
+
+        {/* ===== 月次（週次分解）===== */}
+        {view === "monthly" && (
+          <>
+            <SectionTitle icon={<Clock size={16} color="#047857" />} title="月次レポート（週次分解）" note="当月の週別（第1週〜）推移と前月比。クライアント提出・月初レポート用。日次データのあるGoogleアカウントが対象。" />
+            {(() => {
+              const list = A.filter((c) => (dailyMap[`${c.client}|${c.media}`] || []).length >= 7);
+              if (!list.length) return <Empty text="日次データのあるアカウントがありません（Meta は日次未取得）。" />;
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {list.map((c) => (
+                    <MonthlyReport key={c.id} c={c} days={dailyMap[`${c.client}|${c.media}`]} />
+                  ))}
+                </div>
+              );
+            })()}
+          </>
+        )}
 
         {/* ===== 接続ステータス ===== */}
         {view === "conn" && (
@@ -602,6 +640,59 @@ function PortfolioGrid({ clients, onOpen }) {
           </button>
         );
       })}
+    </div>
+  );
+}
+// ① 今日の要対応：運用者がまず見るパネル。重要度順・事実+推奨対応つき・クリックで社別へ。
+function TodayActions({ items, onClient, generatedAt }) {
+  const crit = items.filter((i) => i.severity === "critical").length;
+  const warn = items.filter((i) => i.severity === "warning").length;
+  const info = items.filter((i) => i.severity === "info").length;
+  const accent = crit ? "#dc2626" : warn ? "#d97706" : "#047857";
+  if (!items.length) {
+    return (
+      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderLeft: "4px solid #047857", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+        <ShieldCheck size={20} color="#047857" />
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>本日、要対応はありません</div>
+          <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>全アカウント基準内・急変なし。{generatedAt ? `（監視 ${generatedAt}）` : ""}</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderLeft: `4px solid ${accent}`, borderRadius: 12, padding: "14px 16px 6px", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <AlertTriangle size={18} color={accent} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>今日の要対応 <span style={{ color: accent }}>{items.length}件</span></span>
+        </div>
+        <div style={{ display: "flex", gap: 8, fontSize: 11.5, fontWeight: 700 }}>
+          {crit > 0 && <span style={{ color: "#dc2626" }}>● 要対応 {crit}</span>}
+          {warn > 0 && <span style={{ color: "#d97706" }}>● 注意 {warn}</span>}
+          {info > 0 && <span style={{ color: "#047857" }}>● 提案 {info}</span>}
+          {generatedAt && <span style={{ color: "#94a3b8", fontWeight: 400 }}>監視 {generatedAt}</span>}
+        </div>
+      </div>
+      <div>
+        {items.map((a, i) => {
+          const s = SEV[a.severity] || SEV.warning;
+          return (
+            <div key={i} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 4px", borderTop: i ? "1px solid #f4f6f5" : "none", cursor: onClient ? "pointer" : "default" }}>
+              <span style={{ flexShrink: 0, marginTop: 1, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText, minWidth: 44, textAlign: "center" }}>{s.label}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1f" }}>
+                  {a.client}<MediaPill m={a.media} />
+                  {a.kind && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.chipText, marginLeft: 4 }}>{a.kind}</span>}
+                </div>
+                <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{a.fact}</div>
+                {a.action && <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}><b style={{ color: "#047857" }}>対応 </b>{a.action}</div>}
+              </div>
+              {onClient && <ChevronRight size={15} color="#cbd5e1" style={{ flexShrink: 0, marginTop: 2 }} />}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -849,7 +940,7 @@ function BenchmarkChecks({ c }) {
 }
 
 // クライアント詳細の「レポート状態」：予算消化＋直近7日/先月/先月比
-function AccountReport({ c }) {
+function AccountReport({ c, days }) {
   const d7 = c.metrics.d7, lm = c.metrics.lm;
   const lmDays = c.lmDays || 30;
   // rate=率(直接比較) / 総量は1日あたりに正規化して比較（7日÷7 vs 先月÷lmDays）
@@ -913,6 +1004,198 @@ function AccountReport({ c }) {
         </table>
       </div>
       <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6 }}>※「先月比」は<b>1日あたり</b>で比較（費用/表示/クリック/CVは 直近7日÷7 vs 先月÷{lmDays}日、CTR/CPC/CPAは率のため直接）。緑＝改善／赤＝悪化。目標CPA未設定のため対目標比は非表示。</div>
+      {/* ② 週次：期間比較（7/14/28日）＋日次推移グラフ（Googleのみ日次あり） */}
+      {days && days.length >= 7 && <TrendReport days={days} bench={c.bench} />}
+    </div>
+  );
+}
+
+// 日次配列から直近n日（offset日前まで遡る）を集計
+function sumDays(days, n, offset) {
+  offset = offset || 0;
+  const end = days.length - offset;
+  const slice = days.slice(Math.max(0, end - n), end);
+  const t = slice.reduce((a, d) => ({ imp: a.imp + (d.imp || 0), clk: a.clk + (d.clk || 0), cost: a.cost + (d.cost || 0), cv: a.cv + (d.cv || 0) }), { imp: 0, clk: 0, cost: 0, cv: 0 });
+  t.cpa = t.cv ? Math.round(t.cost / t.cv) : null;
+  t.cpc = t.clk ? Math.round(t.cost / t.clk) : null;
+  t.ctr = t.imp ? +((t.clk / t.imp) * 100).toFixed(2) : null;
+  return t;
+}
+
+// 日次配列の合計（CPA付き）
+function aggList(list) {
+  const t = (list || []).reduce((a, d) => ({ imp: a.imp + (d.imp || 0), clk: a.clk + (d.clk || 0), cost: a.cost + (d.cost || 0), cv: a.cv + (d.cv || 0) }), { imp: 0, clk: 0, cost: 0, cv: 0 });
+  t.cpa = t.cv ? Math.round(t.cost / t.cv) : null;
+  t.cpc = t.clk ? Math.round(t.cost / t.clk) : null;
+  return t;
+}
+
+// ③ 月次：当月を週別（第1週〜）に分解＋前月比＋目標CPA照合。月初レポート・振り返り用。
+function MonthlyReport({ c, days }) {
+  const months = [...new Set(days.map((d) => d.date.slice(0, 7)))].sort();
+  const curM = months[months.length - 1];
+  const prevM = months.length > 1 ? months[months.length - 2] : null;
+  const curDays = days.filter((d) => d.date.slice(0, 7) === curM);
+  const prevDays = prevM ? days.filter((d) => d.date.slice(0, 7) === prevM) : [];
+  const cur = aggList(curDays), prev = aggList(prevDays);
+  const target = c.target || (c.bench && c.bench.targetCpa) || null;
+  const mLabel = (m) => (m ? +m.slice(5, 7) + "月" : "—");
+  const weeks = {};
+  curDays.forEach((d) => { const w = Math.ceil(parseInt(d.date.slice(8, 10), 10) / 7); (weeks[w] = weeks[w] || []).push(d); });
+  const weekRows = Object.keys(weeks).map((w) => {
+    const ds = weeks[w]; const a = aggList(ds);
+    return { w: +w, from: ds[0].date.slice(5), to: ds[ds.length - 1].date.slice(5), ...a };
+  }).sort((a, b) => a.w - b.w);
+  const maxW = Math.max(1, ...weekRows.map((r) => r.cost));
+  const cpaJudge = (cpa) => {
+    if (!target || cpa == null) return "#475569";
+    const over = cpa / target - 1;
+    return over >= (c.bench && c.bench.cpaSeverePct != null ? c.bench.cpaSeverePct : 0.5) ? "#dc2626" : over >= (c.bench && c.bench.cpaWarnPct != null ? c.bench.cpaWarnPct : 0.2) ? "#d97706" : "#047857";
+  };
+  const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
+  const cell = { padding: "6px 10px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11 };
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+        <span style={{ fontWeight: 700, fontSize: 14 }}>{c.client}{c.tier === "large" && <LargePill />}</span>
+        <MediaPill m={c.media} />
+        <span style={{ fontSize: 11.5, color: "#94a3b8", fontFamily: "monospace" }}>{c.acct}</span>
+      </div>
+      {/* 当月サマリー vs 前月 vs 目標 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))", gap: 10, marginBottom: 14 }}>
+        {[
+          { label: `当月(${mLabel(curM)})費用`, v: yen(cur.cost), sub: prevM ? `前月 ${yen(prev.cost)}` : "", d: pct(cur.cost, prev.cost), dir: 0 },
+          { label: "当月CV", v: Math.round(cur.cv) + "件", sub: prevM ? `前月 ${Math.round(prev.cv)}件` : "", d: pct(cur.cv, prev.cv), dir: 1 },
+          { label: "当月CPA", v: cur.cpa ? yen(cur.cpa) : "—", sub: prevM ? `前月 ${prev.cpa ? yen(prev.cpa) : "—"}` : "", d: pct(cur.cpa, prev.cpa), dir: -1, color: cpaJudge(cur.cpa) },
+          { label: "目標CPA", v: target ? yen(target) : "未設定", sub: target && cur.cpa ? `対目標 ${cur.cpa > target ? "+" : ""}${Math.round((cur.cpa / target - 1) * 100)}%` : "" },
+        ].map((k) => (
+          <div key={k.label}>
+            <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{k.label}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: k.color || "#0f2a1f" }}>{k.v}</div>
+            <div style={{ fontSize: 10.5, color: "#94a3b8", display: "flex", gap: 5, alignItems: "center" }}>{k.sub}{k.d != null && <DeltaTag v={k.d} dir={k.dir} />}</div>
+          </div>
+        ))}
+      </div>
+      {/* 週次分解 */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420 }}>
+          <thead><tr>
+            <th style={{ ...head, textAlign: "left" }}>週</th><th style={{ ...head, textAlign: "left" }}>期間</th>
+            <th style={head}>費用</th><th style={head}>CV</th><th style={head}>CPA</th>
+            <th style={{ ...head, textAlign: "left", width: "26%" }}>費用の推移</th>
+          </tr></thead>
+          <tbody>
+            {weekRows.map((r) => (
+              <tr key={r.w} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                <td style={{ ...cell, textAlign: "left", fontWeight: 700, color: "#0f2a1f" }}>第{r.w}週</td>
+                <td style={{ ...cell, textAlign: "left", color: "#94a3b8" }}>{r.from}〜{r.to}</td>
+                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{yen(r.cost)}</td>
+                <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
+                <td style={{ ...cell, color: cpaJudge(r.cpa), fontWeight: 600 }}>{r.cpa ? yen(r.cpa) : "—"}</td>
+                <td style={{ padding: "6px 10px" }}>
+                  <div style={{ height: 8, background: "#eef1f4", borderRadius: 999, overflow: "hidden" }}>
+                    <div style={{ width: (r.cost / maxW) * 100 + "%", height: "100%", background: "#9ec7b4" }} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {target && <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 6 }}>※CPAの色：緑=目標内／橙=+20%超／赤=+50%超（目標 {yen(target)}）。</div>}
+    </div>
+  );
+}
+
+// ② 期間比較（7/14/28日）＋日次推移グラフ。運用者が「本物の悪化か」を判断し急変を目視できる。
+function TrendReport({ days, bench }) {
+  const d7 = sumDays(days, 7, 0), p7 = sumDays(days, 7, 7), d14 = sumDays(days, 14, 0), d28 = sumDays(days, 28, 0);
+  const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
+  const cols = [
+    { k: "費用", d7: yen(d7.cost), p7: yen(p7.cost), d14: yen(d14.cost), d28: yen(d28.cost), delta: pct(d7.cost, p7.cost), dir: 0 },
+    { k: "CV", d7: Math.round(d7.cv) + "件", p7: Math.round(p7.cv) + "件", d14: Math.round(d14.cv) + "件", d28: Math.round(d28.cv) + "件", delta: pct(d7.cv, p7.cv), dir: 1 },
+    { k: "CPA", d7: d7.cpa ? yen(d7.cpa) : "—", p7: p7.cpa ? yen(p7.cpa) : "—", d14: d14.cpa ? yen(d14.cpa) : "—", d28: d28.cpa ? yen(d28.cpa) : "—", delta: pct(d7.cpa, p7.cpa), dir: -1 },
+    { k: "CPC", d7: yen(d7.cpc), p7: yen(p7.cpc), d14: yen(d14.cpc), d28: yen(d28.cpc), delta: pct(d7.cpc, p7.cpc), dir: -1 },
+  ];
+  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  return (
+    <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 8 }}>
+        <TrendingUp size={14} color="#047857" /> 期間比較・推移（日次データより）
+      </div>
+      <div style={{ overflowX: "auto", marginBottom: 12 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 340 }}>
+          <thead><tr>
+            <th style={{ ...head, textAlign: "left" }}>指標</th>
+            <th style={head}>直近7日</th><th style={head}>前7日</th><th style={head}>7日→前7日</th>
+            <th style={head}>直近14日</th><th style={head}>直近28日</th>
+          </tr></thead>
+          <tbody>
+            {cols.map((r) => (
+              <tr key={r.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
+                <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{r.k}</td>
+                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{r.d7}</td>
+                <td style={{ ...cell, color: "#64748b" }}>{r.p7}</td>
+                <td style={cell}><DeltaTag v={r.delta} dir={r.dir} /></td>
+                <td style={{ ...cell, color: "#64748b" }}>{r.d14}</td>
+                <td style={{ ...cell, color: "#64748b" }}>{r.d28}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <DailyChart days={days.slice(-30)} target={bench && bench.targetCpa} />
+    </div>
+  );
+}
+
+// 日次推移グラフ（直近30日）：費用=棒、CV=折れ線。縦軸に数値目盛り。急変を目視。
+function DailyChart({ days, target }) {
+  if (!days || !days.length) return null;
+  const W = 560, H = 150, padL = 44, padR = 40, padT = 12, padB = 22;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const maxCost = Math.max(1, ...days.map((d) => d.cost || 0));
+  const maxCv = Math.max(1, ...days.map((d) => d.cv || 0));
+  const bw = iw / days.length;
+  const x = (i) => padL + i * bw;
+  const yCost = (v) => padT + ih - (v / maxCost) * ih;
+  const yCv = (v) => padT + ih - (v / maxCv) * ih;
+  const niceMax = (m) => { const p = Math.pow(10, Math.floor(Math.log10(m))); return Math.ceil(m / p) * p; };
+  const cMax = niceMax(maxCost), vMax = niceMax(maxCv);
+  const cvPts = days.map((d, i) => `${x(i) + bw / 2},${yCv(d.cv || 0)}`).join(" ");
+  const fmtY = (n) => (n >= 10000 ? (n / 10000) + "万" : n >= 1000 ? (n / 1000) + "k" : "" + n);
+  const lab = (d) => d.date.slice(5); // MM-DD
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 14, fontSize: 11, color: "#64748b", marginBottom: 4 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, background: "#9ec7b4", borderRadius: 2, display: "inline-block" }} />費用</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 12, height: 3, background: "#0f7a52", borderRadius: 2, display: "inline-block" }} />CV</span>
+        <span style={{ color: "#94a3b8" }}>直近{days.length}日</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 420, height: "auto" }}>
+        {/* y軸グリッド（費用・左） */}
+        {[0, 0.5, 1].map((f) => (
+          <g key={f}>
+            <line x1={padL} y1={padT + ih - f * ih} x2={W - padR} y2={padT + ih - f * ih} stroke="#eef1f4" />
+            <text x={padL - 5} y={padT + ih - f * ih + 3} textAnchor="end" fontSize="9" fill="#94a3b8">{fmtY(Math.round(cMax * f))}</text>
+            <text x={W - padR + 4} y={padT + ih - f * ih + 3} textAnchor="start" fontSize="9" fill="#0f7a52">{Math.round(vMax * f)}</text>
+          </g>
+        ))}
+        {/* 費用の棒 */}
+        {days.map((d, i) => (
+          <rect key={i} x={x(i) + 1} y={yCost(d.cost || 0)} width={Math.max(1, bw - 2)} height={padT + ih - yCost(d.cost || 0)} fill="#9ec7b4" rx="1" />
+        ))}
+        {/* CVの折れ線 */}
+        <polyline points={cvPts} fill="none" stroke="#0f7a52" strokeWidth="1.6" />
+        {days.map((d, i) => <circle key={i} cx={x(i) + bw / 2} cy={yCv(d.cv || 0)} r="1.6" fill="#0f7a52" />)}
+        {/* x軸ラベル（両端＋中央） */}
+        {[0, Math.floor(days.length / 2), days.length - 1].map((i) => (
+          <text key={i} x={x(i) + bw / 2} y={H - 6} textAnchor="middle" fontSize="9" fill="#94a3b8">{lab(days[i])}</text>
+        ))}
+      </svg>
+      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>左軸=費用（{fmtY(cMax)}）／右軸=CV（{vMax}）。棒の急な立ち上がり/途切れ・CV折れ線の急降下は要確認。</div>
     </div>
   );
 }

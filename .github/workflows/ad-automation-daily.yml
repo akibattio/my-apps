@@ -8,6 +8,12 @@ on:
   schedule:
     - cron: "30 23 * * *"
   workflow_dispatch: {}
+  # ad-automation の変更を main に push したら自動で再取得＆デプロイ（コンソール改修を即反映）
+  push:
+    branches: [main]
+    paths:
+      - "ad-automation/**"
+      - ".github/workflows/ad-automation-daily.yml"
 
 permissions:
   contents: read
@@ -49,6 +55,8 @@ jobs:
           python3 scripts/fetch_search_diagnostics.py
           # 通知先(NOTIFY_CHANNEL)未設定なら送信されない。有効化時は「monitor.py --send」に変更
           python3 scripts/monitor.py
+          # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
+          cp data/daily.json console/daily.json 2>/dev/null || true
 
       - name: Cloudflare Pages へデプロイ（console/ を配信）
         uses: cloudflare/wrangler-action@v3
