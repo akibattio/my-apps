@@ -5,7 +5,7 @@ import {
   Users, ArrowLeft, Target, Clock,
 } from "lucide-react";
 
-// ===== sample data (ダミー / 実データは Google Ads MCP・Meta Ads コネクタから供給) =====
+// ===== sample data（ダミー / 実データは Google Ads・Meta から供給） =====
 const SAMPLE_DATA = [
   { id: 1, client: "エムライフ物販", tier: "large", monthly: 1800000, media: "google", acct: "742-118-9930", status: "ok", tokenDays: 55, cp: 8, sync: "今朝 09:00", spend: 341000, cpa: 3100, target: 3200, roas: 4.6, cv: 110, ctr: 4.1, is: 74 },
   { id: 2, client: "エムライフ物販", tier: "large", monthly: 1800000, media: "meta", acct: "act_60417", status: "ok", tokenDays: 999, cp: 6, sync: "今朝 09:00", spend: 288000, cpa: 2900, target: 3200, roas: 5.0, cv: 99, ctr: 1.8, is: null },
