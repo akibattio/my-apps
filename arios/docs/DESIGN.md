@@ -216,8 +216,11 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 - ✅ migration 0003 適用（documents RLS）— 2026-07-12 SQL Editorで適用
 - 本番デプロイ: Netlifyでアカウント全体がデプロイ403（ビルド枠/請求/保留の可能性）。要アカウント確認、
   または別ホスト。※DB直結はIPv6不通のまま → 今後のマイグレーションはSUPABASE_DB_URLをSession pooler(IPv4)へ。
-- 地固めの宿題: メール送信（本番SMTP）/ ログイン後の登録動線を /garage 起点に統一 /
-  owner なし車両の「あとから紐付け(claim)」/ trust_scores永続化 / メーターOCR / AIコスト監視 / 本番デプロイ。
+- ✅ マイページ `/account` + 管理者画面 `/admin`（サマリー/車両/オーナー）— 2026-07-12
+  （管理者はメール許可リスト isAdminEmail で判定。トップ/ガレージ/マイページのナビも追加）
+- 地固めの宿題: メール送信（本番SMTP・現状はスマホ実機ログインに必須）/ 本番デプロイ（Netlify 403 要アカウント確認）/
+  修正機能（登録内容の訂正・追記）/ owner なし車両の「あとから紐付け(claim)」/ trust_scores永続化 /
+  管理者機能の拡充（AIレビュー/信頼度/取引）/ メーターOCR / AIコスト監視。
 - Step 5以降（後で）: Marketplace / Dream Garage / Partner / Notification / Global。
 
 進め方の指針:

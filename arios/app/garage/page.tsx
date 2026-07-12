@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { ensureOwner } from "@/lib/auth";
-import { signOut } from "@/app/auth/actions";
+import { ensureOwner, isAdminEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マイガレージ — ARIOS" };
@@ -36,11 +35,16 @@ export default async function GaragePage() {
     <main className="mx-auto min-h-dvh max-w-xl px-6 py-10">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-xl font-semibold">マイガレージ</h1>
-        <form action={signOut}>
-          <button type="submit" className="text-xs text-muted">
-            ログアウト
-          </button>
-        </form>
+        <nav className="flex gap-4 text-sm text-muted">
+          {isAdminEmail(owner.email) && (
+            <Link href="/admin" className="text-accent">
+              管理者
+            </Link>
+          )}
+          <Link href="/account" className="hover:text-foreground">
+            マイページ
+          </Link>
+        </nav>
       </header>
 
       {list.length === 0 ? (

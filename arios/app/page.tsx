@@ -6,7 +6,12 @@ export default function Home() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-between px-6 py-14">
       <header>
-        <p className="text-sm tracking-[0.3em] text-accent">ARIOS</p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm tracking-[0.3em] text-accent">ARIOS</p>
+          <Link href="/garage" className="text-sm text-muted underline-offset-4 hover:underline">
+            ログイン / マイガレージ
+          </Link>
+        </div>
         <h1 className="mt-6 text-3xl leading-snug font-semibold">
           一台ごとの歴史を、
           <br />
@@ -35,9 +40,12 @@ export default function Home() {
         >
           愛車を登録する
         </Link>
-        <p className="text-center text-xs text-muted">
-          ※ 登録フロー（Register / Photo Upload / AI / Timeline）は Phase 2 で実装
-        </p>
+        <Link
+          href="/garage"
+          className="block text-center text-sm text-muted underline-offset-4 hover:underline"
+        >
+          すでにアカウントをお持ちの方は マイガレージへ
+        </Link>
       </footer>
     </main>
   );

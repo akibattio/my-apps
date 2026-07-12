@@ -44,3 +44,31 @@ export async function ensureOwner(): Promise<
   if (error || !created) return null;
   return { userId: user.id, ownerId: created.id as string, email: user.email ?? null };
 }
+
+// ---- 管理者判定 ----
+// 管理者はメール許可リストで判定する。既定は akiba@sofcom.co.jp。
+// 本番では ADMIN_EMAILS（カンマ区切り）で上書きできる。
+const DEFAULT_ADMIN_EMAILS = ["akiba@sofcom.co.jp"];
+
+export function getAdminEmails(): string[] {
+  const env = process.env.ADMIN_EMAILS;
+  if (env && env.trim()) {
+    return env
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+  }
+  return DEFAULT_ADMIN_EMAILS;
+}
+
+export function isAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return getAdminEmails().includes(email.toLowerCase());
+}
+
+// ログイン中かつ管理者なら user を返す。そうでなければ null。
+export async function getCurrentAdmin() {
+  const user = await getCurrentUser();
+  if (!user || !isAdminEmail(user.email)) return null;
+  return user;
+}

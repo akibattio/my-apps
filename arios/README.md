@@ -62,6 +62,11 @@ Vehicle is permanent. Owner changes. History grows. Trust accumulates.
   公開ページには「書類あり」の事実だけ反映し、中身は非公開。
   - migration 0003（documents RLS）は**適用済み**（2026-07-12、SQL Editorで適用・台帳に記録）。
     ガレージの「現在N件」表示が有効。※DB直結がIPv6不通のため `npm run migrate` は使わずSQL Editorで適用した。
+- [x] 地固め: マイページ + 管理者画面（2026-07-12）
+  - `/account`（マイページ）: メール・登録台数の表示、表示名の編集、マイガレージ/管理者への導線、ログアウト。
+  - `/admin`（管理者・メール許可リストで判定、既定 akiba@sofcom.co.jp）: 全体サマリー / `/admin/vehicles`（全車両+オーナー名）/ `/admin/owners`（全オーナー）。非管理者はトップへリダイレクト。動作確認済み。
+  - トップ・ガレージ・マイページ間のナビ導線を追加。
+  - 管理者判定は `lib/auth.ts` の isAdminEmail（`ADMIN_EMAILS` で上書き可）。
 - [ ] Phase 2: 公開登録（Top / Register / Photo Upload / AI / Timeline / Thank You）
 
 ### 開発コマンド
