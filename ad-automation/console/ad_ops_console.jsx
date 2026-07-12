@@ -50,11 +50,19 @@ const CONN = {
   warn: { label: "期限接近", c: "#d97706", bg: "#fffbeb" },
   error: { label: "エラー", c: "#dc2626", bg: "#fef2f2" },
 };
-const HC = { good: "#047857", warning: "#d97706", critical: "#dc2626" };
+const HC = { good: "#047857", unset: "#94a3b8", warning: "#d97706", critical: "#dc2626" };
+const HLABEL = { good: "良好", unset: "目標未設定", warning: "注意", critical: "要対応" };
 const cpcOf = (c) => (c.metrics && c.metrics.d7 ? c.metrics.d7.cpc : null);
 const cpcOver = (c) => { const mx = c.bench && c.bench.cpcMax, v = cpcOf(c); return mx && v && v > mx; };
-const healthOf = (c) => (c.cv === 0 && c.spend > 0 ? "critical" : (c.target && c.cpa > c.target * 1.15) || cpcOver(c) ? "warning" : "good");
-const RANK = { good: 0, warning: 1, critical: 2 };
+// 健全性判定：CV0(critical)／CPA超過・CPC超過・IS低下(warning)／目標未設定は判定不可(unset＝良好にしない)／それ以外good
+const healthOf = (c) => {
+  if (c.cv === 0 && (c.spend || 0) > 0) return "critical";
+  if ((c.target && c.cpa > c.target * 1.15) || cpcOver(c) || (c.is != null && c.is < 50)) return "warning";
+  if (!c.target && (c.spend || 0) > 0) return "unset";
+  return "good";
+};
+const RANK = { good: 0, unset: 1, warning: 2, critical: 3 };
+const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "unset" : "good");
 function alertsOf(accts) {
   const out = [];
   accts.forEach((c) => {
@@ -196,6 +204,19 @@ export default function AdOpsConsole() {
       .sort((x, y) => (SEVRANK[x.severity] ?? 3) - (SEVRANK[y.severity] ?? 3));
   }, [dataInfo, A, media, alerts]);
 
+  // クライアント別の健全性に「今日の要対応」を反映するため、社ごとの最悪アラート重要度を集計
+  const alertRankByClient = useMemo(() => {
+    const m = {};
+    serverAlerts.forEach((a) => {
+      const r = a.severity === "critical" ? 3 : a.severity === "warning" ? 2 : 0;
+      if (r > (m[a.client] || 0)) m[a.client] = r;
+    });
+    return m;
+  }, [serverAlerts]);
+  // 社の健全性＝しきい値判定(worstHealth) と アラート の重い方
+  const clientRank = (cl) => Math.max(worstHealth(cl.accts), alertRankByClient[cl.client] || 0);
+  const clientHk = (cl) => rankToHk(clientRank(cl));
+
   const NavBtn = ({ id, icon, label, badge }) => (
     <button onClick={() => { setView(id); if (id !== "client") setOpenClient(null); }} style={{
       display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 8, border: "none",
@@ -256,7 +277,7 @@ export default function AdOpsConsole() {
               const g = rows.filter((c) => healthOf(c) === "good").length;
               const w = rows.filter((c) => healthOf(c) === "warning").length;
               const cr = rows.filter((c) => healthOf(c) === "critical").length;
-              const nt = rows.filter((c) => !c.target && (c.spend || 0) > 0).length;
+              const nt = rows.filter((c) => healthOf(c) === "unset").length;
               const crit = serverAlerts.filter((a) => a.severity === "critical").length;
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 20 }}>
@@ -342,12 +363,11 @@ export default function AdOpsConsole() {
           <>
             <SectionTitle icon={<Users size={16} color="#047857" />} title="クライアント別" note="社をクリックすると、その社の接続・費用・成果・承認待ちがまとまって見えます。" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
-              {[...clients].sort((x, y) => worstHealth(y.accts) - worstHealth(x.accts)).map((cl) => {
+              {[...clients].sort((x, y) => clientRank(y) - clientRank(x)).map((cl) => {
                 const a = agg(cl.accts);
                 const cAlerts = alertsOf(cl.accts);
-                const wh = worstHealth(cl.accts);
-                const hk = wh === 2 ? "critical" : wh === 1 ? "warning" : "good";
-                const hlabel = hk === "good" ? "良好" : hk === "warning" ? "注意" : "要対応";
+                const hk = clientHk(cl);
+                const hlabel = HLABEL[hk];
                 // 前月（先月）実績＝各アカウントの metrics.lm を合算して前月比を出す
                 const lm = cl.accts.reduce((s, c) => { const m = (c.metrics && c.metrics.lm) || {}; return { spend: s.spend + (m.spend || 0), cv: s.cv + (m.cv || 0) }; }, { spend: 0, cv: 0 });
                 const lmCpa = lm.cv ? Math.round(lm.spend / lm.cv) : null;
@@ -366,7 +386,7 @@ export default function AdOpsConsole() {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12, marginBottom: cAlerts.length ? 10 : 0 }}>
                       <StatCell label="消化" value={yen(a.spend)} d={pct(a.spend, lm.spend)} dir={0} />
-                      <StatCell label="CPA" value={a.cpa ? yen(a.cpa) : "—"} d={pct(a.cpa, lmCpa)} dir={-1} bad={hk !== "good"} />
+                      <StatCell label="CPA" value={a.cpa ? yen(a.cpa) : "—"} d={pct(a.cpa, lmCpa)} dir={-1} bad={hk === "warning" || hk === "critical"} />
                       <StatCell label="CV" value={a.cv + "件"} d={pct(a.cv, lm.cv)} dir={1} />
                     </div>
                     {cAlerts.length > 0 && (
@@ -437,7 +457,7 @@ export default function AdOpsConsole() {
                         <MiniStat label="ROAS" value={c.roas ? c.roas + "x" : "—"} />
                         <MiniStat label="CV" value={c.cv + "件"} />
                         <MiniStat label="CTR" value={c.ctr + "%"} />
-                        <MiniStat label="状態" value={h === "good" ? "良好" : h === "warning" ? "注意" : "要対応"} bad={h !== "good"} />
+                        <MiniStat label="状態" value={HLABEL[h]} bad={h !== "good" && h !== "unset"} />
                       </div>
                       )}
                     </div>
@@ -532,7 +552,7 @@ export default function AdOpsConsole() {
                     <span style={{ color: c.cpa > c.target * 1.15 ? "#dc2626" : "#475569", fontWeight: c.cpa > c.target * 1.15 ? 700 : 400 }}>{c.cpa ? yen(c.cpa) : "—"} <span style={{ color: "#94a3b8", fontWeight: 400 }}>/ {yen(c.target)}</span></span>
                     <span style={{ color: "#475569" }}>{c.roas ? c.roas + "x" : "—"}</span>
                     <span style={{ color: "#475569" }}>{c.cv}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: HC[h], fontWeight: 600 }}><Circle size={8} fill={HC[h]} color={HC[h]} />{h === "good" ? "良好" : h === "warning" ? "注意" : "要対応"}</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: HC[h], fontWeight: 600 }}><Circle size={8} fill={HC[h]} color={HC[h]} />{HLABEL[h]}</span>
                   </div>
                 );
               })}
@@ -607,9 +627,8 @@ function PortfolioGrid({ clients, onOpen }) {
       {[...clients].sort((x, y) => worstHealth(y.accts) - worstHealth(x.accts)).map((cl) => {
         const a = agg(cl.accts);
         const cAlerts = alertsOf(cl.accts);
-        const wh = worstHealth(cl.accts);
-        const hk = wh === 2 ? "critical" : wh === 1 ? "warning" : "good";
-        const hlabel = hk === "good" ? "良好" : hk === "warning" ? "注意" : "要対応";
+        const hk = rankToHk(worstHealth(cl.accts));
+        const hlabel = HLABEL[hk];
         return (
           <button key={cl.client} onClick={() => onOpen(cl.client)} style={{ textAlign: "left", cursor: "pointer",
             background: "#fff", border: "1px solid #e6ebe8", borderLeft: `3px solid ${HC[hk]}`, borderRadius: 12, padding: 15 }}>
