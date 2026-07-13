@@ -18,7 +18,9 @@ PROJ = Path(__file__).resolve().parent.parent
 
 def main():
     days = int(sys.argv[1]) if len(sys.argv) > 1 else 90
-    load_env(PROJ / ".env")
+    env_path = PROJ / ".env"
+    if env_path.exists():  # CI では .env が無く環境変数(GitHub Secrets)で供給されるためスキップ
+        load_env(env_path)
     dpath = PROJ / "console" / "data.json"
     if not dpath.exists():
         print("console/data.json が無い（先に取得を実行）"); raise SystemExit(1)
