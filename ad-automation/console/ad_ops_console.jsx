@@ -670,7 +670,7 @@ function TodayActions({ items, onClient, generatedAt }) {
   const accent = crit ? "#dc2626" : warn ? "#d97706" : "#047857";
   if (!items.length) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderLeft: "4px solid #047857", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderTop: "3px solid #047857", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
         <ShieldCheck size={20} color="#047857" />
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>本日、要対応はありません</div>
@@ -680,7 +680,7 @@ function TodayActions({ items, onClient, generatedAt }) {
     );
   }
   return (
-    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderLeft: `4px solid ${accent}`, borderRadius: 12, padding: "14px 16px 6px", marginBottom: 20 }}>
+    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderTop: `3px solid ${accent}`, borderRadius: 12, padding: "14px 16px 6px", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <AlertTriangle size={18} color={accent} />
