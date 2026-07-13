@@ -80,6 +80,8 @@ const worstHealth = (accts) => accts.reduce((w, c) => Math.max(w, RANK[healthOf(
 export default function AdOpsConsole() {
   const [view, setView] = useState("dash");
   const [media, setMedia] = useState("all");
+  const [flagFilter, setFlagFilter] = useState("all");
+  const [clientFilter, setClientFilter] = useState("all");
   const [proposals, setProposals] = useState(SAMPLE_PROPOSALS);
   const [openClient, setOpenClient] = useState(null);
   const [DATA, setDATA] = useState(SAMPLE_DATA);
@@ -216,6 +218,18 @@ export default function AdOpsConsole() {
   // 社の健全性＝しきい値判定(worstHealth) と アラート の重い方
   const clientRank = (cl) => Math.max(worstHealth(cl.accts), alertRankByClient[cl.client] || 0);
   const clientHk = (cl) => rankToHk(clientRank(cl));
+  // アカウント(client|media)ごとの最悪アラート重要度
+  const alertRankByAcct = useMemo(() => {
+    const m = {};
+    serverAlerts.forEach((a) => {
+      const k = `${a.client}|${a.media}`;
+      const r = a.severity === "critical" ? 3 : a.severity === "warning" ? 2 : 0;
+      if (r > (m[k] || 0)) m[k] = r;
+    });
+    return m;
+  }, [serverAlerts]);
+  // アカウントの健全性＝しきい値判定 と アラート の重い方
+  const acctHk = (c) => rankToHk(Math.max(RANK[healthOf(c)], alertRankByAcct[`${c.client}|${c.media}`] || 0));
 
   const NavBtn = ({ id, icon, label, badge }) => (
     <button onClick={() => { setView(id); if (id !== "client") setOpenClient(null); }} style={{
@@ -251,16 +265,15 @@ export default function AdOpsConsole() {
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
           <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={serverAlerts.length} />
-          <NavBtn id="client" icon={<Users size={15} />} label="クライアント別" />
+          <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧（媒体別）" />
           <NavBtn id="monthly" icon={<Clock size={15} />} label="月次（週次分解）" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
-          <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧" />
           <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
         </div>
       </div>
 
       <div style={{ padding: 24, maxWidth: 1240, margin: "0 auto" }}>
-        {(view === "summary" || view === "list") && (
+        {view === "summary" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />
           </div>
@@ -358,54 +371,7 @@ export default function AdOpsConsole() {
           </>
         )}
 
-        {/* ===== クライアント別 ===== */}
-        {view === "client" && !openClient && (
-          <>
-            <SectionTitle icon={<Users size={16} color="#047857" />} title="クライアント別" note="社をクリックすると、その社の接続・費用・成果・承認待ちがまとまって見えます。" />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 12 }}>
-              {[...clients].sort((x, y) => clientRank(y) - clientRank(x)).map((cl) => {
-                const a = agg(cl.accts);
-                const cAlerts = alertsOf(cl.accts);
-                const hk = clientHk(cl);
-                const hlabel = HLABEL[hk];
-                // 前月（先月）実績＝各アカウントの metrics.lm を合算して前月比を出す
-                const lm = cl.accts.reduce((s, c) => { const m = (c.metrics && c.metrics.lm) || {}; return { spend: s.spend + (m.spend || 0), cv: s.cv + (m.cv || 0) }; }, { spend: 0, cv: 0 });
-                const lmCpa = lm.cv ? Math.round(lm.spend / lm.cv) : null;
-                const pct = (x, y) => (x == null || y == null || y === 0 ? null : Math.round((x / y - 1) * 100));
-                return (
-                  <button key={cl.client} onClick={() => setOpenClient(cl.client)} style={{ textAlign: "left", cursor: "pointer",
-                    background: "#fff", border: "1px solid #e6ebe8", borderLeft: `3px solid ${HC[hk]}`, borderRadius: 12, padding: 15 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{cl.client}{cl.tier === "large" && <LargePill />}</div>
-                      <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: HC[hk] }}>
-                        <Circle size={8} fill={HC[hk]} color={HC[hk]} />{hlabel}</span>
-                    </div>
-                    <div style={{ fontSize: 11.5, color: "#64748b", margin: "3px 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
-                      <span>月額規模 {man(cl.monthly)}/月</span>
-                      <span style={{ display: "flex", gap: 4 }}>{cl.accts.map((x) => <MediaPill key={x.id} m={x.media} />)}</span>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, fontSize: 12, marginBottom: cAlerts.length ? 10 : 0 }}>
-                      <StatCell label="消化" value={yen(a.spend)} d={pct(a.spend, lm.spend)} dir={0} />
-                      <StatCell label="CPA" value={a.cpa ? yen(a.cpa) : "—"} d={pct(a.cpa, lmCpa)} dir={-1} bad={hk === "warning" || hk === "critical"} />
-                      <StatCell label="CV" value={a.cv + "件"} d={pct(a.cv, lm.cv)} dir={1} />
-                    </div>
-                    {cAlerts.length > 0 && (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5, borderTop: "1px solid #f1f5f4", paddingTop: 8 }}>
-                        {cAlerts.map((al, i) => (
-                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5 }}>
-                            <Circle size={7} fill={SEV[al.sev].dot} color={SEV[al.sev].dot} />
-                            <MediaPill m={al.media} /><span style={{ color: "#475569" }}>{al.msg}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-
+        {/* ===== 社別詳細（費用・成果一覧の行クリックで表示） ===== */}
         {view === "client" && openClient && (() => {
           const cl = clients.find((c) => c.client === openClient);
           const a = agg(cl.accts);
@@ -419,8 +385,8 @@ export default function AdOpsConsole() {
           }).filter(Boolean);
           return (
             <>
-              <button onClick={() => setOpenClient(null)} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, padding: 0 }}>
-                <ArrowLeft size={15} /> クライアント一覧に戻る
+              <button onClick={() => { setView("list"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, padding: 0 }}>
+                <ArrowLeft size={15} /> 一覧に戻る
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
                 <span style={{ fontSize: 22, fontWeight: 700 }}>{cl.client}</span>
@@ -535,30 +501,64 @@ export default function AdOpsConsole() {
           </>
         )}
 
-        {/* ===== 費用・成果一覧 ===== */}
-        {view === "list" && (
-          <>
-            <SectionTitle icon={<Table2 size={16} color="#047857" />} title="費用・成果一覧" note="行クリックで社別ビューへ。大型は★。" />
-            <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
-              <TableHead which="list" cols={["クライアント", "媒体", "月額規模", "今月消化", "CPA / 目標", "ROAS", "CV", "状態"]} />
-              {rows.map((c, i) => {
-                const h = healthOf(c);
-                return (
-                  <div key={c.id} onClick={() => goClient(c.client)} style={{ display: "grid", gridTemplateColumns: "1.4fr 0.7fr 0.9fr 0.9fr 1.1fr 0.6fr 0.5fr 0.7fr", alignItems: "center", padding: "10px 14px", fontSize: 12.5, borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
-                    <span style={{ fontWeight: 600 }}>{c.client}{c.tier === "large" && <LargePill />}</span>
-                    <span><MediaPill m={c.media} /></span>
-                    <span style={{ color: "#475569" }}>{man(c.monthly)}/月</span>
-                    <span style={{ color: "#0f2a1f" }}>{yen(c.spend)}</span>
-                    <span style={{ color: c.cpa > c.target * 1.15 ? "#dc2626" : "#475569", fontWeight: c.cpa > c.target * 1.15 ? 700 : 400 }}>{c.cpa ? yen(c.cpa) : "—"} <span style={{ color: "#94a3b8", fontWeight: 400 }}>/ {yen(c.target)}</span></span>
-                    <span style={{ color: "#475569" }}>{c.roas ? c.roas + "x" : "—"}</span>
-                    <span style={{ color: "#475569" }}>{c.cv}</span>
-                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: HC[h], fontWeight: 600 }}><Circle size={8} fill={HC[h]} color={HC[h]} />{HLABEL[h]}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
+        {/* ===== 費用・成果一覧（媒体別・統合） ===== */}
+        {view === "list" && (() => {
+          const pct = (x, y) => (x == null || y == null || y === 0 ? null : Math.round((x / y - 1) * 100));
+          const clientNames = [...new Set(A.map((c) => c.client))];
+          const tmpl = "1.5fr 0.7fr 1fr 1fr 0.55fr 0.85fr";
+          const listRows = A
+            .filter((c) => media === "all" || c.media === media)
+            .filter((c) => clientFilter === "all" || c.client === clientFilter)
+            .filter((c) => flagFilter === "all" || acctHk(c) === flagFilter)
+            .sort((x, y) => (RANK[acctHk(y)] - RANK[acctHk(x)]) || ((y.spend || 0) - (x.spend || 0)));
+          const sel = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff", color: "#0f172a" };
+          const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
+          return (
+            <>
+              <SectionTitle icon={<Table2 size={16} color="#047857" />} title="費用・成果一覧（媒体別）" note="アカウント（媒体）単位の一覧。クライアント・状態・媒体で絞り込み。行クリックで社別詳細へ。" />
+              {/* フィルタ */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />
+                <span style={{ width: 1, height: 20, background: "#e2e8f0" }} />
+                <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} style={sel}>
+                  <option value="all">すべてのクライアント</option>
+                  {clientNames.map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <select value={flagFilter} onChange={(e) => setFlagFilter(e.target.value)} style={sel}>
+                  <option value="all">すべての状態</option>
+                  <option value="critical">要対応</option>
+                  <option value="warning">注意</option>
+                  <option value="unset">目標未設定</option>
+                  <option value="good">良好</option>
+                </select>
+                {(clientFilter !== "all" || flagFilter !== "all" || media !== "all") &&
+                  <button onClick={() => { setClientFilter("all"); setFlagFilter("all"); setMedia("all"); }} style={{ border: "none", background: "none", color: "#047857", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>絞り込み解除</button>}
+                <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{listRows.length}件</span>
+              </div>
+              <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+                <div style={head}>
+                  <span>クライアント</span><span>媒体</span><span>消化（前月比）</span><span>CPA（前月比）</span><span>CV</span><span>状態</span>
+                </div>
+                {listRows.length === 0 && <div style={{ padding: "18px 14px", fontSize: 12.5, color: "#94a3b8", textAlign: "center" }}>該当なし</div>}
+                {listRows.map((c, i) => {
+                  const h = acctHk(c);
+                  const lm = (c.metrics && c.metrics.lm) || {};
+                  const overT = c.target && c.cpa > c.target * 1.15;
+                  return (
+                    <div key={c.id} onClick={() => goClient(c.client)} style={{ display: "grid", gridTemplateColumns: tmpl, alignItems: "center", padding: "10px 14px", fontSize: 12.5, borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
+                      <span style={{ fontWeight: 600 }}>{c.client}{c.tier === "large" && <LargePill />}</span>
+                      <span><MediaPill m={c.media} /></span>
+                      <span><span style={{ color: "#0f2a1f", fontWeight: 600 }}>{yen(c.spend)}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.spend, lm.spend)} dir={0} /></span></span>
+                      <span><span style={{ color: overT ? "#dc2626" : "#0f2a1f", fontWeight: overT ? 700 : 600 }}>{c.cpa ? yen(c.cpa) : "—"}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.cpa, lm.cpa)} dir={-1} /></span>{c.target ? <span style={{ color: "#94a3b8", fontSize: 10.5 }}> /目標{yen(c.target)}</span> : null}</span>
+                      <span style={{ color: "#475569" }}>{c.cv}件</span>
+                      <span style={{ display: "flex", alignItems: "center", gap: 5, color: HC[h], fontWeight: 600 }}><Circle size={8} fill={HC[h]} color={HC[h]} />{HLABEL[h]}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          );
+        })()}
 
         {/* ===== 目標設定 ===== */}
         {view === "targets" && (
