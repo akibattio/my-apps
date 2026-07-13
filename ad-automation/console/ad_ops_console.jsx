@@ -190,9 +190,10 @@ export default function AdOpsConsole() {
     const hasServer = dataInfo && Array.isArray(dataInfo.alerts);
     let items;
     if (hasServer) {
+      const normSev = (s) => (s === "warn" ? "warning" : (s === "crit" ? "critical" : (s || "warning")));
       items = dataInfo.alerts.map((a) => ({
         client: a.client, media: a.media, kind: a.kind || "",
-        fact: a.fact || a.msg || "", severity: a.severity || "warning", action: a.approve || null,
+        fact: a.fact || a.msg || "", severity: normSev(a.severity), action: a.approve || null,
       }));
       A.forEach((c) => {
         if (c.status === "error") items.push({ client: c.client, media: c.media, kind: "接続エラー", fact: `トークン失効（最終同期 ${c.sync}）`, severity: "critical", action: "接続担当へ即連絡" });
@@ -287,10 +288,10 @@ export default function AdOpsConsole() {
 
             {/* 上部：全体集計(クリックで詳細ページ)・アラート・健全性 */}
             {(() => {
-              const g = rows.filter((c) => healthOf(c) === "good").length;
-              const w = rows.filter((c) => healthOf(c) === "warning").length;
-              const cr = rows.filter((c) => healthOf(c) === "critical").length;
-              const nt = rows.filter((c) => healthOf(c) === "unset").length;
+              const g = rows.filter((c) => acctHk(c) === "good").length;
+              const w = rows.filter((c) => acctHk(c) === "warning").length;
+              const cr = rows.filter((c) => acctHk(c) === "critical").length;
+              const nt = rows.filter((c) => acctHk(c) === "unset").length;
               const crit = serverAlerts.filter((a) => a.severity === "critical").length;
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 20 }}>
