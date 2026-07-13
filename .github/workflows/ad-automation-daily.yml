@@ -53,6 +53,8 @@ jobs:
           python3 scripts/build_console_data.py
           python3 scripts/fetch_daily_series.py
           python3 scripts/fetch_search_diagnostics.py
+          # 監査（ads-google観点の機械チェック）→ console/audit.json（クライアント詳細で表示）
+          python3 scripts/build_audits.py || true
           # 通知先(NOTIFY_CHANNEL)未設定なら送信されない。有効化時は「monitor.py --send」に変更
           python3 scripts/monitor.py
           # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Bell, AlertTriangle, Check, X, Circle, TrendingUp, TrendingDown, Zap,
   ChevronRight, ShieldCheck, LayoutDashboard, Cable, Table2, KeyRound, Star,
@@ -131,6 +131,7 @@ export default function AdOpsConsole() {
   };
 
   const [daily, setDaily] = useState(null);
+  const [audit, setAudit] = useState(null);
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -146,7 +147,12 @@ export default function AdOpsConsole() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && Array.isArray(j.accounts)) setDaily(j); })
       .catch(() => {});
+    fetch("./audit.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.byAccount) setAudit(j); })
+      .catch(() => {});
   }, []);
+  const auditMap = useMemo(() => (audit && audit.byAccount) || {}, [audit]);
   // 日次時系列を client|media で引けるマップに（{days, byType}。Googleのみ・Metaは空）
   const dailyMap = useMemo(() => {
     const m = {};
@@ -167,7 +173,9 @@ export default function AdOpsConsole() {
     return () => window.removeEventListener("hashchange", parse);
   }, []);
   // 画面状態が変わったらハッシュに反映（履歴に積まれ、戻るボタンで戻れる）
+  const hashInit = useRef(false);
   useEffect(() => {
+    if (!hashInit.current) { hashInit.current = true; return; } // 初回は上書きしない（深リンク保持）
     const target = (view === "client" && openClient) ? `#client/${encodeURIComponent(openClient)}` : `#${view}`;
     if (window.location.hash !== target) window.location.hash = target;
   }, [view, openClient]);
@@ -402,6 +410,7 @@ export default function AdOpsConsole() {
         {/* ===== 社別詳細（費用・成果一覧の行クリックで表示） ===== */}
         {view === "client" && openClient && (() => {
           const cl = clients.find((c) => c.client === openClient);
+          if (!cl) return <Empty text="データを読み込み中、または該当クライアントが見つかりません。" />;
           const a = agg(cl.accts);
           const cProps = proposals.filter((p) => p.client === openClient && p.status == null);
           const cAlerts = cl.accts.map((c) => {
@@ -454,6 +463,7 @@ export default function AdOpsConsole() {
                         <MiniStat label="状態" value={HLABEL[h]} bad={h !== "good" && h !== "unset"} />
                       </div>
                       )}
+                      {auditMap[`${c.client}|${c.media}`] && <AuditReport a={auditMap[`${c.client}|${c.media}`]} />}
                     </div>
                   );
                 })}
@@ -974,6 +984,42 @@ function BenchmarkChecks({ c }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// 監査チェック（ads-google観点の機械監査）：スコア/グレード＋各項目の pass/warn/fail
+function AuditReport({ a }) {
+  if (!a || a.error) return null;
+  const gradeColor = (a.grade === "A" || a.grade === "B") ? "#047857" : a.grade === "C" ? "#d97706" : "#dc2626";
+  const SV = { pass: { c: "#047857", bg: "#ecfdf5", mk: "✓" }, warn: { c: "#d97706", bg: "#fffbeb", mk: "△" }, fail: { c: "#dc2626", bg: "#fef2f2", mk: "✗" } };
+  const order = { fail: 0, warn: 1, pass: 2 };
+  const fs = [...(a.findings || [])].sort((x, y) => (order[x.sev] ?? 3) - (order[y.sev] ?? 3));
+  const nFail = fs.filter((f) => f.sev === "fail").length, nWarn = fs.filter((f) => f.sev === "warn").length, nPass = fs.filter((f) => f.sev === "pass").length;
+  return (
+    <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+        <ShieldCheck size={15} color="#047857" />
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2a1f" }}>監査チェック（ads-google 観点）</span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: gradeColor, borderRadius: 6, padding: "1px 8px" }}>{a.grade} ・ {a.score}/100</span>
+        <span style={{ fontSize: 11, color: "#64748b" }}>要対応{nFail}・注意{nWarn}・良好{nPass}</span>
+      </div>
+      <div style={{ fontSize: 11.5, color: "#475569", marginBottom: 8 }}>{a.summary}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {fs.map((f, i) => {
+          const s = SV[f.sev] || SV.warn;
+          return (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 5, background: s.bg, color: s.c, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mk}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#0f2a1f" }}>{f.title}</div>
+                <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.6 }}>{f.detail}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 6 }}>※データから自動チェック（{a.period}）。コンバージョン計測・無駄消化KW・配信手法の効率差・入札整合・アカウント構造などを ads-google ルールで判定。表現/薬機など人の最終確認は別途。</div>
     </div>
   );
 }

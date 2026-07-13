@@ -14,6 +14,8 @@ mkdir -p logs
   /usr/bin/python3 scripts/fetch_search_diagnostics.py
   # 取得直後に監視チェック（読み取りのみ・外部送信なし＝ログとconsole/data.jsonのalertsへ反映）
   # 通知(--send)は通知先(.env NOTIFY_CHANNEL)を設定してから有効化する
+  # 監査（ads-google観点の機械チェック）→ console/audit.json
+  /usr/bin/python3 scripts/build_audits.py || true
   /usr/bin/python3 scripts/monitor.py
   # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
   cp data/daily.json console/daily.json 2>/dev/null || true

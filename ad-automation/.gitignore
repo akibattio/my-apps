@@ -33,6 +33,7 @@ out/
 # コンソールの実データ（個社数値・Git管理外）
 console/data.json
 console/daily.json
+console/audit.json
 
 # 実行ログ
 logs/
