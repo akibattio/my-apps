@@ -63,6 +63,16 @@ const healthOf = (c) => {
 };
 const RANK = { good: 0, unset: 1, warning: 2, critical: 3 };
 const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "unset" : "good");
+// 配信ステータス：直近7日にインプレッション（or 消化）があれば配信中、無ければ停止中
+const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
+function DeliveryBadge({ c }) {
+  const on = deliveryOf(c) === "active";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: on ? "#ecfdf5" : "#f1f5f4", color: on ? "#047857" : "#64748b" }}>
+      <Circle size={7} fill={on ? "#047857" : "#94a3b8"} color={on ? "#047857" : "#94a3b8"} />{on ? "配信中" : "停止中"}
+    </span>
+  );
+}
 function alertsOf(accts) {
   const out = [];
   accts.forEach((c) => {
@@ -143,6 +153,24 @@ export default function AdOpsConsole() {
     if (daily && daily.accounts) daily.accounts.forEach((a) => { m[`${a.client}|${a.media}`] = { days: a.days || [], byType: a.byType || {} }; });
     return m;
   }, [daily]);
+
+  // ブラウザの戻る/進むを効かせる（URLハッシュと画面状態を同期）
+  useEffect(() => {
+    const parse = () => {
+      const h = decodeURIComponent((window.location.hash || "").replace(/^#/, ""));
+      if (h.indexOf("client/") === 0) { setOpenClient(h.slice(7)); setView("client"); }
+      else if (["dash", "list", "conn", "targets", "summary"].indexOf(h) >= 0) { setView(h); setOpenClient(null); }
+      else { setView("dash"); setOpenClient(null); }
+    };
+    parse();
+    window.addEventListener("hashchange", parse);
+    return () => window.removeEventListener("hashchange", parse);
+  }, []);
+  // 画面状態が変わったらハッシュに反映（履歴に積まれ、戻るボタンで戻れる）
+  useEffect(() => {
+    const target = (view === "client" && openClient) ? `#client/${encodeURIComponent(openClient)}` : `#${view}`;
+    if (window.location.hash !== target) window.location.hash = target;
+  }, [view, openClient]);
 
   // 手入力の目標(localStorage)を各アカウントに反映：target/monthly/bench.targetCpa を上書き
   const A = useMemo(() => DATA.map((c) => {
@@ -267,7 +295,6 @@ export default function AdOpsConsole() {
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
           <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={serverAlerts.length} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧（媒体別）" />
-          <NavBtn id="monthly" icon={<Clock size={15} />} label="月次（週次分解）" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
         </div>
@@ -411,7 +438,7 @@ export default function AdOpsConsole() {
                   return (
                     <div key={c.id} style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: 15 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <MediaPill m={c.media} />
+                        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><MediaPill m={c.media} /><DeliveryBadge c={c} /></span>
                         <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: s.c }}><Circle size={8} fill={s.c} color={s.c} />{s.label}</span>
                       </div>
                       <div style={{ fontSize: 11.5, color: "#64748b", fontFamily: "monospace", marginBottom: 3 }}>{c.acct}</div>
@@ -453,24 +480,6 @@ export default function AdOpsConsole() {
             </>
           );
         })()}
-
-        {/* ===== 月次（週次分解）===== */}
-        {view === "monthly" && (
-          <>
-            <SectionTitle icon={<Clock size={16} color="#047857" />} title="月次レポート（週次分解）" note="当月の週別（第1週〜）推移と前月比。クライアント提出・月初レポート用。日次データのあるGoogleアカウントが対象。" />
-            {(() => {
-              const list = A.filter((c) => ((dailyMap[`${c.client}|${c.media}`] || {}).days || []).length >= 7);
-              if (!list.length) return <Empty text="日次データのあるアカウントがありません（Meta は日次未取得）。" />;
-              return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {list.map((c) => (
-                    <MonthlyReport key={c.id} c={c} days={(dailyMap[`${c.client}|${c.media}`] || {}).days} byType={(dailyMap[`${c.client}|${c.media}`] || {}).byType} />
-                  ))}
-                </div>
-              );
-            })()}
-          </>
-        )}
 
         {/* ===== 接続ステータス ===== */}
         {view === "conn" && (
@@ -548,7 +557,7 @@ export default function AdOpsConsole() {
                   return (
                     <div key={c.id} onClick={() => goClient(c.client)} style={{ display: "grid", gridTemplateColumns: tmpl, alignItems: "center", padding: "10px 14px", fontSize: 12.5, borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
                       <span style={{ fontWeight: 600 }}>{c.client}{c.tier === "large" && <LargePill />}</span>
-                      <span><MediaPill m={c.media} /></span>
+                      <span style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}><MediaPill m={c.media} /><DeliveryBadge c={c} /></span>
                       <span><span style={{ color: "#0f2a1f", fontWeight: 600 }}>{yen(c.spend)}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.spend, lm.spend)} dir={0} /></span></span>
                       <span><span style={{ color: overT ? "#dc2626" : "#0f2a1f", fontWeight: overT ? 700 : 600 }}>{c.cpa ? yen(c.cpa) : "—"}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.cpa, lm.cpa)} dir={-1} /></span>{c.target ? <span style={{ color: "#94a3b8", fontSize: 10.5 }}> /目標{yen(c.target)}</span> : null}</span>
                       <span style={{ color: "#475569" }}>{c.cv}件</span>
