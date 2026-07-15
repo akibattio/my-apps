@@ -100,12 +100,15 @@ export default function AdOpsConsole() {
   const [history, setHistory] = useState([]);
   const [operator, setOperator] = useState("");
   const [alertOps, setAlertOps] = useState({});
+  const [approvals, setApprovals] = useState({});
+  const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     try {
       setTargets(JSON.parse(localStorage.getItem("adops_targets") || "{}"));
       setHistory(JSON.parse(localStorage.getItem("adops_targets_history") || "[]"));
       setOperator(localStorage.getItem("adops_operator") || "");
       setAlertOps(JSON.parse(localStorage.getItem("adops_alert_ops") || "{}"));
+      setApprovals(JSON.parse(localStorage.getItem("adops_approvals") || "{}"));
     } catch (e) {}
   }, []);
   // アラート対応（確認済み/様子見/メモ）— この端末に保存（共有はKV化で将来対応）
@@ -211,10 +214,21 @@ export default function AdOpsConsole() {
 
   const rows = useMemo(() => A.filter((c) => media === "all" || c.media === media), [media, A]);
   const totals = useMemo(() => agg(rows), [rows]);
-  const pending = proposals.filter((p) => p.status == null);
+  const pKey = (p) => `${p.client}|${p.media}|${p.kind}`;
+  const pending = proposals.filter((p) => !approvals[pKey(p)]);
   const connIssues = A.filter((c) => c.status !== "ok").length;
   const noTargetCount = A.filter((c) => !c.target && (c.spend || 0) > 0).length;
-  const decide = (id, status) => setProposals((ps) => ps.map((p) => (p.id === id ? { ...p, status } : p)));
+  // 承認/却下を記録（この端末＋ログ）。却下は理由を記録（CLAUDE.md §4）。書き込み(適用)はしない＝意思決定の記録のみ。
+  const decide = (p, decision) => {
+    let reason = "";
+    if (decision === "rejected") { reason = (window.prompt("却下の理由（記録されます）", "") || "").trim(); }
+    const key = pKey(p);
+    const next = { ...approvals, [key]: { decision, reason, by: (operator || "").trim() || "担当", at: new Date().toLocaleString("ja-JP"), client: p.client, media: p.media, kind: p.kind, next: p.next } };
+    setApprovals(next);
+    try { localStorage.setItem("adops_approvals", JSON.stringify(next)); } catch (e) {}
+  };
+  const undecide = (key) => { const n = { ...approvals }; delete n[key]; setApprovals(n); try { localStorage.setItem("adops_approvals", JSON.stringify(n)); } catch (e) {} };
+  const approvalLog = Object.entries(approvals).map(([key, v]) => ({ key, ...v }));
 
   const clients = useMemo(() => {
     const m = {};
@@ -391,6 +405,30 @@ export default function AdOpsConsole() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 10 }}>
                 {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} />)}
               </div>
+              {approvalLog.length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <button onClick={() => setShowLog((v) => !v)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: "#64748b", padding: 0 }}>
+                    <Clock size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />承認ログ {approvalLog.length}件 {showLog ? "▲" : "▼"}
+                  </button>
+                  {showLog && (
+                    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.9fr 1.4fr 0.8fr 0.5fr", padding: "8px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                        <span>クライアント</span><span>媒体</span><span>提案</span><span>判断・理由</span><span>担当・日時</span><span></span>
+                      </div>
+                      {approvalLog.map((l, i) => (
+                        <div key={l.key} style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.9fr 1.4fr 0.8fr 0.5fr", alignItems: "center", padding: "8px 12px", fontSize: 12, borderTop: i ? "1px solid #f1f5f4" : "none" }}>
+                          <span style={{ fontWeight: 600 }}>{l.client}</span>
+                          <span><MediaPill m={l.media} /></span>
+                          <span style={{ color: "#475569" }}>{l.kind}</span>
+                          <span style={{ color: l.decision === "approved" ? "#047857" : "#dc2626", fontWeight: 700 }}>{l.decision === "approved" ? "承認" : "却下"}{l.reason ? <span style={{ color: "#94a3b8", fontWeight: 400 }}>・{l.reason}</span> : null}</span>
+                          <span style={{ color: "#94a3b8", fontSize: 11 }}>{l.by}・{l.at}</span>
+                          <span><button onClick={() => undecide(l.key)} style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 6, border: "1px solid #d7e0db", background: "#fff", cursor: "pointer", color: "#475569" }}>戻す</button></span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -443,7 +481,7 @@ export default function AdOpsConsole() {
           const cl = clients.find((c) => c.client === openClient);
           if (!cl) return <Empty text="データを読み込み中、または該当クライアントが見つかりません。" />;
           const a = agg(cl.accts);
-          const cProps = proposals.filter((p) => p.client === openClient && p.status == null);
+          const cProps = proposals.filter((p) => p.client === openClient && !approvals[pKey(p)]);
           const cAlerts = cl.accts.map((c) => {
             if (c.cv === 0 && c.spend > 0) return { c, sev: "critical", msg: `CV 0件のまま ${yen(c.spend)} を消化` };
             if (c.target && c.cpa > c.target * 1.15) return { c, sev: "warning", msg: `CPA ${yen(c.cpa)}（目標比 +${Math.round((c.cpa / c.target - 1) * 100)}%）` };
@@ -672,8 +710,8 @@ function ProposalCard({ p, decide, onClient, hideClient }) {
       </div>
       <div style={{ fontSize: 12.5, color: "#475569", background: "#f8faf9", borderRadius: 8, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 }}><b style={{ color: "#047857" }}>AI </b>{p.reason}</div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => decide(p.id, "approved")} style={btnP}><Check size={15} />{p.twoStep ? "レビュー承認" : "承認して適用"}</button>
-        <button onClick={() => decide(p.id, "rejected")} style={btnS}><X size={15} /> 却下</button>
+        <button onClick={() => decide(p, "approved")} style={btnP}><Check size={15} />{p.twoStep ? "レビュー承認" : "承認"}</button>
+        <button onClick={() => decide(p, "rejected")} style={btnS}><X size={15} /> 却下</button>
       </div>
     </div>
   );

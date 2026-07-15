@@ -59,6 +59,8 @@ jobs:
           python3 scripts/fetch_monthly_series.py || true
           # 監査（ads-google観点の機械チェック）→ console/audit.json（クライアント詳細で表示）
           python3 scripts/build_audits.py || true
+          # 提案の下書き生成（監査・検索診断から）→ console/data.json の proposals（承認キュー）
+          python3 scripts/build_proposals.py || true
           # 監視＋通知（NOTIFY_CHANNEL=none のときは送信スキップ＝Webhook未登録/朝以外は自動でnone）
           python3 scripts/monitor.py --send || true
           # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製

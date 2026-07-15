@@ -18,6 +18,8 @@ mkdir -p logs
   /usr/bin/python3 scripts/fetch_monthly_series.py || true
   # 監査（ads-google観点の機械チェック）→ console/audit.json
   /usr/bin/python3 scripts/build_audits.py || true
+  # 提案の下書き生成（承認キュー）→ console/data.json の proposals
+  /usr/bin/python3 scripts/build_proposals.py || true
   /usr/bin/python3 scripts/monitor.py
   # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
   cp data/daily.json console/daily.json 2>/dev/null || true
