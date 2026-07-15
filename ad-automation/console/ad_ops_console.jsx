@@ -65,12 +65,22 @@ const RANK = { good: 0, unset: 1, warning: 2, critical: 3 };
 const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "unset" : "good");
 // 配信ステータス：直近7日にインプレッション（or 消化）があれば配信中、無ければ停止中
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
-// 媒体（Google広告/Meta広告マネージャ）の該当アカウントページURL
+// 媒体（Google広告/Meta広告マネージャ）の該当ページURL。alertの種類(kind)から「修正する画面」を選ぶ。
 const onlyDigits = (s) => (s || "").replace(/\D/g, "");
-function platformUrl(media, acct, mcc) {
+function googleSection(kind) {
+  const k = kind || "";
+  if (/検索クエリ|不要検索|除外/.test(k)) return "keywords/searchterms";   // 検索語句（除外KW追加）
+  if (/CTR|クリエイティブ|広告文|LP/.test(k)) return "ads";                 // 広告
+  if (/コンバージョン|計測/.test(k)) return "conversions";                 // コンバージョン設定
+  if (/アセット|広告表示オプション/.test(k)) return "assetgroup";           // アセット
+  if (/CPC|品質スコア|キーワード|入札/.test(k)) return "keywords";          // キーワード
+  if (/インプ|消化|予算|停止|アカウント整理|配信|再配分/.test(k)) return "campaigns"; // キャンペーン（予算/配信）
+  return "overview";
+}
+function platformUrl(media, acct, mcc, kind) {
   const d = onlyDigits(acct);
   if (!d) return null;
-  if (media === "google") return `https://ads.google.com/aw/overview?__c=${onlyDigits(mcc)}&uscid=${d}`;
+  if (media === "google") return `https://ads.google.com/aw/${googleSection(kind)}?__c=${onlyDigits(mcc)}&uscid=${d}`;
   if (media === "meta") return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${d}`;
   return null;
 }
@@ -224,6 +234,8 @@ export default function AdOpsConsole() {
   const rows = useMemo(() => A.filter((c) => media === "all" || c.media === media), [media, A]);
   const totals = useMemo(() => agg(rows), [rows]);
   const pKey = (p) => `${p.client}|${p.media}|${p.kind}`;
+  const acctOf = (client, media) => (A.find((c) => c.client === client && c.media === media) || {}).acct;
+  const propUrl = (p) => platformUrl(p.media, acctOf(p.client, p.media), dataInfo && dataInfo.googleMcc, p.kind);
   const pending = proposals.filter((p) => !approvals[pKey(p)]);
   const connIssues = A.filter((c) => c.status !== "ok").length;
   const noTargetCount = A.filter((c) => !c.target && (c.spend || 0) > 0).length;
@@ -281,7 +293,7 @@ export default function AdOpsConsole() {
     return items
       .map((a) => {
         const acc = A.find((c) => c.client === a.client && c.media === a.media);
-        return { ...a, key: `${a.client}|${a.media}|${a.kind}`, url: platformUrl(a.media, acc && acc.acct, mcc) };
+        return { ...a, key: `${a.client}|${a.media}|${a.kind}`, url: platformUrl(a.media, acc && acc.acct, mcc, a.kind) };
       })
       .filter((a) => media === "all" || a.media === media)
       .sort((x, y) => (SEVRANK[x.severity] ?? 3) - (SEVRANK[y.severity] ?? 3));
@@ -416,7 +428,7 @@ export default function AdOpsConsole() {
               <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ（書き込みは承認後のみ）。" />
               {pending.length === 0 && <Empty text="承認待ちはありません。" />}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(340px,1fr))", gap: 10 }}>
-                {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} />)}
+                {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} url={propUrl(p)} />)}
               </div>
               {approvalLog.length > 0 && (
                 <div style={{ marginTop: 14 }}>
@@ -564,7 +576,7 @@ export default function AdOpsConsole() {
               <div className="no-print">
                 <SectionTitle icon={<Zap size={16} color="#047857" />} title="この社の承認待ち" note={cProps.length ? "" : "承認待ちはありません。"} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: cProps.length ? 22 : 8 }}>
-                  {cProps.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={null} hideClient />)}
+                  {cProps.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={null} hideClient url={propUrl(p)} />)}
                 </div>
               </div>
 
@@ -709,7 +721,7 @@ function agg(list) {
 const btnP = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "none", background: "#047857", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" };
 const btnS = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer" };
 
-function ProposalCard({ p, decide, onClient, hideClient }) {
+function ProposalCard({ p, decide, onClient, hideClient, url }) {
   const s = SEV[p.severity];
   return (
     <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderLeft: `3px solid ${s.dot}`, borderRadius: 10, padding: 14 }}>
@@ -728,6 +740,7 @@ function ProposalCard({ p, decide, onClient, hideClient }) {
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={() => decide(p, "approved")} style={btnP}><Check size={15} />{p.twoStep ? "レビュー承認" : "承認"}</button>
         <button onClick={() => decide(p, "rejected")} style={btnS}><X size={15} /> 却下</button>
+        {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ ...btnS, textDecoration: "none", marginLeft: "auto", color: p.media === "google" ? "#1a56db" : "#4338ca" }}>↗ 修正画面</a>}
       </div>
     </div>
   );
