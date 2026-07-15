@@ -65,6 +65,15 @@ const RANK = { good: 0, unset: 1, warning: 2, critical: 3 };
 const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "unset" : "good");
 // 配信ステータス：直近7日にインプレッション（or 消化）があれば配信中、無ければ停止中
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
+// 媒体（Google広告/Meta広告マネージャ）の該当アカウントページURL
+const onlyDigits = (s) => (s || "").replace(/\D/g, "");
+function platformUrl(media, acct, mcc) {
+  const d = onlyDigits(acct);
+  if (!d) return null;
+  if (media === "google") return `https://ads.google.com/aw/overview?__c=${onlyDigits(mcc)}&uscid=${d}`;
+  if (media === "meta") return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${d}`;
+  return null;
+}
 function DeliveryBadge({ c }) {
   const on = deliveryOf(c) === "active";
   return (
@@ -268,8 +277,12 @@ export default function AdOpsConsole() {
     } else {
       items = alerts.map((a) => ({ client: a.c.client, media: a.c.media, kind: "", fact: a.msg, severity: a.sev, action: null }));
     }
+    const mcc = dataInfo && dataInfo.googleMcc;
     return items
-      .map((a) => ({ ...a, key: `${a.client}|${a.media}|${a.kind}` }))
+      .map((a) => {
+        const acc = A.find((c) => c.client === a.client && c.media === a.media);
+        return { ...a, key: `${a.client}|${a.media}|${a.kind}`, url: platformUrl(a.media, acc && acc.acct, mcc) };
+      })
       .filter((a) => media === "all" || a.media === media)
       .sort((x, y) => (SEVRANK[x.severity] ?? 3) - (SEVRANK[y.severity] ?? 3));
   }, [dataInfo, A, media, alerts]);
@@ -522,7 +535,10 @@ export default function AdOpsConsole() {
                   return (
                     <div key={c.id} style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: 15 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><MediaPill m={c.media} /><DeliveryBadge c={c} /></span>
+                        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <MediaPill m={c.media} /><DeliveryBadge c={c} />
+                          {platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc) && <a className="no-print" href={platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10.5, fontWeight: 700, color: c.media === "google" ? "#1a56db" : "#4338ca", textDecoration: "none", border: "1px solid #c7d2fe", borderRadius: 6, padding: "2px 8px" }}>↗ {c.media === "google" ? "Google広告" : "Meta"}を開く</a>}
+                        </span>
                         <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: s.c }}><Circle size={8} fill={s.c} color={s.c} />{s.label}</span>
                       </div>
                       <div style={{ fontSize: 11.5, color: "#64748b", fontFamily: "monospace", marginBottom: 3 }}>{c.acct}</div>
@@ -799,6 +815,7 @@ function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, 
               <button style={btn} onClick={() => onAck(a.key)}>✓ 確認済み</button>
               <button style={btn} onClick={() => onSnooze(a.key)}>様子見3日</button>
               <button style={btn} onClick={() => { setEditKey(a.key); setDraft(op.memo || ""); }}>メモ</button>
+              {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ ...btn, textDecoration: "none", color: a.media === "google" ? "#1a56db" : "#4338ca", borderColor: "#c7d2fe" }}>↗ {a.media === "google" ? "Google広告" : "Meta"}を開く</a>}
             </div>
           )}
         </div>

@@ -271,6 +271,7 @@ def main():
         "label": "Meta＋Google 実データ",
         "period": "直近30日",
         "generatedAt": datetime.now(JST).strftime("%Y-%m-%d %H:%M JST"),
+        "googleMcc": re.sub(r"\D", "", os.environ.get("GOOGLE_LOGIN_CUSTOMER_ID", "") or ""),  # 媒体ページへのリンク用
         "accounts": accounts,
         "proposals": proposals,
     }
