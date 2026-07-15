@@ -68,17 +68,41 @@ def pull(ga, cid, dr):
         a["cost"] += (m.cost_micros or 0) / 1e6; a["imp"] += int(m.impressions or 0)
         a["clk"] += int(m.clicks or 0); a["cv"] += m.conversions or 0
     d["channels"] = chan
-    # キーワード（無駄消化・マッチタイプ）
+    # キーワード（無駄消化・マッチタイプ・品質スコア）
     kws = []
     for r in ga.search(customer_id=cid, query=f"""
         SELECT ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type,
+               ad_group_criterion.quality_info.quality_score,
                metrics.cost_micros, metrics.clicks, metrics.conversions
         FROM keyword_view WHERE segments.date {dr}"""):
         k = r.ad_group_criterion.keyword; m = r.metrics
         kws.append({"text": k.text, "match": k.match_type.name,
+                    "qs": int(r.ad_group_criterion.quality_info.quality_score or 0),
                     "cost": (m.cost_micros or 0) / 1e6, "clk": int(m.clicks or 0),
                     "cv": m.conversions or 0})
     d["keywords"] = kws
+    # 検索の予算による機会損失（インプレッションシェア）※取得できない環境もあるので防御的に
+    sis = []
+    try:
+        for r in ga.search(customer_id=cid, query=f"""
+            SELECT metrics.impressions, metrics.search_budget_lost_impression_share
+            FROM campaign
+            WHERE segments.date {dr} AND campaign.advertising_channel_type = 'SEARCH'"""):
+            m = r.metrics
+            sis.append({"imp": int(m.impressions or 0), "blis": float(m.search_budget_lost_impression_share or 0)})
+    except Exception:
+        pass
+    d["search_is"] = sis
+    # 広告表示オプション（有効なアセットの種類）
+    atypes = set()
+    try:
+        for r in ga.search(customer_id=cid, query="""
+            SELECT campaign_asset.field_type FROM campaign_asset
+            WHERE campaign_asset.status = 'ENABLED'"""):
+            atypes.add(r.campaign_asset.field_type.name)
+    except Exception:
+        pass
+    d["asset_types"] = sorted(atypes)
     return d
 
 
@@ -163,6 +187,43 @@ def audit(d, period_label):
     if len(paused) > len(active) and len(paused) >= 3:
         add("warn", "停止キャンペーンの残置が多い",
             f"稼働{len(active)}件に対し停止{len(paused)}件。棚卸し（アーカイブ）で管理が明確になる。", 4)
+
+    # --- 7. 品質スコア（費用加重の平均QS） ---
+    qkw = [k for k in d["keywords"] if k.get("qs") and k["cost"] > 0]
+    if qkw:
+        wsum = sum(k["cost"] for k in qkw)
+        wqs = sum(k["qs"] * k["cost"] for k in qkw) / wsum if wsum else 0
+        low = [k for k in qkw if k["qs"] <= 3]
+        lowcost = sum(k["cost"] for k in low)
+        if wqs and wqs < 5 and search_cost and lowcost / search_cost >= 0.2:
+            add("warn", "品質スコアが低い",
+                f"費用加重の平均QS {wqs:.1f}。QS≤3のKWが{len(low)}件・費用¥{lowcost:,.0f}（検索費用の{lowcost/search_cost*100:.0f}%）。"
+                f"広告文とLPの関連性・遷移先の改善余地。", 6)
+        else:
+            add("pass", "品質スコアは概ね良好", f"費用加重の平均QS {wqs:.1f}（QS≤3は{len(low)}件）。", 0)
+
+    # --- 8. 予算による機会損失（検索インプレッションシェア） ---
+    sis = d.get("search_is") or []
+    tot_imp = sum(x["imp"] for x in sis)
+    if tot_imp > 0:
+        blis = sum(x["blis"] * x["imp"] for x in sis) / tot_imp
+        if blis >= 0.2:
+            add("warn", "予算による機会損失が大きい",
+                f"検索の「予算による損失IS」{blis*100:.0f}%。予算増額または効率改善で表示機会を回収できる可能性。", 6)
+        else:
+            add("pass", "予算による機会損失は限定的", f"検索の予算損失IS {blis*100:.0f}%。", 0)
+
+    # --- 9. 広告表示オプション（アセット）の設定状況 ---
+    at = set(d.get("asset_types") or [])
+    if "SEARCH" in chan:
+        key_assets = {"SITELINK": "サイトリンク", "CALLOUT": "コールアウト", "STRUCTURED_SNIPPET": "構造化スニペット"}
+        present = [jp for k, jp in key_assets.items() if k in at]
+        if len(present) < 2:
+            miss = [jp for k, jp in key_assets.items() if k not in at]
+            add("warn", "広告表示オプションが不足",
+                f"検索の主要アセットのうち設定は{len(present)}種（{'/'.join(present) or 'なし'}）。未設定：{'/'.join(miss)}。CTR・占有率の改善余地。", 5)
+        else:
+            add("pass", "広告表示オプションは設定済み", f"主要アセット{len(present)}種を設定（{'/'.join(present)}）。", 0)
 
     # スコア算出
     score = max(0, min(100, 100 - sum(f["_p"] for f in F)))
