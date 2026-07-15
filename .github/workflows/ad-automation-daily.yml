@@ -37,9 +37,9 @@ jobs:
       GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
       GOOGLE_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_LOGIN_CUSTOMER_ID }}
       SOFCOM_META_SYSTEM_USER_TOKEN: ${{ secrets.SOFCOM_META_SYSTEM_USER_TOKEN }}
-      # 通知(Google Chat)は運用確立後に有効化：下2行のコメントを外し Secrets を登録
-      # NOTIFY_CHANNEL: googlechat
-      # GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+      GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+      # 通知は「Webhookが登録済み かつ 朝8:30の実行(または手動)」のときだけ Google Chat へ。昼/夕は通知しない（ノイズ回避）。
+      NOTIFY_CHANNEL: ${{ (secrets.GOOGLE_CHAT_WEBHOOK_URL != '' && (github.event_name != 'schedule' || github.event.schedule == '30 23 * * *')) && 'googlechat' || 'none' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,8 +59,8 @@ jobs:
           python3 scripts/fetch_monthly_series.py || true
           # 監査（ads-google観点の機械チェック）→ console/audit.json（クライアント詳細で表示）
           python3 scripts/build_audits.py || true
-          # 通知先(NOTIFY_CHANNEL)未設定なら送信されない。有効化時は「monitor.py --send」に変更
-          python3 scripts/monitor.py
+          # 監視＋通知（NOTIFY_CHANNEL=none のときは送信スキップ＝Webhook未登録/朝以外は自動でnone）
+          python3 scripts/monitor.py --send || true
           # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
           cp data/daily.json console/daily.json 2>/dev/null || true
 
