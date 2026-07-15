@@ -6,7 +6,9 @@ name: ad-automation daily
 
 on:
   schedule:
-    - cron: "30 23 * * *"
+    - cron: "30 23 * * *"  # 08:30 JST（朝の定期）
+    - cron: "0 3 * * *"    # 12:00 JST（日中の再取得＝急変を早く検知）
+    - cron: "0 7 * * *"    # 16:00 JST（夕方の再取得）
   workflow_dispatch: {}
   # ad-automation の変更を main に push したら自動で再取得＆デプロイ（コンソール改修を即反映）
   push:

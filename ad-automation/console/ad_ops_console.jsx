@@ -596,7 +596,7 @@ export default function AdOpsConsole() {
 
         <div style={{ marginTop: 20, fontSize: 11, color: "#94a3b8", lineHeight: 1.7 }}>
           {dataInfo
-            ? "実データ（Google Ads / Meta）。毎朝8:30に取得→監視。判断基準はCLAUDE.mdルールブック＋各社の目標設定に集約。書き込み（予算/入札/ON-OFF）は承認後にのみ実行。"
+            ? "実データ（Google Ads / Meta）。毎日 8:30・12:00・16:00 に取得→監視。判断基準はCLAUDE.mdルールブック＋各社の目標設定に集約。書き込み（予算/入札/ON-OFF）は承認後にのみ実行。"
             : "サンプルデータのプロトタイプ。実運用では Google Ads / Meta を接続し、毎朝取得・分析・提案生成。書き込みは承認後にのみ実行。"}
         </div>
       </div>
