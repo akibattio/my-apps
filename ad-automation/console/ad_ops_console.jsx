@@ -314,7 +314,7 @@ export default function AdOpsConsole() {
   return (
     <div style={{ minHeight: "100vh", background: "#f6f7f6", color: "#0f172a",
       fontFamily: "-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" }}>
-      <div style={{ background: "#0f2a1f", color: "#fff", padding: "14px 24px" }}>
+      <div className="no-print" style={{ background: "#0f2a1f", color: "#fff", padding: "14px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700 }}>広告運用コンソール</div>
@@ -453,9 +453,15 @@ export default function AdOpsConsole() {
           }).filter(Boolean);
           return (
             <>
-              <button onClick={() => { setView("list"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, padding: 0 }}>
-                <ArrowLeft size={15} /> 一覧に戻る
-              </button>
+              <div className="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <button onClick={() => { setView("list"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
+                  <ArrowLeft size={15} /> 一覧に戻る
+                </button>
+                <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, border: "1px solid #047857", background: "#fff", color: "#047857", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                  🖨 レポート印刷／PDF
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>ソフトコミュニケーションズ 広告運用レポート{dataInfo ? `（${dataInfo.generatedAt || ""}時点）` : ""}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
                 <span style={{ fontSize: 22, fontWeight: 700 }}>{cl.client}</span>
                 {cl.tier === "large" && <LargePill />}
@@ -501,9 +507,11 @@ export default function AdOpsConsole() {
                 })}
               </div>
 
-              <SectionTitle icon={<Zap size={16} color="#047857" />} title="この社の承認待ち" note={cProps.length ? "" : "承認待ちはありません。"} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: cProps.length ? 22 : 8 }}>
-                {cProps.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={null} hideClient />)}
+              <div className="no-print">
+                <SectionTitle icon={<Zap size={16} color="#047857" />} title="この社の承認待ち" note={cProps.length ? "" : "承認待ちはありません。"} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: cProps.length ? 22 : 8 }}>
+                  {cProps.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={null} hideClient />)}
+                </div>
               </div>
 
               {cAlerts.length > 0 && (
@@ -626,7 +634,7 @@ export default function AdOpsConsole() {
           </>
         )}
 
-        <div style={{ marginTop: 20, fontSize: 11, color: "#94a3b8", lineHeight: 1.7 }}>
+        <div className="no-print" style={{ marginTop: 20, fontSize: 11, color: "#94a3b8", lineHeight: 1.7 }}>
           {dataInfo
             ? "実データ（Google Ads / Meta）。毎日 8:30・12:00・16:00 に取得→監視。判断基準はCLAUDE.mdルールブック＋各社の目標設定に集約。書き込み（予算/入札/ON-OFF）は承認後にのみ実行。"
             : "サンプルデータのプロトタイプ。実運用では Google Ads / Meta を接続し、毎朝取得・分析・提案生成。書き込みは承認後にのみ実行。"}

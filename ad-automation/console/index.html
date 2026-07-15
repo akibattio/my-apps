@@ -18,6 +18,12 @@
   body { margin: 0; }
   #root { min-height: 100vh; }
   .boot { font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; padding: 40px; color: #64748b; }
+  /* 月初レポート：印刷/PDF時はナビ・ボタン等を隠し、開いている社の詳細だけを出す */
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff !important; }
+    @page { margin: 12mm; }
+  }
 </style>
 </head>
 <body>
