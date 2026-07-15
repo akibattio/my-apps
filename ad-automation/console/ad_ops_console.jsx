@@ -132,6 +132,7 @@ export default function AdOpsConsole() {
 
   const [daily, setDaily] = useState(null);
   const [audit, setAudit] = useState(null);
+  const [monthly, setMonthly] = useState(null);
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -151,8 +152,14 @@ export default function AdOpsConsole() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && j.byAccount) setAudit(j); })
       .catch(() => {});
+    fetch("./monthly.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.byAccount) setMonthly(j); })
+      .catch(() => {});
   }, []);
   const auditMap = useMemo(() => (audit && audit.byAccount) || {}, [audit]);
+  const monthlyMap = useMemo(() => (monthly && monthly.byAccount) || {}, [monthly]);
+  const monthlyGen = monthly && monthly.generated;
   // 日次時系列を client|media で引けるマップに（{days, byType}。Googleのみ・Metaは空）
   const dailyMap = useMemo(() => {
     const m = {};
@@ -463,6 +470,7 @@ export default function AdOpsConsole() {
                         <MiniStat label="状態" value={HLABEL[h]} bad={h !== "good" && h !== "unset"} />
                       </div>
                       )}
+                      {((monthlyMap[`${c.client}|${c.media}`] || []).length > 0) && <MonthlyTrend series={monthlyMap[`${c.client}|${c.media}`]} generated={monthlyGen} target={c.target || (c.bench && c.bench.targetCpa)} bench={c.bench} />}
                       {auditMap[`${c.client}|${c.media}`] && <AuditReport a={auditMap[`${c.client}|${c.media}`]} />}
                     </div>
                   );
@@ -984,6 +992,71 @@ function BenchmarkChecks({ c }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// 月次トレンド（前年同月比＋最大13ヶ月の推移）。長期の伸び/落ちを把握。
+function MonthlyTrend({ series, generated, target, bench }) {
+  if (!series || !series.length) return null;
+  const curM = generated ? generated.slice(0, 7) : null;
+  const complete = curM ? series.filter((m) => m.month !== curM) : series;
+  const base = complete.length ? complete : series;
+  const latest = base[base.length - 1];
+  const [yy, mm] = latest.month.split("-");
+  const prevYM = `${+yy - 1}-${mm}`;
+  const prev = series.find((m) => m.month === prevYM);
+  const mJp = (s) => (s ? `${+s.split("-")[0]}年${+s.split("-")[1]}月` : "—");
+  const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
+  const chart = series.slice(-13);
+  const maxC = Math.max(1, ...chart.map((m) => m.cost || 0));
+  const W = 560, H = 130, padL = 40, padT = 8, padB = 22;
+  const iw = W - padL - 10, ih = H - padT - padB;
+  const bw = iw / chart.length;
+  const fmtY = (n) => (n >= 10000 ? Math.round(n / 10000) + "万" : n >= 1000 ? Math.round(n / 1000) + "k" : "" + n);
+  const cpaCol = (cpa) => cpaColor(cpa, target, bench);
+  const cards = [
+    { k: "費用", cur: yen(latest.cost), prev: prev ? yen(prev.cost) : "—", d: prev ? pct(latest.cost, prev.cost) : null, dir: 0 },
+    { k: "CV", cur: Math.round(latest.cv) + "件", prev: prev ? Math.round(prev.cv) + "件" : "—", d: prev ? pct(latest.cv, prev.cv) : null, dir: 1 },
+    { k: "CPA", cur: latest.cpa ? yen(latest.cpa) : "—", prev: prev && prev.cpa ? yen(prev.cpa) : "—", d: prev ? pct(latest.cpa, prev.cpa) : null, dir: -1, col: cpaCol(latest.cpa) },
+  ];
+  return (
+    <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 2 }}>
+        <TrendingUp size={14} color="#047857" /> 月次トレンド（前年同月比）
+      </div>
+      <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 8 }}>{prev ? `${mJp(latest.month)}（確定月）と ${mJp(prevYM)} を比較。` : `${mJp(latest.month)}（前年同月のデータなし）。`}緑＝改善／赤＝悪化。</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 12 }}>
+        {cards.map((c) => (
+          <div key={c.k}>
+            <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{c.k}（{mJp(latest.month)}）</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: c.col || "#0f2a1f" }}>{c.cur}</div>
+            <div style={{ fontSize: 10.5, color: "#94a3b8", display: "flex", gap: 5, alignItems: "center" }}>前年 {c.prev} {c.d != null && <DeltaTag v={c.d} dir={c.dir} />}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 420, height: "auto" }}>
+          {[0, 0.5, 1].map((f) => (
+            <g key={f}>
+              <line x1={padL} y1={padT + ih - f * ih} x2={W - 10} y2={padT + ih - f * ih} stroke="#eef1f4" />
+              <text x={padL - 5} y={padT + ih - f * ih + 3} textAnchor="end" fontSize="9" fill="#94a3b8">{fmtY(maxC * f)}</text>
+            </g>
+          ))}
+          {chart.map((m, i) => {
+            const h = (m.cost / maxC) * ih;
+            const hot = m.month === latest.month || m.month === prevYM;
+            return (
+              <g key={m.month}>
+                <rect x={padL + i * bw + 1} y={padT + ih - h} width={Math.max(1, bw - 3)} height={h} fill={m.month === latest.month ? "#0f7a52" : m.month === prevYM ? "#c9a227" : "#cfe0d7"} rx="1" />
+                {(i === 0 || i === chart.length - 1 || m.month.endsWith("-01")) &&
+                  <text x={padL + i * bw + bw / 2} y={H - 6} textAnchor="middle" fontSize="8.5" fill="#94a3b8">{m.month.slice(2).replace("-", "/")}</text>}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>棒＝月間費用（最大{chart.length}ヶ月）。<span style={{ color: "#0f7a52" }}>■</span>直近確定月 ／ <span style={{ color: "#c9a227" }}>■</span>前年同月。</div>
     </div>
   );
 }

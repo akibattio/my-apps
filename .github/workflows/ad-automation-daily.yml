@@ -55,6 +55,8 @@ jobs:
           python3 scripts/build_console_data.py
           python3 scripts/fetch_daily_series.py
           python3 scripts/fetch_search_diagnostics.py
+          # 月次時系列(最大14ヶ月・前年同月比/長期トレンド用)→ console/monthly.json
+          python3 scripts/fetch_monthly_series.py || true
           # 監査（ads-google観点の機械チェック）→ console/audit.json（クライアント詳細で表示）
           python3 scripts/build_audits.py || true
           # 通知先(NOTIFY_CHANNEL)未設定なら送信されない。有効化時は「monitor.py --send」に変更
