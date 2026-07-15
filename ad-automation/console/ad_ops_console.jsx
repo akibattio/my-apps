@@ -1172,6 +1172,48 @@ function AuditReport({ a }) {
   );
 }
 
+// 月末着地予測：当月の消化ペースから月末の 費用/CV/CPA を線形予測。予算・目標との対比つき。
+function MonthEndProjection({ days, dailyBudget, target, bench }) {
+  if (!days || !days.length) return null;
+  const cur = days[days.length - 1].date.slice(0, 7);
+  const md = days.filter((d) => d.date.slice(0, 7) === cur);
+  if (!md.length) return null;
+  const [Y, M] = cur.split("-").map(Number);
+  const daysInMonth = new Date(Y, M, 0).getDate();
+  const elapsed = Math.max(1, +md[md.length - 1].date.slice(8, 10));
+  const spendMTD = md.reduce((s, d) => s + (d.cost || 0), 0);
+  const cvMTD = md.reduce((s, d) => s + (d.cv || 0), 0);
+  const projSpend = Math.round(spendMTD / elapsed * daysInMonth);
+  const projCv = cvMTD / elapsed * daysInMonth;
+  const projCpa = projCv ? Math.round(projSpend / projCv) : null;
+  const expected = dailyBudget ? dailyBudget * daysInMonth : null;
+  const overPct = expected ? Math.round((projSpend / expected - 1) * 100) : null;
+  const overC = overPct == null ? "#475569" : Math.abs(overPct) <= 10 ? "#047857" : overPct > 0 ? "#dc2626" : "#d97706";
+  const cell = { fontSize: 10.5, color: "#94a3b8" };
+  return (
+    <div style={{ marginBottom: 12, background: "#f8faf9", border: "1px solid #eef1f4", borderRadius: 8, padding: "9px 12px" }}>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>月末着地予測（{M}月・{elapsed}/{daysInMonth}日 経過）</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+        <div>
+          <div style={cell}>費用 着地予測</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: overC }}>{yen(projSpend)}</div>
+          <div style={cell}>当月 {yen(spendMTD)}{expected ? ` / 予算 ${yen(expected)}${overPct != null ? `（${overPct > 0 ? "+" : ""}${overPct}%）` : ""}` : ""}</div>
+        </div>
+        <div>
+          <div style={cell}>CV 着地予測</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>{Math.round(projCv)}件</div>
+          <div style={cell}>当月 {Math.round(cvMTD)}件</div>
+        </div>
+        <div>
+          <div style={cell}>CPA 着地予測</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: cpaColor(projCpa, target, bench) }}>{projCpa ? yen(projCpa) : "—"}</div>
+          <div style={cell}>{target ? `目標 ${yen(target)}` : "目標未設定"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // クライアント詳細の「レポート状態」：予算消化＋直近7日/前7日/手法別
 function AccountReport({ c, days, byType }) {
   const d7 = c.metrics.d7, lm = c.metrics.lm;
@@ -1213,6 +1255,8 @@ function AccountReport({ c, days, byType }) {
           </div>
         )}
       </div>
+      {/* 月末着地予測（当月の消化ペースから月末を予測） */}
+      {days && days.length >= 3 && <MonthEndProjection days={days} dailyBudget={c.dailyBudget} target={c.target || (c.bench && c.bench.targetCpa)} bench={c.bench} />}
       {/* 基準チェック（運用サポート） */}
       {c.bench && <BenchmarkChecks c={c} />}
       {/* 指標テーブル（直近7日 / 先月 / 先月比）— 日次データが無いアカウント(Meta)のみ表示 */}
