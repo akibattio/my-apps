@@ -99,13 +99,22 @@ export default function AdOpsConsole() {
   const [targets, setTargets] = useState({});
   const [history, setHistory] = useState([]);
   const [operator, setOperator] = useState("");
+  const [alertOps, setAlertOps] = useState({});
   useEffect(() => {
     try {
       setTargets(JSON.parse(localStorage.getItem("adops_targets") || "{}"));
       setHistory(JSON.parse(localStorage.getItem("adops_targets_history") || "[]"));
       setOperator(localStorage.getItem("adops_operator") || "");
+      setAlertOps(JSON.parse(localStorage.getItem("adops_alert_ops") || "{}"));
     } catch (e) {}
   }, []);
+  // アラート対応（確認済み/様子見/メモ）— この端末に保存（共有はKV化で将来対応）
+  const saveAlertOps = (next) => { setAlertOps(next); try { localStorage.setItem("adops_alert_ops", JSON.stringify(next)); } catch (e) {} };
+  const setAlertOp = (key, patch) => {
+    const cur = alertOps[key] || {};
+    saveAlertOps({ ...alertOps, [key]: { ...cur, ...patch, at: new Date().toLocaleString("ja-JP"), by: (operator || "").trim() || "担当" } });
+  };
+  const clearAlertOp = (key) => { const n = { ...alertOps }; delete n[key]; saveAlertOps(n); };
   const saveOperator = (v) => { setOperator(v); try { localStorage.setItem("adops_operator", v); } catch (e) {} };
   const saveTargets = (t) => {
     // 変更差分を履歴に記録（誰が・いつ・何を・変更前後の値）— CLAUDE.md §4
@@ -246,9 +255,19 @@ export default function AdOpsConsole() {
       items = alerts.map((a) => ({ client: a.c.client, media: a.c.media, kind: "", fact: a.msg, severity: a.sev, action: null }));
     }
     return items
+      .map((a) => ({ ...a, key: `${a.client}|${a.media}|${a.kind}` }))
       .filter((a) => media === "all" || a.media === media)
       .sort((x, y) => (SEVRANK[x.severity] ?? 3) - (SEVRANK[y.severity] ?? 3));
   }, [dataInfo, A, media, alerts]);
+  // 対応管理で「確認済み/様子見(期限内)」は主リストから外す
+  const alertActive = serverAlerts.filter((a) => {
+    const op = alertOps[a.key];
+    if (!op) return true;
+    if (op.status === "ack") return false;
+    if (op.status === "snooze" && op.until && new Date(op.until).getTime() > Date.now()) return false;
+    return true;
+  });
+  const alertHandled = serverAlerts.filter((a) => !alertActive.includes(a));
 
   // クライアント別の健全性に「今日の要対応」を反映するため、社ごとの最悪アラート重要度を集計
   const alertRankByClient = useMemo(() => {
@@ -308,7 +327,7 @@ export default function AdOpsConsole() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
-          <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={serverAlerts.length} />
+          <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={alertActive.length} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧（媒体別）" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
@@ -326,7 +345,12 @@ export default function AdOpsConsole() {
         {view === "dash" && (
           <>
             {/* ① 今日の要対応（画面トップ固定・最優先）— 運用者はまずここだけ見れば良い */}
-            <TodayActions items={serverAlerts} onClient={goClient} generatedAt={dataInfo && dataInfo.alertsGeneratedAt} />
+            <TodayActions items={alertActive} handled={alertHandled} ops={alertOps} onClient={goClient}
+              onAck={(k) => setAlertOp(k, { status: "ack" })}
+              onSnooze={(k) => setAlertOp(k, { status: "snooze", until: new Date(Date.now() + 3 * 864e5).toISOString() })}
+              onMemo={(k, v) => setAlertOp(k, { memo: v })}
+              onClear={clearAlertOp}
+              generatedAt={dataInfo && dataInfo.alertsGeneratedAt} />
 
             {/* 上部：全体集計(クリックで詳細ページ)・アラート・健全性 */}
             {(() => {
@@ -334,7 +358,7 @@ export default function AdOpsConsole() {
               const w = rows.filter((c) => acctHk(c) === "warning").length;
               const cr = rows.filter((c) => acctHk(c) === "critical").length;
               const nt = rows.filter((c) => acctHk(c) === "unset").length;
-              const crit = serverAlerts.filter((a) => a.severity === "critical").length;
+              const crit = alertActive.filter((a) => a.severity === "critical").length;
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 20 }}>
                   <button onClick={() => setView("summary")} style={{ textAlign: "left", cursor: "pointer", background: "#0f2a1f", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px" }}>
@@ -344,8 +368,8 @@ export default function AdOpsConsole() {
                   </button>
                   <Card>
                     <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>今日の要対応</div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: serverAlerts.length ? "#dc2626" : "#047857" }}>{serverAlerts.length}件</div>
-                    <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8" }}>{crit ? `うち要対応 ${crit}件` : "重大なし"}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: alertActive.length ? "#dc2626" : "#047857" }}>{alertActive.length}件</div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8" }}>{crit ? `うち要対応 ${crit}件` : (alertHandled.length ? `対応済/様子見 ${alertHandled.length}件` : "重大なし")}</div>
                   </Card>
                   <Card>
                     <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>健全性（{rows.length}アカウント）</div>
@@ -690,13 +714,54 @@ function PortfolioGrid({ clients, onOpen }) {
     </div>
   );
 }
-// ① 今日の要対応：運用者がまず見るパネル。重要度順・事実+推奨対応つき・クリックで社別へ。
-function TodayActions({ items, onClient, generatedAt }) {
+// ① 今日の要対応：運用者がまず見るパネル。重要度順・事実+推奨対応つき・確認済み/様子見/メモで対応管理。
+function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, onClear, generatedAt }) {
+  const [editKey, setEditKey] = useState(null);
+  const [draft, setDraft] = useState("");
+  const [showHandled, setShowHandled] = useState(false);
   const crit = items.filter((i) => i.severity === "critical").length;
   const warn = items.filter((i) => i.severity === "warning").length;
   const info = items.filter((i) => i.severity === "info").length;
   const accent = crit ? "#dc2626" : warn ? "#d97706" : "#047857";
-  if (!items.length) {
+  const nh = (handled || []).length;
+  const btn = { fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 6, border: "1px solid #d7e0db", background: "#fff", cursor: "pointer", color: "#475569" };
+  const stop = (e) => e.stopPropagation();
+
+  const renderRow = (a) => {
+    const s = SEV[a.severity] || SEV.warning;
+    const op = (ops && ops[a.key]) || {};
+    return (
+      <div key={a.key} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", border: "1px solid #eef1f0", borderLeft: `3px solid ${s.dot}`, borderRadius: 8, background: "#fcfdfc", cursor: onClient ? "pointer" : "default" }}>
+        <span style={{ flexShrink: 0, marginTop: 1, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText, minWidth: 44, textAlign: "center" }}>{s.label}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1f" }}>
+            {a.client}<MediaPill m={a.media} />
+            {a.kind && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.chipText, marginLeft: 4 }}>{a.kind}</span>}
+          </div>
+          <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{a.fact}</div>
+          {a.action && <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}><b style={{ color: "#047857" }}>対応 </b>{a.action}</div>}
+          {op.memo && editKey !== a.key && <div style={{ fontSize: 11.5, color: "#0f2a1f", marginTop: 3, background: "#fff8e1", borderRadius: 6, padding: "3px 7px" }}>📝 {op.memo}</div>}
+          {editKey === a.key ? (
+            <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 5 }}>
+              <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="メモ（この端末に保存）"
+                style={{ flex: 1, minWidth: 0, fontSize: 11.5, padding: "4px 8px", border: "1px solid #d7e0db", borderRadius: 6 }} />
+              <button style={btn} onClick={() => { onMemo(a.key, draft.trim()); setEditKey(null); }}>保存</button>
+              <button style={btn} onClick={() => setEditKey(null)}>取消</button>
+            </div>
+          ) : (
+            <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+              <button style={btn} onClick={() => onAck(a.key)}>✓ 確認済み</button>
+              <button style={btn} onClick={() => onSnooze(a.key)}>様子見3日</button>
+              <button style={btn} onClick={() => { setEditKey(a.key); setDraft(op.memo || ""); }}>メモ</button>
+            </div>
+          )}
+        </div>
+        {onClient && <ChevronRight size={15} color="#cbd5e1" style={{ flexShrink: 0, marginTop: 2 }} />}
+      </div>
+    );
+  };
+
+  if (!items.length && !nh) {
     return (
       <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderTop: "3px solid #047857", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
         <ShieldCheck size={20} color="#047857" />
@@ -708,11 +773,11 @@ function TodayActions({ items, onClient, generatedAt }) {
     );
   }
   return (
-    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderTop: `3px solid ${accent}`, borderRadius: 12, padding: "14px 16px 6px", marginBottom: 20 }}>
+    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderTop: `3px solid ${items.length ? accent : "#047857"}`, borderRadius: 12, padding: "14px 16px 12px", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <AlertTriangle size={18} color={accent} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>今日の要対応 <span style={{ color: accent }}>{items.length}件</span></span>
+          <AlertTriangle size={18} color={items.length ? accent : "#047857"} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>今日の要対応 <span style={{ color: items.length ? accent : "#047857" }}>{items.length}件</span></span>
         </div>
         <div style={{ display: "flex", gap: 8, fontSize: 11.5, fontWeight: 700 }}>
           {crit > 0 && <span style={{ color: "#dc2626" }}>● 要対応 {crit}</span>}
@@ -721,25 +786,35 @@ function TodayActions({ items, onClient, generatedAt }) {
           {generatedAt && <span style={{ color: "#94a3b8", fontWeight: 400 }}>監視 {generatedAt}</span>}
         </div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-        {items.map((a, i) => {
-          const s = SEV[a.severity] || SEV.warning;
-          return (
-            <div key={i} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", border: "1px solid #eef1f0", borderLeft: `3px solid ${s.dot}`, borderRadius: 8, background: "#fcfdfc", cursor: onClient ? "pointer" : "default" }}>
-              <span style={{ flexShrink: 0, marginTop: 1, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText, minWidth: 44, textAlign: "center" }}>{s.label}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1f" }}>
-                  {a.client}<MediaPill m={a.media} />
-                  {a.kind && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.chipText, marginLeft: 4 }}>{a.kind}</span>}
-                </div>
-                <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{a.fact}</div>
-                {a.action && <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}><b style={{ color: "#047857" }}>対応 </b>{a.action}</div>}
-              </div>
-              {onClient && <ChevronRight size={15} color="#cbd5e1" style={{ flexShrink: 0, marginTop: 2 }} />}
+      {items.length ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>{items.map(renderRow)}</div>
+      ) : (
+        <div style={{ fontSize: 12.5, color: "#64748b", padding: "4px 2px" }}>未対応はありません（対応済み・様子見 {nh}件）。</div>
+      )}
+      {nh > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <button onClick={() => setShowHandled((v) => !v)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#64748b", padding: 0 }}>
+            対応済み・様子見 {nh}件 {showHandled ? "▲" : "▼"}
+          </button>
+          {showHandled && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8, marginTop: 8 }}>
+              {handled.map((a) => {
+                const op = (ops && ops[a.key]) || {};
+                const st = op.status === "ack" ? "確認済み" : op.status === "snooze" ? `様子見〜${(op.until || "").slice(0, 10)}` : "";
+                return (
+                  <div key={a.key} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", border: "1px solid #f1f5f4", borderRadius: 8, background: "#fafbfa", opacity: 0.85 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{a.client}<MediaPill m={a.media} />{a.kind && <span style={{ marginLeft: 4, color: "#94a3b8" }}>{a.kind}</span>}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>{st}{op.by ? `・${op.by}` : ""}{op.memo ? `・📝${op.memo}` : ""}</div>
+                    </div>
+                    <button style={{ ...btn, flexShrink: 0 }} onClick={() => onClear(a.key)}>戻す</button>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
