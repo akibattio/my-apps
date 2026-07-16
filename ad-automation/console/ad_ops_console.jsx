@@ -130,8 +130,38 @@ export default function AdOpsConsole() {
       setApprovals(JSON.parse(localStorage.getItem("adops_approvals") || "{}"));
     } catch (e) {}
   }, []);
-  // アラート対応（確認済み/様子見/メモ）— この端末に保存（共有はKV化で将来対応）
-  const saveAlertOps = (next) => { setAlertOps(next); try { localStorage.setItem("adops_alert_ops", JSON.stringify(next)); } catch (e) {} };
+
+  // 共有ストレージ(Cloudflare KV)：目標設定・アラート対応・承認をスタッフ間で同期。KV未バインド時はlocalStorageのまま。
+  const putState = (section, data) => {
+    fetch(`./api/state/${section}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }).catch(() => {});
+  };
+  const applyShared = (j) => {
+    if (!j || j.error) return false; // kv_unbound 等 → 共有なし
+    if (j.targets) setTargets(j.targets);
+    if (Array.isArray(j.targetsHistory)) setHistory(j.targetsHistory);
+    if (j.alertOps) setAlertOps(j.alertOps);
+    if (j.approvals) setApprovals(j.approvals);
+    return true;
+  };
+  useEffect(() => {
+    // 起動時：KVから共有状態を読み込み。空なら手元(localStorage)を初回移行としてKVへ。
+    fetch("./api/state", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (!j || j.error) return;
+      const ls = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || d); } catch (e) { return JSON.parse(d); } };
+      const has = (o) => o && (Array.isArray(o) ? o.length : Object.keys(o).length);
+      if (has(j.targets)) setTargets(j.targets); else { const t = ls("adops_targets", "{}"); if (has(t)) putState("targets", t); }
+      if (has(j.targetsHistory)) setHistory(j.targetsHistory); else { const h = ls("adops_targets_history", "[]"); if (has(h)) putState("targetsHistory", h); }
+      if (has(j.alertOps)) setAlertOps(j.alertOps); else { const a = ls("adops_alert_ops", "{}"); if (has(a)) putState("alertOps", a); }
+      if (has(j.approvals)) setApprovals(j.approvals); else { const a = ls("adops_approvals", "{}"); if (has(a)) putState("approvals", a); }
+    }).catch(() => {});
+    // 定期同期：45秒ごとに共有状態を取得（他スタッフの変更を自分の画面へ反映）
+    const id = setInterval(() => {
+      fetch("./api/state", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then(applyShared).catch(() => {});
+    }, 45000);
+    return () => clearInterval(id);
+  }, []);
+  // アラート対応（確認済み/様子見/メモ）— localStorage＋共有(KV)に保存
+  const saveAlertOps = (next) => { setAlertOps(next); try { localStorage.setItem("adops_alert_ops", JSON.stringify(next)); } catch (e) {} putState("alertOps", next); };
   const setAlertOp = (key, patch) => {
     const cur = alertOps[key] || {};
     saveAlertOps({ ...alertOps, [key]: { ...cur, ...patch, at: new Date().toLocaleString("ja-JP"), by: (operator || "").trim() || "担当" } });
@@ -154,10 +184,12 @@ export default function AdOpsConsole() {
     });
     setTargets(t);
     try { localStorage.setItem("adops_targets", JSON.stringify(t)); } catch (e) {}
+    putState("targets", t); // 共有(KV)へ
     if (entries.length) {
       const h = [...entries, ...history];
       setHistory(h);
       try { localStorage.setItem("adops_targets_history", JSON.stringify(h)); } catch (e) {}
+      putState("targetsHistory", h);
     }
   };
 
@@ -247,8 +279,9 @@ export default function AdOpsConsole() {
     const next = { ...approvals, [key]: { decision, reason, by: (operator || "").trim() || "担当", at: new Date().toLocaleString("ja-JP"), client: p.client, media: p.media, kind: p.kind, next: p.next } };
     setApprovals(next);
     try { localStorage.setItem("adops_approvals", JSON.stringify(next)); } catch (e) {}
+    putState("approvals", next);
   };
-  const undecide = (key) => { const n = { ...approvals }; delete n[key]; setApprovals(n); try { localStorage.setItem("adops_approvals", JSON.stringify(n)); } catch (e) {} };
+  const undecide = (key) => { const n = { ...approvals }; delete n[key]; setApprovals(n); try { localStorage.setItem("adops_approvals", JSON.stringify(n)); } catch (e) {} putState("approvals", n); };
   const approvalLog = Object.entries(approvals).map(([key, v]) => ({ key, ...v }));
 
   const clients = useMemo(() => {
