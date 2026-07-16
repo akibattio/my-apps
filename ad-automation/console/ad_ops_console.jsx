@@ -120,6 +120,7 @@ export default function AdOpsConsole() {
   const [operator, setOperator] = useState("");
   const [alertOps, setAlertOps] = useState({});
   const [approvals, setApprovals] = useState({});
+  const [notes, setNotes] = useState({}); // クライアント別 運用メモ・予算メモ（履歴）
   const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     try {
@@ -128,6 +129,7 @@ export default function AdOpsConsole() {
       setOperator(localStorage.getItem("adops_operator") || "");
       setAlertOps(JSON.parse(localStorage.getItem("adops_alert_ops") || "{}"));
       setApprovals(JSON.parse(localStorage.getItem("adops_approvals") || "{}"));
+      setNotes(JSON.parse(localStorage.getItem("adops_notes") || "{}"));
     } catch (e) {}
   }, []);
 
@@ -141,6 +143,7 @@ export default function AdOpsConsole() {
     if (Array.isArray(j.targetsHistory)) setHistory(j.targetsHistory);
     if (j.alertOps) setAlertOps(j.alertOps);
     if (j.approvals) setApprovals(j.approvals);
+    if (j.notes) setNotes(j.notes);
     return true;
   };
   useEffect(() => {
@@ -153,6 +156,7 @@ export default function AdOpsConsole() {
       if (has(j.targetsHistory)) setHistory(j.targetsHistory); else { const h = ls("adops_targets_history", "[]"); if (has(h)) putState("targetsHistory", h); }
       if (has(j.alertOps)) setAlertOps(j.alertOps); else { const a = ls("adops_alert_ops", "{}"); if (has(a)) putState("alertOps", a); }
       if (has(j.approvals)) setApprovals(j.approvals); else { const a = ls("adops_approvals", "{}"); if (has(a)) putState("approvals", a); }
+      if (has(j.notes)) setNotes(j.notes); else { const nt = ls("adops_notes", "{}"); if (has(nt)) putState("notes", nt); }
     }).catch(() => {});
     // 定期同期：45秒ごとに共有状態を取得（他スタッフの変更を自分の画面へ反映）
     const id = setInterval(() => {
@@ -283,6 +287,16 @@ export default function AdOpsConsole() {
   };
   const undecide = (key) => { const n = { ...approvals }; delete n[key]; setApprovals(n); try { localStorage.setItem("adops_approvals", JSON.stringify(n)); } catch (e) {} putState("approvals", n); };
   const approvalLog = Object.entries(approvals).map(([key, v]) => ({ key, ...v }));
+  // クライアント別 運用メモ・予算メモ（履歴：追記型）
+  const saveNotes = (next) => { setNotes(next); try { localStorage.setItem("adops_notes", JSON.stringify(next)); } catch (e) {} putState("notes", next); };
+  const addNote = (client, entry) => {
+    const rec = { ...entry, by: (operator || "").trim() || "担当", at: new Date().toLocaleString("ja-JP") };
+    saveNotes({ ...notes, [client]: [rec, ...(notes[client] || [])] });
+  };
+  const delNote = (client, idx) => {
+    const cur = (notes[client] || []).slice(); cur.splice(idx, 1);
+    saveNotes({ ...notes, [client]: cur });
+  };
 
   const clients = useMemo(() => {
     const m = {};
@@ -570,6 +584,8 @@ export default function AdOpsConsole() {
                 <Card><MiniStat label="合計CV" value={a.cv + "件"} /></Card>
                 <Card><MiniStat label="接続" value={cl.accts.every((x) => x.status === "ok") ? "正常" : "要確認"} bad={!cl.accts.every((x) => x.status === "ok")} /></Card>
               </div>
+
+              <ClientNotes client={cl.client} list={notes[cl.client] || []} onAdd={addNote} onDel={delNote} />
 
               <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体別" note="この社の各アカウントの接続と成果。手法別（検索/PMax等）・週次も表示。" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
@@ -922,6 +938,57 @@ function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, 
               })}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+// クライアント別 運用メモ・予算メモ（履歴：追記型）。対象月・媒体・増減額・理由を残し、予算変動の説明とミス防止に使う。
+function ClientNotes({ client, list, onAdd, onDel }) {
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [media, setMedia] = useState("");
+  const [amount, setAmount] = useState("");
+  const [text, setText] = useState("");
+  const submit = () => {
+    if (!text.trim()) return;
+    onAdd(client, { month, media, amount: amount === "" ? null : Number(amount), text: text.trim() });
+    setText(""); setAmount("");
+  };
+  const inp = { padding: "6px 9px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, background: "#fff" };
+  const amtStr = (n) => (n == null ? null : (n >= 0 ? "+¥" + n.toLocaleString("ja-JP") : "−¥" + Math.abs(n).toLocaleString("ja-JP")));
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <SectionTitle icon={<span style={{ fontSize: 15 }}>📝</span>} title="運用メモ・予算メモ（履歴）" note="今月だけの予算変更やキャンペーン/イベント対応などを記録。予算変動の理由が残り、運用ミス防止＋説明に使えます。" />
+      {/* 入力 */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...inp, width: 140 }} />
+        <select value={media} onChange={(e) => setMedia(e.target.value)} style={inp}>
+          <option value="">媒体（任意）</option><option value="Google">Google</option><option value="Meta">Meta</option>
+          <option value="Yahoo">Yahoo!</option><option value="全体">全体</option><option value="その他">その他</option>
+        </select>
+        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="増減額(円・任意)" style={{ ...inp, width: 150, textAlign: "right" }} />
+        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="理由・メモ（例：見学会でMeta増額）" style={{ ...inp, flex: 1, minWidth: 220 }} />
+        <button onClick={submit} style={btnP}><Check size={15} /> 追加</button>
+      </div>
+      {/* 履歴 */}
+      {list.length === 0 ? (
+        <Empty text="まだメモはありません。今月の特別対応や予算変更を記録しておくと、後から理由が追えます。" />
+      ) : (
+        <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
+          {list.map((n, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 13px", borderTop: i ? "1px solid #f1f5f4" : "none" }}>
+              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: "#0f2a1f", background: "#eef2ff", borderRadius: 6, padding: "2px 8px" }}>{n.month ? `${+n.month.slice(5, 7)}月` : "—"}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: "#0f172a" }}>
+                  {n.media && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#4338ca", marginRight: 6 }}>{n.media}</span>}
+                  {n.amount != null && <span style={{ fontSize: 12.5, fontWeight: 700, color: n.amount >= 0 ? "#1a56db" : "#b45309", marginRight: 6 }}>{amtStr(n.amount)}</span>}
+                  {n.text}
+                </div>
+                <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 2 }}>{n.by}・{n.at}</div>
+              </div>
+              <button onClick={() => { if (window.confirm("このメモを削除しますか？")) onDel(client, i); }} style={{ flexShrink: 0, border: "none", background: "none", color: "#cbd5e1", cursor: "pointer", fontSize: 14 }}>×</button>
+            </div>
+          ))}
         </div>
       )}
     </div>
