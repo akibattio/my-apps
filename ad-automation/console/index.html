@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>広告運用コンソール（モック）</title>
+<!-- 依存(React/ReactDOM/lucide/Babel)は console/vendor/ に自前ホスト。外部CDN(esm.sh/unpkg)に依存せず、CDN障害時も表示が壊れない。差し替えは scripts でバンドル再生成。 -->
 <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?external=react",
-    "lucide-react": "https://esm.sh/lucide-react@0.407.0?external=react"
+    "react": "./vendor/react.js",
+    "react-dom/client": "./vendor/react-dom-client.js",
+    "lucide-react": "./vendor/lucide-react.js"
   }
 }
 </script>
-<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<script src="./vendor/babel.min.js"></script>
 <style>
   body { margin: 0; }
   #root { min-height: 100vh; }
@@ -27,7 +28,7 @@
 </style>
 </head>
 <body>
-<div id="root"><div class="boot">モックを読み込み中…（React / アイコンをCDN取得）</div></div>
+<div id="root"><div class="boot">読み込み中…</div></div>
 <script type="module">
   try {
     const src = await (await fetch('./ad_ops_console.jsx', { cache: 'no-store' })).text();
@@ -39,8 +40,7 @@
     rd.createRoot(document.getElementById('root')).render(React.createElement(mod.default));
   } catch (e) {
     document.getElementById('root').innerHTML =
-      '<div class="boot">読み込みエラー: ' + e.message +
-      '<br>（CDN接続が必要です。ネットワークをご確認ください）</div>';
+      '<div class="boot">読み込みエラー: ' + e.message + '</div>';
     console.error(e);
   }
 </script>
