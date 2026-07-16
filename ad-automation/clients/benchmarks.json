@@ -7,21 +7,68 @@
       "ctrMin": 2.0,
       "freqMax": 3.5,
       "cpaWarnPct": 0.15,
-      "cpaSeverePct": 0.30,
+      "cpaSeverePct": 0.3,
       "tier": "large",
       "monthly": 2800000
     },
     "【EM生活】公式オンラインショップ": {
       "targetCpa": 800,
-      "cpcMax": 100
+      "cpcMax": 100,
+      "monthly": 250000
     },
     "【展示会ブース装飾】": {
       "targetCpa": 40000,
-      "cpcMax": 1000
+      "cpcMax": 1000,
+      "monthly": 450000
     },
     "【東海グランド】TOOGU": {
       "targetCpa": 6000,
-      "cpcMax": 300
+      "cpcMax": 300,
+      "monthly": 260000
+    },
+    "Ricelog（エス・ジー）": {
+      "cpcMax": 150,
+      "monthly": 30000
+    },
+    "【SC】コーポレートサイト": {
+      "targetCpa": 20000,
+      "cpcMax": 1000,
+      "monthly": 100000
+    },
+    "【SUBACO】": {
+      "targetCpa": 30000,
+      "cpcMax": 600,
+      "monthly": 200000
+    },
+    "【あんじゅホーム】": {
+      "targetCpa": 5000,
+      "cpcMax": 600,
+      "monthly": 150000
+    },
+    "【エスジー】RiceLog": {
+      "targetCpa": 2000,
+      "cpcMax": 500,
+      "monthly": 100000
+    },
+    "【メディナビ】AICE": {
+      "targetCpa": 3000,
+      "cpcMax": 600,
+      "monthly": 100000
+    },
+    "【リアリット】ドン・キホーテ": {
+      "targetCpa": 2000,
+      "cpcMax": 100,
+      "monthly": 370000
+    },
+    "【明成建設】クラテルリノベ": {
+      "targetCpa": 50000,
+      "cpcMax": 1000,
+      "monthly": 100000
+    },
+    "【村上建設】": {
+      "targetCpa": 30000,
+      "cpcMax": 800,
+      "monthly": 550000
     }
   }
 }
