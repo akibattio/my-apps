@@ -124,9 +124,14 @@ def daily_checks(acct: dict, today, cadence=None) -> list[dict]:
         d = bydate.get(ds)
         cal.append({"date": ds, "imp": (d["imp"] if d else 0), "clk": (d["clk"] if d else 0), "cost": (d["cost"] if d else 0)})
     y = cal[-1]                       # 昨日（最新の完全日）
-    prev14 = cal[-15:-1]             # 昨日の前14日
-    imp_base = _median([d["imp"] for d in prev14])
-    cost_base = _median([d["cost"] for d in prev14])
+
+    def _is_wend(ds):
+        return datetime.fromisoformat(ds).weekday() >= 5   # 土(5)・日(6)
+    ywend = _is_wend(y["date"])
+    # 基準は「同じ曜日区分(平日/土日)」の直近28日中央値 → 土日非配信クライアントでも誤検知しない
+    sametype = [d for d in cal[-29:-1] if _is_wend(d["date"]) == ywend]
+    imp_base = _median([d["imp"] for d in sametype])
+    cost_base = _median([d["cost"] for d in sametype])
     active7 = sum(1 for d in cal[-8:-1] if d["imp"] > 0)
     active_days = sum(1 for d in cal if d["cost"] > 0)
     if cadence is None:
@@ -141,18 +146,18 @@ def daily_checks(acct: dict, today, cadence=None) -> list[dict]:
     if imp_base >= 100 and active7 >= 5 and y["imp"] < imp_base * 0.2:
         pct = round(y["imp"] / imp_base * 100) if imp_base else 0
         add("critical", "インプ急停止",
-            f"{y['date']} 表示{y['imp']:,}（直近14日中央値{int(imp_base):,}の{pct}%）",
+            f"{y['date']} 表示{y['imp']:,}（同曜日の中央値{int(imp_base):,}の{pct}%）",
             "接続/配信担当へ即確認（意図的停止でないか）")
 
     # ② 消化 大幅増減（クレーム直結）— 安定=週次(月曜/前週比±30%)、日次=前日中央値比±50%
     if cadence == "daily":
         if cost_base >= 1000 and y["cost"] == 0:
-            add("critical", "消化急減", f"{y['date']} 消化¥0（直近中央値¥{int(cost_base):,}）", "担当（配信停止を確認）")
+            add("critical", "消化急減", f"{y['date']} 消化¥0（同曜日の中央値¥{int(cost_base):,}）", "担当（配信停止を確認）")
         elif cost_base >= 1000:
             dev = y["cost"] / cost_base - 1
             if abs(dev) >= 0.5:
                 add("critical", "消化" + ("急増" if dev > 0 else "急減"),
-                    f"{y['date']} ¥{y['cost']:,}（直近中央値¥{int(cost_base):,}比 {'+' if dev > 0 else ''}{round(dev * 100)}%）",
+                    f"{y['date']} ¥{y['cost']:,}（同曜日中央値¥{int(cost_base):,}比 {'+' if dev > 0 else ''}{round(dev * 100)}%）",
                     "担当（予算/配信を確認）")
     elif today.weekday() == 0:  # weekly は月曜に前週比
         this7 = sum(d["cost"] for d in cal[-7:])
