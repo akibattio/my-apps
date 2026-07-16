@@ -118,12 +118,16 @@ def daily_checks(acct: dict, today, cadence=None) -> list[dict]:
     if len(days) < 10:  # データ不足/学習期間は対象外（早すぎる判定を避ける）
         return out
     bydate = {d["date"]: d for d in days}
+    # 評価の基準日は「暦の昨日」ではなく「データの最新日」に合わせる（取得TZ差/遅延で暦とデータがズレるため）。
+    # 最新データ日は当日＝部分データの可能性が高いので除外し、その前日を最新完全日(y)とする。
+    latest = datetime.fromisoformat(sorted(bydate.keys())[-1]).date()
+    end = latest - timedelta(days=1)   # 最新完全日
     cal = []
-    for i in range(35, 0, -1):
-        ds = (today - timedelta(days=i)).isoformat()
+    for i in range(34, -1, -1):
+        ds = (end - timedelta(days=i)).isoformat()
         d = bydate.get(ds)
         cal.append({"date": ds, "imp": (d["imp"] if d else 0), "clk": (d["clk"] if d else 0), "cost": (d["cost"] if d else 0)})
-    y = cal[-1]                       # 昨日（最新の完全日）
+    y = cal[-1]                       # 最新完全日（部分データの当日は除外済み）
 
     def _is_wend(ds):
         return datetime.fromisoformat(ds).weekday() >= 5   # 土(5)・日(6)
@@ -159,7 +163,7 @@ def daily_checks(acct: dict, today, cadence=None) -> list[dict]:
                 add("critical", "消化" + ("急増" if dev > 0 else "急減"),
                     f"{y['date']} ¥{y['cost']:,}（同曜日中央値¥{int(cost_base):,}比 {'+' if dev > 0 else ''}{round(dev * 100)}%）",
                     "担当（予算/配信を確認）")
-    elif today.weekday() == 0:  # weekly は月曜に前週比
+    elif end.weekday() == 6:  # weekly は「最新完全日=日曜」＝週明けに前週比
         this7 = sum(d["cost"] for d in cal[-7:])
         prev7 = sum(d["cost"] for d in cal[-14:-7])
         if prev7 >= 7000:
@@ -169,8 +173,8 @@ def daily_checks(acct: dict, today, cadence=None) -> list[dict]:
                     f"直近7日¥{this7:,}（前週¥{prev7:,}比 {'+' if dev > 0 else ''}{round(dev * 100)}%）",
                     "担当（予算/配信を確認）")
 
-    # ③ CPC高騰（改善・頻度準拠：日次は毎日／週次は月曜）
-    if cadence == "daily" or today.weekday() == 0:
+    # ③ CPC高騰（改善・頻度準拠：日次は毎日／週次は最新完全日が日曜）
+    if cadence == "daily" or end.weekday() == 6:
         clk7 = sum(d["clk"] for d in cal[-7:]); cost7 = sum(d["cost"] for d in cal[-7:])
         clkB = sum(d["clk"] for d in cal[-21:-7]); costB = sum(d["cost"] for d in cal[-21:-7])
         if clk7 >= 20 and clkB >= 20 and costB > 0:
