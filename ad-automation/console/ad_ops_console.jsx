@@ -121,6 +121,7 @@ export default function AdOpsConsole() {
   const [alertOps, setAlertOps] = useState({});
   const [approvals, setApprovals] = useState({});
   const [notes, setNotes] = useState({}); // クライアント別 運用メモ・予算メモ（履歴）
+  const [noteMonth, setNoteMonth] = useState("all"); // 運用メモ一覧の月フィルタ
   const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     try {
@@ -239,7 +240,7 @@ export default function AdOpsConsole() {
     const parse = () => {
       const h = decodeURIComponent((window.location.hash || "").replace(/^#/, ""));
       if (h.indexOf("client/") === 0) { setOpenClient(h.slice(7)); setView("client"); }
-      else if (["dash", "list", "conn", "targets", "summary"].indexOf(h) >= 0) { setView(h); setOpenClient(null); }
+      else if (["dash", "list", "notes", "conn", "targets", "summary"].indexOf(h) >= 0) { setView(h); setOpenClient(null); }
       else { setView("dash"); setOpenClient(null); }
     };
     parse();
@@ -415,6 +416,7 @@ export default function AdOpsConsole() {
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
           <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={alertActive.length} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧（媒体別）" />
+          <NavBtn id="notes" icon={<span style={{ fontSize: 14 }}>📝</span>} label="運用メモ一覧" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
         </div>
@@ -642,6 +644,63 @@ export default function AdOpsConsole() {
                   </div>
                 </>
               )}
+            </>
+          );
+        })()}
+
+        {/* ===== 運用メモ一覧（全クライアント・月別） ===== */}
+        {view === "notes" && (() => {
+          const all = [];
+          Object.entries(notes).forEach(([client, list]) => (list || []).forEach((n, idx) => all.push({ client, idx, ...n })));
+          const months = [...new Set(all.map((n) => n.month).filter(Boolean))].sort().reverse();
+          const shown = all.filter((n) => noteMonth === "all" || n.month === noteMonth);
+          const byMonth = {};
+          shown.forEach((n) => { const m = n.month || "（月未設定）"; (byMonth[m] = byMonth[m] || []).push(n); });
+          const monthKeys = Object.keys(byMonth).sort().reverse();
+          const sel = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff" };
+          const amtStr = (x) => (x == null ? null : (x >= 0 ? "+¥" + x.toLocaleString("ja-JP") : "−¥" + Math.abs(x).toLocaleString("ja-JP")));
+          return (
+            <>
+              <SectionTitle icon={<span style={{ fontSize: 15 }}>📝</span>} title="運用メモ一覧（月別）" note="全クライアントの運用メモ・予算メモを月ごとに一覧。今月どこに何を（いくら）やっているかが一目でわかります。メモはクライアント詳細で追加。" />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12.5, color: "#64748b" }}>月</span>
+                <select value={noteMonth} onChange={(e) => setNoteMonth(e.target.value)} style={sel}>
+                  <option value="all">すべての月</option>
+                  {months.map((m) => <option key={m} value={m}>{m.replace("-", "年") + "月"}</option>)}
+                </select>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{shown.length}件</span>
+              </div>
+              {all.length === 0 && <Empty text="まだ運用メモがありません。クライアント詳細ページの「運用メモ・予算メモ」から追加してください。" />}
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {monthKeys.map((m) => {
+                  const rows = byMonth[m];
+                  const total = rows.reduce((s, n) => s + (typeof n.amount === "number" ? n.amount : 0), 0);
+                  return (
+                    <div key={m}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>{m === "（月未設定）" ? m : (m.replace("-", "年") + "月")}</span>
+                        <span style={{ fontSize: 12, color: "#64748b" }}>{rows.length}件{total ? ` ・ 増減合計 ${amtStr(total)}` : ""}</span>
+                      </div>
+                      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
+                        {rows.map((n, i) => (
+                          <div key={i} onClick={() => goClient(n.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 13px", borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
+                            <span style={{ flexShrink: 0, fontWeight: 700, fontSize: 12.5, minWidth: 150 }}>{n.client}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, color: "#0f172a" }}>
+                                {n.media && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#4338ca", marginRight: 6 }}>{n.media}</span>}
+                                {n.amount != null && <span style={{ fontSize: 12.5, fontWeight: 700, color: n.amount >= 0 ? "#1a56db" : "#b45309", marginRight: 6 }}>{amtStr(n.amount)}</span>}
+                                {n.text}
+                              </div>
+                              <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 2 }}>{n.by}・{n.at}</div>
+                            </div>
+                            <ChevronRight size={14} color="#cbd5e1" style={{ flexShrink: 0, marginTop: 2 }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </>
           );
         })()}
