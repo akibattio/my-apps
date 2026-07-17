@@ -31,7 +31,7 @@ function jsonRes(obj, status) {
 }
 
 // 共有ストレージAPI（目標設定・アラート対応・承認をスタッフ間で同期）。KV(STATE)に保存。認証の内側でのみ動く。
-const SECTIONS = ["targets", "targetsHistory", "alertOps", "approvals", "notes"];
+const SECTIONS = ["targets", "targetsHistory", "alertOps", "approvals", "notes", "budgets"];
 async function handleState(request, env, url) {
   const kv = env.STATE;
   if (!kv) return jsonRes({ error: "kv_unbound" }); // KV未バインド時は空扱い→画面はlocalStorageにフォールバック

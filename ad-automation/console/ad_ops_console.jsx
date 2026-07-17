@@ -122,6 +122,7 @@ export default function AdOpsConsole() {
   const [approvals, setApprovals] = useState({});
   const [notes, setNotes] = useState({}); // クライアント別 運用メモ・予算メモ（履歴）
   const [noteMonth, setNoteMonth] = useState("all"); // 運用メモ一覧の月フィルタ
+  const [budgets, setBudgets] = useState({}); // クライアント別 契約予算（媒体別内訳＋月次の変更/追加）
   const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     try {
@@ -131,6 +132,7 @@ export default function AdOpsConsole() {
       setAlertOps(JSON.parse(localStorage.getItem("adops_alert_ops") || "{}"));
       setApprovals(JSON.parse(localStorage.getItem("adops_approvals") || "{}"));
       setNotes(JSON.parse(localStorage.getItem("adops_notes") || "{}"));
+      setBudgets(JSON.parse(localStorage.getItem("adops_budgets") || "{}"));
     } catch (e) {}
   }, []);
 
@@ -145,6 +147,7 @@ export default function AdOpsConsole() {
     if (j.alertOps) setAlertOps(j.alertOps);
     if (j.approvals) setApprovals(j.approvals);
     if (j.notes) setNotes(j.notes);
+    if (j.budgets) setBudgets(j.budgets);
     return true;
   };
   useEffect(() => {
@@ -158,6 +161,7 @@ export default function AdOpsConsole() {
       if (has(j.alertOps)) setAlertOps(j.alertOps); else { const a = ls("adops_alert_ops", "{}"); if (has(a)) putState("alertOps", a); }
       if (has(j.approvals)) setApprovals(j.approvals); else { const a = ls("adops_approvals", "{}"); if (has(a)) putState("approvals", a); }
       if (has(j.notes)) setNotes(j.notes); else { const nt = ls("adops_notes", "{}"); if (has(nt)) putState("notes", nt); }
+      if (has(j.budgets)) setBudgets(j.budgets); else { const bg = ls("adops_budgets", "{}"); if (has(bg)) putState("budgets", bg); }
     }).catch(() => {});
     // 定期同期：45秒ごとに共有状態を取得（他スタッフの変更を自分の画面へ反映）
     const id = setInterval(() => {
@@ -290,6 +294,8 @@ export default function AdOpsConsole() {
   const approvalLog = Object.entries(approvals).map(([key, v]) => ({ key, ...v }));
   // クライアント別 運用メモ・予算メモ（履歴：追記型）
   const saveNotes = (next) => { setNotes(next); try { localStorage.setItem("adops_notes", JSON.stringify(next)); } catch (e) {} putState("notes", next); };
+  // クライアント別 契約予算（契約ベース＋月次の変更/追加）— localStorage＋共有(KV)
+  const saveBudgets = (next) => { setBudgets(next); try { localStorage.setItem("adops_budgets", JSON.stringify(next)); } catch (e) {} putState("budgets", next); };
   const addNote = (client, entry) => {
     const rec = { ...entry, by: (operator || "").trim() || "担当", at: new Date().toLocaleString("ja-JP") };
     saveNotes({ ...notes, [client]: [rec, ...(notes[client] || [])] });
@@ -592,6 +598,8 @@ export default function AdOpsConsole() {
                 <Card><MiniStat label="接続" value={cl.accts.every((x) => x.status === "ok") ? "正常" : "要確認"} bad={!cl.accts.every((x) => x.status === "ok")} /></Card>
               </div>
 
+              <ClientBudgetCard cl={cl} bud={budgets[cl.client]} monthlyMap={monthlyMap} />
+
               <ClientNotes client={cl.client} list={notes[cl.client] || []} onAdd={addNote} onDel={delNote} onAdopt={adoptNote} />
 
               <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体別" note="この社の各アカウントの接続と成果。手法別（検索/PMax等）・週次も表示。" />
@@ -826,6 +834,7 @@ export default function AdOpsConsole() {
                 style={{ padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, width: 200 }} />
             </div>
             <TargetEditor clients={clients} targets={targets} onSave={saveTargets} />
+            <BudgetEditor clients={clients} budgets={budgets} onSave={saveBudgets} />
             <TargetHistory history={history} />
           </>
         )}
@@ -1033,6 +1042,120 @@ function noteLines(n) {
 }
 function noteTotal(n) { return noteLines(n).reduce((s, l) => s + (typeof l.amount === "number" ? l.amount : 0), 0); }
 
+// ===== 予算モデル =====
+// budgets[client] = { base:[{media,amount}], months:{ "YYYY-MM":{ contract:[{media,amount}]|null, adds:[{label,media,amount}] } } }
+// 契約は「変更した月だけ」記録し、以降の月は引き継ぐ（carry-forward）。追加はその月だけ有効（キャンペーン等）。
+function sumLines(lines) { return (lines || []).reduce((s, l) => s + (Number(l.amount) || 0), 0); }
+// 指定月の実効予算：契約(当月変更→直近過去→base→benchmarks月予算)＋当月の追加。
+function effectiveBudget(bud, month, fallbackMonthly) {
+  bud = bud || {};
+  const months = bud.months || {};
+  let contract = null, contractMonth = null;
+  if (months[month] && Array.isArray(months[month].contract) && months[month].contract.length) { contract = months[month].contract; contractMonth = month; }
+  if (!contract) {
+    const past = Object.keys(months).filter((m) => m < month && Array.isArray(months[m].contract) && months[m].contract.length).sort();
+    if (past.length) { contractMonth = past[past.length - 1]; contract = months[contractMonth].contract; }
+  }
+  if (!contract && Array.isArray(bud.base) && bud.base.length) { contract = bud.base; contractMonth = "base"; }
+  const fromBench = !contract;
+  if (!contract) contract = fallbackMonthly != null ? [{ media: "（契約未設定）", amount: fallbackMonthly }] : [];
+  const adds = (months[month] && Array.isArray(months[month].adds)) ? months[month].adds : [];
+  const contractTotal = sumLines(contract);
+  const addsTotal = adds.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  return { contract, contractMonth, adds, contractTotal, addsTotal, total: contractTotal + addsTotal, fromBench };
+}
+// monthly.json（Google/Meta両対応の月次）から当月(部分)の client 実消化・CV を合算。
+function clientMonthActual(accts, monthlyMap, month) {
+  let cost = 0, cv = 0, has = false;
+  (accts || []).forEach((c) => {
+    const arr = monthlyMap[`${c.client}|${c.media}`] || [];
+    const e = arr.find((x) => x.month === month);
+    if (e) { has = true; cost += e.cost || 0; cv += e.cv || 0; }
+  });
+  return has ? { cost, cv } : null;
+}
+
+// クライアントの契約予算パネル。契約(媒体別)＋追加(キャンペーン)＝今月の予算。実消化(monthly.json)と対比し、消化ペース・月末着地を「今月の予算」基準で表示。
+function ClientBudgetCard({ cl, bud, monthlyMap, asOfDate }) {
+  const now = asOfDate || new Date();
+  const month = now.toISOString().slice(0, 7);
+  const [Y, M] = month.split("-").map(Number);
+  const daysInMonth = new Date(Y, M, 0).getDate();
+  const elapsed = Math.min(daysInMonth, Math.max(1, now.getDate()));
+  const eb = effectiveBudget(bud, month, cl.monthly);
+  const act = clientMonthActual(cl.accts, monthlyMap, month);
+  const spentMTD = act ? act.cost : null;
+  const cvMTD = act ? act.cv : null;
+  const pace = (spentMTD != null && eb.total) ? Math.round((spentMTD / eb.total) * 100) : null;
+  const projSpend = spentMTD != null ? Math.round((spentMTD / elapsed) * daysInMonth) : null;
+  const projPct = (projSpend != null && eb.total) ? Math.round((projSpend / eb.total) * 100) : null;
+  const projCv = cvMTD != null ? Math.round((cvMTD / elapsed) * daysInMonth) : null;
+  const projC = projPct == null ? "#475569" : Math.abs(projPct - 100) <= 10 ? "#047857" : projPct > 100 ? "#dc2626" : "#d97706";
+  const paceC = pace == null ? "#94a3b8" : pace > 110 ? "#dc2626" : pace >= 45 ? "#047857" : "#d97706";
+  const box = { background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: 15, marginBottom: 22 };
+  const lbl = { fontSize: 10.5, color: "#94a3b8" };
+  return (
+    <div style={box}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>今月の予算（契約 ＋ 追加）</span>
+        <span style={{ fontSize: 12, color: "#64748b" }}>{M}月</span>
+        {eb.fromBench && <span style={{ fontSize: 10.5, color: "#b45309", background: "#fdf6e3", borderRadius: 6, padding: "1px 7px" }}>契約未設定（月予算から仮置き・目標設定で登録）</span>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1.1fr 0.9fr", gap: 14, alignItems: "start" }}>
+        {/* 契約 */}
+        <div>
+          <div style={{ ...lbl, marginBottom: 3 }}>契約（媒体別）{eb.contractMonth && eb.contractMonth !== month && eb.contractMonth !== "base" ? `・${eb.contractMonth.replace("-", "年")}月〜` : ""}</div>
+          {eb.contract.length === 0 ? <div style={{ fontSize: 12, color: "#94a3b8" }}>—</div> : eb.contract.map((l, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#334155", padding: "1px 0" }}>
+              <span style={{ color: "#cbd5e1" }}>└</span><span style={{ fontWeight: 600 }}>{l.media || "（媒体未記入）"}</span>
+              <span style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{fmtYen(l.amount)}</span>
+            </div>
+          ))}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, fontSize: 12, color: "#64748b", borderTop: "1px dashed #eef2f0", marginTop: 3, paddingTop: 3 }}>契約計 <b style={{ color: "#0f2a1f" }}>{fmtYen(eb.contractTotal)}</b></div>
+        </div>
+        {/* 追加 */}
+        <div>
+          <div style={{ ...lbl, marginBottom: 3 }}>今月の追加（キャンペーン等）</div>
+          {eb.adds.length === 0 ? <div style={{ fontSize: 12, color: "#94a3b8" }}>なし</div> : eb.adds.map((a, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#334155", padding: "1px 0" }}>
+              <span style={{ color: "#1a56db", fontWeight: 700 }}>＋</span><span style={{ fontWeight: 600 }}>{a.label || "追加"}{a.media ? `（${a.media}）` : ""}</span>
+              <span style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#1a56db" }}>{fmtYen(a.amount)}</span>
+            </div>
+          ))}
+          {eb.adds.length > 0 && <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, fontSize: 12, color: "#64748b", borderTop: "1px dashed #eef2f0", marginTop: 3, paddingTop: 3 }}>追加計 <b style={{ color: "#1a56db" }}>{fmtYen(eb.addsTotal)}</b></div>}
+        </div>
+        {/* 今月の予算 */}
+        <div style={{ background: "#f0f7f4", borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
+          <div style={lbl}>今月の予算</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{fmtYen(eb.total)}</div>
+          <div style={{ fontSize: 10.5, color: "#64748b" }}>契約 {fmtYen(eb.contractTotal)}{eb.addsTotal ? ` ＋ 追加 ${fmtYen(eb.addsTotal)}` : ""}</div>
+        </div>
+      </div>
+      {/* 予算消化・月末着地（今月の予算基準） */}
+      <div style={{ marginTop: 12, borderTop: "1px solid #f1f5f4", paddingTop: 10 }}>
+        {spentMTD == null ? (
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>当月の実消化データがありません（monthly.json 未取得）。</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 5, flexWrap: "wrap", gap: 4 }}>
+              <span style={{ color: "#64748b" }}>予算消化（当月）</span>
+              <span style={{ color: paceC, fontWeight: 700 }}>{fmtYen(spentMTD)} / {fmtYen(eb.total)}（{pace}%）・{elapsed}/{daysInMonth}日</span>
+            </div>
+            <div style={{ height: 7, background: "#eef1f4", borderRadius: 999, overflow: "hidden", marginBottom: 10 }}>
+              <div style={{ width: Math.min(pace || 0, 100) + "%", height: "100%", background: paceC }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
+              <div><div style={lbl}>着地見込（費用）</div><div style={{ fontSize: 14, fontWeight: 700, color: projC }}>{fmtYen(projSpend)}</div><div style={lbl}>今月の予算比 {projPct}%</div></div>
+              <div><div style={lbl}>着地見込（CV）</div><div style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>{projCv}件</div><div style={lbl}>当月 {cvMTD}件</div></div>
+              <div><div style={lbl}>残り予算</div><div style={{ fontSize: 14, fontWeight: 700, color: eb.total - spentMTD < 0 ? "#dc2626" : "#0f2a1f" }}>{fmtYen(eb.total - spentMTD)}</div><div style={lbl}>残 {daysInMonth - elapsed}日</div></div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // 運用メモ本文：タイトル＋媒体別内訳（└ 媒体 金額）＋合計。採用中プラン表示にも一覧にも使う共通描画。
 function NoteContent({ n }) {
   const lines = noteLines(n);
@@ -1150,6 +1273,117 @@ function StatCell({ label, value, d, dir, bad }) {
   );
 }
 function Empty({ text }) { return <div style={{ background: "#fff", border: "1px dashed #d7e0db", borderRadius: 10, padding: "18px 14px", fontSize: 12.5, color: "#94a3b8", textAlign: "center" }}>{text}</div>; }
+
+// 1クライアントの契約・追加の編集フォーム（対象月）。契約=媒体別内訳（自由記述）、追加=キャンペーン等。保存で months[月] に反映。
+function BudgetClientEditor({ eb, onSave }) {
+  const [contract, setContract] = useState(() => (eb.fromBench || !eb.contract.length ? [{ media: "", amount: "" }] : eb.contract.map((l) => ({ media: l.media || "", amount: l.amount == null ? "" : String(l.amount) }))));
+  const [adds, setAdds] = useState(() => eb.adds.map((a) => ({ label: a.label || "", media: a.media || "", amount: a.amount == null ? "" : String(a.amount) })));
+  const [saved, setSaved] = useState(false);
+  const touch = () => setSaved(false);
+  const setC = (i, k, v) => { touch(); setContract((p) => p.map((l, idx) => (idx === i ? { ...l, [k]: v } : l))); };
+  const setA = (i, k, v) => { touch(); setAdds((p) => p.map((a, idx) => (idx === i ? { ...a, [k]: v } : a))); };
+  const inp = { padding: "6px 9px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, background: "#fff" };
+  const cTotal = contract.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+  const aTotal = adds.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  const save = () => {
+    const c = contract.map((l) => ({ media: l.media.trim(), amount: l.amount === "" ? 0 : Number(l.amount) })).filter((l) => l.media || l.amount);
+    const a = adds.map((x) => ({ label: x.label.trim(), media: x.media.trim(), amount: x.amount === "" ? 0 : Number(x.amount) })).filter((x) => x.label || x.amount);
+    onSave(c, a); setSaved(true);
+  };
+  return (
+    <div style={{ background: "#f8faf9", borderTop: "1px solid #eef1f4", padding: 13 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        {/* 契約 */}
+        <div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>契約（媒体別・この月の契約）</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {contract.map((l, i) => (
+              <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <span style={{ color: "#cbd5e1", fontSize: 13 }}>└</span>
+                <input value={l.media} onChange={(e) => setC(i, "media", e.target.value)} placeholder="媒体（例：Google検索 / Meta / Yahoo!）" style={{ ...inp, flex: 1, minWidth: 130 }} />
+                <input type="number" value={l.amount} onChange={(e) => setC(i, "amount", e.target.value)} placeholder="金額(円)" style={{ ...inp, width: 120, textAlign: "right" }} />
+                <button onClick={() => { touch(); setContract((p) => (p.length <= 1 ? [{ media: "", amount: "" }] : p.filter((_, idx) => idx !== i))); }} title="削除" style={{ border: "none", background: "none", color: "#cbd5e1", cursor: "pointer", fontSize: 15, width: 18 }}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
+            <button onClick={() => { touch(); setContract((p) => [...p, { media: "", amount: "" }]); }} style={{ border: "1px dashed #c7d2cc", background: "#fff", color: "#0f766e", borderRadius: 7, padding: "4px 9px", fontSize: 11.5, cursor: "pointer" }}>＋ 媒体を追加</button>
+            <span style={{ fontSize: 11.5, color: "#64748b" }}>契約計 <b style={{ color: "#0f2a1f" }}>{fmtYen(cTotal)}</b></span>
+          </div>
+        </div>
+        {/* 追加 */}
+        <div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>今月の追加（キャンペーン等）</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {adds.length === 0 && <div style={{ fontSize: 11.5, color: "#94a3b8" }}>追加なし</div>}
+            {adds.map((a, i) => (
+              <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <span style={{ color: "#1a56db", fontWeight: 700 }}>＋</span>
+                <input value={a.label} onChange={(e) => setA(i, "label", e.target.value)} placeholder="名目（例：夏キャンペーン）" style={{ ...inp, flex: 1, minWidth: 110 }} />
+                <input value={a.media} onChange={(e) => setA(i, "media", e.target.value)} placeholder="媒体(任意)" style={{ ...inp, width: 90 }} />
+                <input type="number" value={a.amount} onChange={(e) => setA(i, "amount", e.target.value)} placeholder="金額(円)" style={{ ...inp, width: 110, textAlign: "right" }} />
+                <button onClick={() => { touch(); setAdds((p) => p.filter((_, idx) => idx !== i)); }} title="削除" style={{ border: "none", background: "none", color: "#cbd5e1", cursor: "pointer", fontSize: 15, width: 18 }}>×</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
+            <button onClick={() => { touch(); setAdds((p) => [...p, { label: "", media: "", amount: "" }]); }} style={{ border: "1px dashed #c7d2cc", background: "#fff", color: "#1a56db", borderRadius: 7, padding: "4px 9px", fontSize: 11.5, cursor: "pointer" }}>＋ キャンペーンを追加</button>
+            {aTotal > 0 && <span style={{ fontSize: 11.5, color: "#64748b" }}>追加計 <b style={{ color: "#1a56db" }}>{fmtYen(aTotal)}</b></span>}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, borderTop: "1px dashed #e6ebe8", paddingTop: 10 }}>
+        <span style={{ fontSize: 12.5 }}>今月の予算 <b style={{ fontSize: 15, color: "#0f2a1f" }}>{fmtYen(cTotal + aTotal)}</b></span>
+        <button onClick={save} style={{ ...btnP, marginLeft: "auto" }}><Check size={15} /> この月を保存</button>
+        {saved && <span style={{ fontSize: 12, color: "#047857", fontWeight: 700 }}>保存しました</span>}
+      </div>
+    </div>
+  );
+}
+
+// 契約・予算エディタ（目標設定タブ）。対象月を選び、クライアント別に契約(媒体別)＋追加を編集。今月の予算＝契約＋追加。予算消化判定に連動。
+function BudgetEditor({ clients, budgets, onSave }) {
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [open, setOpen] = useState(null);
+  const applyClient = (client, contract, adds) => {
+    const cur = budgets[client] || {};
+    const months = { ...(cur.months || {}) };
+    const m = { ...(months[month] || {}) };
+    if (contract && contract.length) m.contract = contract; else delete m.contract;
+    if (adds && adds.length) m.adds = adds; else delete m.adds;
+    if (Object.keys(m).length) months[month] = m; else delete months[month];
+    onSave({ ...budgets, [client]: { ...cur, months } });
+  };
+  const inp = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff" };
+  return (
+    <div style={{ marginTop: 26 }}>
+      <SectionTitle icon={<span style={{ fontSize: 15 }}>💰</span>} title="契約・予算（媒体別）" note="契約（ベース月額）と、その月の追加（キャンペーン等）を登録。今月の予算＝契約＋追加。予算消化・月末着地予測がこの予算に連動します。契約は変更した月だけ登録すれば以降は引き継ぎます。" />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 12.5, color: "#64748b" }}>対象月</span>
+        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...inp, width: 150 }} />
+        <span style={{ fontSize: 11.5, color: "#94a3b8" }}>行をクリックで開閉。契約は変更月のみ・追加はその月のみ有効。</span>
+      </div>
+      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+        {clients.map((cl, i) => {
+          const eb = effectiveBudget(budgets[cl.client], month, cl.monthly);
+          const isOpen = open === cl.client;
+          return (
+            <div key={cl.client}>
+              <div onClick={() => setOpen(isOpen ? null : cl.client)} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.9fr 1fr 24px", gap: 8, alignItems: "center", padding: "11px 14px", borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer", background: isOpen ? "#f8faf9" : "#fff" }}>
+                <span style={{ fontWeight: 700, fontSize: 12.5 }}>{cl.client}{cl.tier === "large" && <LargePill />}</span>
+                <span style={{ fontSize: 12, color: "#475569" }}>契約 {fmtYen(eb.contractTotal)}{eb.fromBench ? <span style={{ color: "#b45309", fontSize: 10.5 }}> (仮)</span> : ""}</span>
+                <span style={{ fontSize: 12, color: eb.addsTotal ? "#1a56db" : "#94a3b8" }}>追加 {eb.addsTotal ? fmtYen(eb.addsTotal) : "—"}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2a1f" }}>今月 {fmtYen(eb.total)}</span>
+                <ChevronRight size={15} color="#cbd5e1" style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+              </div>
+              {isOpen && <BudgetClientEditor key={cl.client + "|" + month} eb={eb} onSave={(c, a) => applyClient(cl.client, c, a)} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // 目標入力ボックス：目標CPA(円)・月予算(万円)。保存=この端末(localStorage)へ→アラートに即反映。エクスポート=benchmarks.json用JSONをコピー。
 function TargetEditor({ clients, targets, onSave }) {
