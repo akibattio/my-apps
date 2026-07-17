@@ -298,6 +298,11 @@ export default function AdOpsConsole() {
     const cur = (notes[client] || []).slice(); cur.splice(idx, 1);
     saveNotes({ ...notes, [client]: cur });
   };
+  // 採用中プランは1社1件。対象を採用（他は自動解除）、再押下で解除。
+  const adoptNote = (client, idx) => {
+    const cur = (notes[client] || []).map((n, i) => ({ ...n, adopted: i === idx ? !n.adopted : false }));
+    saveNotes({ ...notes, [client]: cur });
+  };
 
   const clients = useMemo(() => {
     const m = {};
@@ -587,7 +592,7 @@ export default function AdOpsConsole() {
                 <Card><MiniStat label="接続" value={cl.accts.every((x) => x.status === "ok") ? "正常" : "要確認"} bad={!cl.accts.every((x) => x.status === "ok")} /></Card>
               </div>
 
-              <ClientNotes client={cl.client} list={notes[cl.client] || []} onAdd={addNote} onDel={delNote} />
+              <ClientNotes client={cl.client} list={notes[cl.client] || []} onAdd={addNote} onDel={delNote} onAdopt={adoptNote} />
 
               <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体別" note="この社の各アカウントの接続と成果。手法別（検索/PMax等）・週次も表示。" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
@@ -648,7 +653,7 @@ export default function AdOpsConsole() {
           );
         })()}
 
-        {/* ===== 運用メモ一覧（全クライアント・月別） ===== */}
+        {/* ===== 運用メモ一覧（採用中プラン＋全クライアント月別） ===== */}
         {view === "notes" && (() => {
           const all = [];
           Object.entries(notes).forEach(([client, list]) => (list || []).forEach((n, idx) => all.push({ client, idx, ...n })));
@@ -658,10 +663,32 @@ export default function AdOpsConsole() {
           shown.forEach((n) => { const m = n.month || "（月未設定）"; (byMonth[m] = byMonth[m] || []).push(n); });
           const monthKeys = Object.keys(byMonth).sort().reverse();
           const sel = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff" };
-          const amtStr = (x) => (x == null ? null : (x >= 0 ? "+¥" + x.toLocaleString("ja-JP") : "−¥" + Math.abs(x).toLocaleString("ja-JP")));
+          // 採用中プラン（1社1件）。左=クライアント名／右=採用中の内容 の2カラム。
+          const adopted = [];
+          Object.entries(notes).forEach(([client, list]) => { const a = (list || []).find((n) => n.adopted); if (a) adopted.push({ client, note: a }); });
+          adopted.sort((a, b) => a.client.localeCompare(b.client, "ja"));
           return (
             <>
-              <SectionTitle icon={<span style={{ fontSize: 15 }}>📝</span>} title="運用メモ一覧（月別）" note="全クライアントの運用メモ・予算メモを月ごとに一覧。今月どこに何を（いくら）やっているかが一目でわかります。メモはクライアント詳細で追加。" />
+              <SectionTitle icon={<span style={{ fontSize: 15 }}>✅</span>} title="現在採用中の運用（クライアント別）" note="各クライアントで今どの運用プランを動かしているか。左=クライアント名／右=採用中の内容。設定はクライアント詳細の運用メモで「採用にする」。" />
+              {adopted.length === 0 ? (
+                <Empty text="採用中の運用がありません。クライアント詳細の運用メモで、動かしているプランを「採用にする」に設定してください。" />
+              ) : (
+                <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
+                  {adopted.map((row, i) => (
+                    <div key={row.client} onClick={() => goClient(row.client)} style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 14, alignItems: "start", padding: "12px 14px", borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                        <span style={{ fontWeight: 700, fontSize: 13 }}>{row.client}</span>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        {row.note.month && <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 2 }}>{row.note.month.replace("-", "年") + "月"}</div>}
+                        <NoteContent n={row.note} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <SectionTitle icon={<span style={{ fontSize: 15 }}>📝</span>} title="運用メモ一覧（月別）" note="全クライアントの運用メモ・予算メモを月ごとに一覧。追加・採用の設定はクライアント詳細から。" />
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12.5, color: "#64748b" }}>月</span>
                 <select value={noteMonth} onChange={(e) => setNoteMonth(e.target.value)} style={sel}>
@@ -674,26 +701,21 @@ export default function AdOpsConsole() {
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {monthKeys.map((m) => {
                   const rows = byMonth[m];
-                  const total = rows.reduce((s, n) => s + (typeof n.amount === "number" ? n.amount : 0), 0);
                   return (
                     <div key={m}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>{m === "（月未設定）" ? m : (m.replace("-", "年") + "月")}</span>
-                        <span style={{ fontSize: 12, color: "#64748b" }}>{rows.length}件{total ? ` ・ 増減合計 ${amtStr(total)}` : ""}</span>
+                        <span style={{ fontSize: 12, color: "#64748b" }}>{rows.length}件</span>
                       </div>
                       <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
                         {rows.map((n, i) => (
-                          <div key={i} onClick={() => goClient(n.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 13px", borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
-                            <span style={{ flexShrink: 0, fontWeight: 700, fontSize: 12.5, minWidth: 150 }}>{n.client}</span>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, color: "#0f172a" }}>
-                                {n.media && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#4338ca", marginRight: 6 }}>{n.media}</span>}
-                                {n.amount != null && <span style={{ fontSize: 12.5, fontWeight: 700, color: n.amount >= 0 ? "#1a56db" : "#b45309", marginRight: 6 }}>{amtStr(n.amount)}</span>}
-                                {n.text}
-                              </div>
-                              <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 2 }}>{n.by}・{n.at}</div>
+                          <div key={i} onClick={() => goClient(n.client)} style={{ display: "grid", gridTemplateColumns: "160px 1fr auto", gap: 10, alignItems: "start", padding: "10px 13px", borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
+                            <span style={{ fontWeight: 700, fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>{n.client}{n.adopted && <span style={{ fontSize: 9.5, fontWeight: 700, color: "#fff", background: "#10b981", borderRadius: 999, padding: "1px 7px" }}>採用</span>}</span>
+                            <div style={{ minWidth: 0 }}>
+                              <NoteContent n={n} />
+                              <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 3 }}>{n.by}・{n.at}</div>
                             </div>
-                            <ChevronRight size={14} color="#cbd5e1" style={{ flexShrink: 0, marginTop: 2 }} />
+                            <ChevronRight size={14} color="#cbd5e1" style={{ marginTop: 2 }} />
                           </div>
                         ))}
                       </div>
@@ -1002,50 +1024,97 @@ function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, 
     </div>
   );
 }
-// クライアント別 運用メモ・予算メモ（履歴：追記型）。対象月・媒体・増減額・理由を残し、予算変動の説明とミス防止に使う。
-function ClientNotes({ client, list, onAdd, onDel }) {
+// 運用メモの共通ヘルパ。金額表示・媒体別内訳の正規化（旧形式 media/amount 単体もlinesに変換）・合計。
+function fmtYen(n) { if (n == null || isNaN(n)) return "—"; return (n < 0 ? "−¥" : "¥") + Math.abs(n).toLocaleString("ja-JP"); }
+function noteLines(n) {
+  if (Array.isArray(n.lines) && n.lines.length) return n.lines;
+  if (n.media || n.amount != null) return [{ media: n.media || "", amount: n.amount != null ? n.amount : null }]; // 旧形式の後方互換
+  return [];
+}
+function noteTotal(n) { return noteLines(n).reduce((s, l) => s + (typeof l.amount === "number" ? l.amount : 0), 0); }
+
+// 運用メモ本文：タイトル＋媒体別内訳（└ 媒体 金額）＋合計。採用中プラン表示にも一覧にも使う共通描画。
+function NoteContent({ n }) {
+  const lines = noteLines(n);
+  const withAmt = lines.filter((l) => l.amount != null).length;
+  return (
+    <div>
+      {n.text && <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: lines.length ? 3 : 0 }}>{n.text}</div>}
+      {lines.map((l, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#334155", padding: "1px 0" }}>
+          <span style={{ color: "#cbd5e1" }}>└</span>
+          <span style={{ fontWeight: 600 }}>{l.media || "（媒体未記入）"}</span>
+          {l.amount != null && <span style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: l.amount >= 0 ? "#1a56db" : "#b45309" }}>{fmtYen(l.amount)}</span>}
+        </div>
+      ))}
+      {withAmt > 1 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, fontSize: 12, color: "#64748b", borderTop: "1px dashed #eef2f0", marginTop: 3, paddingTop: 3 }}>
+          合計 <b style={{ color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{fmtYen(noteTotal(n))}</b>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// クライアント別 運用メモ・予算メモ（追記型）。運用プランを媒体別の内訳（媒体は自由記述）で記録し、動かしているプランを1つ「採用」にできる。
+function ClientNotes({ client, list, onAdd, onDel, onAdopt }) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [media, setMedia] = useState("");
-  const [amount, setAmount] = useState("");
   const [text, setText] = useState("");
+  const [lines, setLines] = useState([{ media: "", amount: "" }]);
+  const setLine = (i, key, val) => setLines((p) => p.map((l, idx) => (idx === i ? { ...l, [key]: val } : l)));
+  const addLine = () => setLines((p) => [...p, { media: "", amount: "" }]);
+  const delLine = (i) => setLines((p) => (p.length <= 1 ? [{ media: "", amount: "" }] : p.filter((_, idx) => idx !== i)));
   const submit = () => {
-    if (!text.trim()) return;
-    onAdd(client, { month, media, amount: amount === "" ? null : Number(amount), text: text.trim() });
-    setText(""); setAmount("");
+    const cleaned = lines
+      .map((l) => ({ media: l.media.trim(), amount: l.amount === "" ? null : Number(l.amount) }))
+      .filter((l) => l.media || l.amount != null);
+    if (!text.trim() && cleaned.length === 0) return;
+    onAdd(client, { month, text: text.trim(), lines: cleaned });
+    setText(""); setLines([{ media: "", amount: "" }]);
   };
   const inp = { padding: "6px 9px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, background: "#fff" };
-  const amtStr = (n) => (n == null ? null : (n >= 0 ? "+¥" + n.toLocaleString("ja-JP") : "−¥" + Math.abs(n).toLocaleString("ja-JP")));
+  const draftTotal = lines.reduce((s, l) => s + (l.amount === "" ? 0 : Number(l.amount) || 0), 0);
   return (
     <div style={{ marginBottom: 22 }}>
-      <SectionTitle icon={<span style={{ fontSize: 15 }}>📝</span>} title="運用メモ・予算メモ（履歴）" note="今月だけの予算変更やキャンペーン/イベント対応などを記録。予算変動の理由が残り、運用ミス防止＋説明に使えます。" />
+      <SectionTitle icon={<span style={{ fontSize: 15 }}>📝</span>} title="運用メモ・予算メモ（履歴）" note="運用プランを媒体別の内訳で記録。媒体名は自由記述。動かしているプランを「採用」にすると、今どれで運用中かが一目でわかります。" />
       {/* 入力 */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
-        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...inp, width: 140 }} />
-        <select value={media} onChange={(e) => setMedia(e.target.value)} style={inp}>
-          <option value="">媒体（任意）</option><option value="Google">Google</option><option value="Meta">Meta</option>
-          <option value="Yahoo">Yahoo!</option><option value="全体">全体</option><option value="その他">その他</option>
-        </select>
-        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="増減額(円・任意)" style={{ ...inp, width: 150, textAlign: "right" }} />
-        <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="理由・メモ（例：見学会でMeta増額）" style={{ ...inp, flex: 1, minWidth: 220 }} />
-        <button onClick={submit} style={btnP}><Check size={15} /> 追加</button>
+      <div style={{ background: "#f8faf9", border: "1px solid #e6ebe8", borderRadius: 10, padding: 12, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...inp, width: 140 }} />
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="メモ・タイトル（例：30万円の運用）" style={{ ...inp, flex: 1, minWidth: 220 }} />
+        </div>
+        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 5 }}>内訳（媒体は自由記述）</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {lines.map((l, i) => (
+            <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <span style={{ color: "#cbd5e1", fontSize: 13 }}>└</span>
+              <input value={l.media} onChange={(e) => setLine(i, "media", e.target.value)} placeholder="媒体（例：Google検索 / Meta / Yahoo!）" style={{ ...inp, flex: 1, minWidth: 160 }} />
+              <input type="number" value={l.amount} onChange={(e) => setLine(i, "amount", e.target.value)} placeholder="金額(円)" style={{ ...inp, width: 130, textAlign: "right" }} />
+              <button onClick={() => delLine(i)} title="行を削除" style={{ border: "none", background: "none", color: "#cbd5e1", cursor: "pointer", fontSize: 15, width: 20 }}>×</button>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+          <button onClick={addLine} style={{ border: "1px dashed #c7d2cc", background: "#fff", color: "#0f766e", borderRadius: 7, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>＋ 媒体を追加</button>
+          {draftTotal > 0 && <span style={{ fontSize: 12, color: "#64748b" }}>合計 <b style={{ color: "#0f2a1f" }}>{fmtYen(draftTotal)}</b></span>}
+          <button onClick={submit} style={{ ...btnP, marginLeft: "auto" }}><Check size={15} /> メモを追加</button>
+        </div>
       </div>
       {/* 履歴 */}
       {list.length === 0 ? (
-        <Empty text="まだメモはありません。今月の特別対応や予算変更を記録しておくと、後から理由が追えます。" />
+        <Empty text="まだメモはありません。運用プランを内訳つきで記録し、動かしているものを「採用にする」にしておくと一目でわかります。" />
       ) : (
-        <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {list.map((n, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 13px", borderTop: i ? "1px solid #f1f5f4" : "none" }}>
-              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: "#0f2a1f", background: "#eef2ff", borderRadius: 6, padding: "2px 8px" }}>{n.month ? `${+n.month.slice(5, 7)}月` : "—"}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: "#0f172a" }}>
-                  {n.media && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#4338ca", marginRight: 6 }}>{n.media}</span>}
-                  {n.amount != null && <span style={{ fontSize: 12.5, fontWeight: 700, color: n.amount >= 0 ? "#1a56db" : "#b45309", marginRight: 6 }}>{amtStr(n.amount)}</span>}
-                  {n.text}
-                </div>
-                <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 2 }}>{n.by}・{n.at}</div>
+            <div key={i} style={{ background: "#fff", border: n.adopted ? "1.5px solid #10b981" : "1px solid #e6ebe8", borderRadius: 10, padding: "10px 13px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#0f2a1f", background: "#eef2ff", borderRadius: 6, padding: "2px 8px" }}>{n.month ? `${+n.month.slice(5, 7)}月` : "—"}</span>
+                {n.adopted && <span style={{ fontSize: 10.5, fontWeight: 700, color: "#fff", background: "#10b981", borderRadius: 999, padding: "2px 9px" }}>採用中</span>}
+                <button onClick={() => onAdopt(client, i)} style={{ marginLeft: "auto", border: "1px solid " + (n.adopted ? "#10b981" : "#d7e0db"), background: n.adopted ? "#ecfdf5" : "#fff", color: n.adopted ? "#047857" : "#475569", borderRadius: 7, padding: "3px 10px", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>{n.adopted ? "採用を解除" : "採用にする"}</button>
+                <button onClick={() => { if (window.confirm("このメモを削除しますか？")) onDel(client, i); }} title="削除" style={{ border: "none", background: "none", color: "#cbd5e1", cursor: "pointer", fontSize: 14 }}>×</button>
               </div>
-              <button onClick={() => { if (window.confirm("このメモを削除しますか？")) onDel(client, i); }} style={{ flexShrink: 0, border: "none", background: "none", color: "#cbd5e1", cursor: "pointer", fontSize: 14 }}>×</button>
+              <NoteContent n={n} />
+              <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 5 }}>{n.by}・{n.at}</div>
             </div>
           ))}
         </div>
