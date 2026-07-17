@@ -51,14 +51,19 @@ export default async function GarageVehiclePage({
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl px-6 py-10">
-      <header className="mb-6 flex items-center gap-3">
-        <Link href="/garage" className="text-muted" aria-label="ガレージに戻る">
-          ←
+      <header className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/garage" className="text-muted" aria-label="ガレージに戻る">
+            ←
+          </Link>
+          <h1 className="text-xl font-semibold">
+            {name}
+            {vehicle.year ? <span className="text-muted"> · {vehicle.year}</span> : null}
+          </h1>
+        </div>
+        <Link href={`/garage/${id}/edit`} className="flex-none text-sm text-accent">
+          編集
         </Link>
-        <h1 className="text-xl font-semibold">
-          {name}
-          {vehicle.year ? <span className="text-muted"> · {vehicle.year}</span> : null}
-        </h1>
       </header>
 
       {photos.length > 0 && (
