@@ -1,113 +1,82 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// メールでログイン（パスワード不要）。メールに届く6桁コードを入力して確定する。
+// メールでログイン（パスワード不要）。
+// 送られてくるメールのリンクをタップすると /auth/callback 経由でログインする。
 export default function LoginForm() {
-  const router = useRouter();
   const supabase = createClient();
-  const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function sendCode(e: React.FormEvent) {
+  async function send(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/garage`,
+      },
     });
     setBusy(false);
     if (error) {
-      setError("コードの送信に失敗しました。メールアドレスを確認してください。");
+      setError("送信に失敗しました。メールアドレスを確認して、もう一度お試しください。");
       return;
     }
-    setStep("code");
+    setSent(true);
   }
 
-  async function verify(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setBusy(true);
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: code.trim(),
-      type: "email",
-    });
-    setBusy(false);
-    if (error) {
-      setError("コードが正しくないか、期限切れです。もう一度お試しください。");
-      return;
-    }
-    router.push("/garage");
-    router.refresh();
+  if (sent) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm leading-relaxed text-foreground">
+          {email} に<span className="text-accent">ログイン用リンク</span>を送りました。
+        </p>
+        <p className="text-sm leading-relaxed text-muted">
+          メールを開いて、中のリンク（ボタン）をタップするとログインできます。
+          届かない場合は、迷惑メールフォルダもご確認ください。
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setSent(false);
+            setError(null);
+          }}
+          className="text-sm text-muted underline-offset-4 hover:underline"
+        >
+          別のメールアドレスで送り直す
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      {step === "email" ? (
-        <form onSubmit={sendCode} className="space-y-4">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="メールアドレス"
-            autoComplete="email"
-            className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-full bg-accent px-6 py-4 font-medium text-black disabled:opacity-60"
-          >
-            {busy ? "送信中…" : "ログインコードを送る"}
-          </button>
-          <p className="text-center text-xs text-muted">
-            初めての方はそのまま登録されます。パスワードは不要です。
-          </p>
-        </form>
-      ) : (
-        <form onSubmit={verify} className="space-y-4">
-          <p className="text-sm text-muted">
-            {email} に届いた6桁のコードを入力してください。
-          </p>
-          <input
-            inputMode="numeric"
-            required
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="6桁のコード"
-            autoComplete="one-time-code"
-            className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-center text-lg tracking-[0.4em] text-foreground placeholder:text-neutral-500"
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-full bg-accent px-6 py-4 font-medium text-black disabled:opacity-60"
-          >
-            {busy ? "確認中…" : "ログイン"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setStep("email");
-              setCode("");
-              setError(null);
-            }}
-            className="w-full text-center text-xs text-muted"
-          >
-            メールアドレスを変更する
-          </button>
-        </form>
-      )}
-
+    <form onSubmit={send} className="space-y-4">
+      <input
+        type="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="メールアドレス"
+        autoComplete="email"
+        className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
+      />
+      <button
+        type="submit"
+        disabled={busy}
+        className="w-full rounded-full bg-accent px-6 py-4 font-medium text-black disabled:opacity-60"
+      >
+        {busy ? "送信中…" : "ログインリンクを送る"}
+      </button>
       {error && <p className="text-sm text-red-400">{error}</p>}
-    </div>
+      <p className="text-center text-xs text-muted">
+        初めての方はそのまま登録されます。パスワードは不要です。
+      </p>
+    </form>
   );
 }
