@@ -67,7 +67,15 @@ Vehicle is permanent. Owner changes. History grows. Trust accumulates.
   - `/admin`（管理者・メール許可リストで判定、既定 akiba@sofcom.co.jp）: 全体サマリー / `/admin/vehicles`（全車両+オーナー名）/ `/admin/owners`（全オーナー）。非管理者はトップへリダイレクト。動作確認済み。
   - トップ・ガレージ・マイページ間のナビ導線を追加。
   - 管理者判定は `lib/auth.ts` の isAdminEmail（`ADMIN_EMAILS` で上書き可）。
-- [ ] Phase 2: 公開登録（Top / Register / Photo Upload / AI / Timeline / Thank You）
+- [x] 地固め: 登録内容の修正機能（2026-07-13）: `/garage/[id]/edit` でメーカー/モデル/年式を編集。
+  変更は `audit_logs` に before/after で記録。
+- [x] 本番デプロイ（2026-07-13）: **Vercel** で公開。Netlify はアカウント403で断念。
+  公開URL https://my-apps-akibattios-projects.vercel.app/ 。GitHub push で自動デプロイ。
+  Vercelプロジェクト "my-apps"（Root=arios）、env設定済み、Deployment Protection無効。
+- [x] メールログイン稼働（2026-07-17）: マジックリンク方式（`/login`→メール→`/auth/callback` の
+  `?code` を exchangeCodeForSession）。SMTP=Resend。※Resendドメイン未検証のため送信先は
+  登録メアド(akiba)限定。他人にも送るには sofcom.co.jp のDNS検証が必要。
+- 詳細な本番/運用メモは個人メモ `arios-deployment` を参照。
 
 ### 開発コマンド
 

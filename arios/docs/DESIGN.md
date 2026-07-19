@@ -211,16 +211,19 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 - ✅ Step 3(一部) AI下書き: 写真→車種推定でフォーム下書き、append-only保存、動作確認済み
 - ✅ Step 4(一部) 信頼と公開: 公開パスポートに証拠ベースTrust表示、動作確認済み
 
-次の一手: V1公開に向けた地固めの続き
-- ✅ 書類アップロードUI（Trust LEVEL_2到達）— 2026-07-05 完了
-- ✅ migration 0003 適用（documents RLS）— 2026-07-12 SQL Editorで適用
-- 本番デプロイ: Netlifyでアカウント全体がデプロイ403（ビルド枠/請求/保留の可能性）。要アカウント確認、
-  または別ホスト。※DB直結はIPv6不通のまま → 今後のマイグレーションはSUPABASE_DB_URLをSession pooler(IPv4)へ。
-- ✅ マイページ `/account` + 管理者画面 `/admin`（サマリー/車両/オーナー）— 2026-07-12
-  （管理者はメール許可リスト isAdminEmail で判定。トップ/ガレージ/マイページのナビも追加）
-- 地固めの宿題: メール送信（本番SMTP・現状はスマホ実機ログインに必須）/ 本番デプロイ（Netlify 403 要アカウント確認）/
-  修正機能（登録内容の訂正・追記）/ owner なし車両の「あとから紐付け(claim)」/ trust_scores永続化 /
-  管理者機能の拡充（AIレビュー/信頼度/取引）/ メーターOCR / AIコスト監視。
+地固め〜本番公開まで完了（2026-07-17）。ARIOSの主要機能が本番URLで稼働:
+https://my-apps-akibattios-projects.vercel.app/ （詳細はメモ arios-deployment）
+- ✅ 書類アップロードUI（Trust LEVEL_2到達）— 2026-07-05
+- ✅ migration 0003 適用（documents RLS）— 2026-07-12
+- ✅ マイページ `/account` + 管理者画面 `/admin`（サマリー/車両/オーナー、isAdminEmailで判定）— 2026-07-12
+- ✅ 登録内容の修正機能 `/garage/[id]/edit`（audit_logs記録）— 2026-07-13
+- ✅ 本番デプロイ: **Vercel**（Netlifyはアカウント403で断念）。GitHub push で自動デプロイ。
+- ✅ メールログイン稼働（マジックリンク方式・Resend SMTP）— 2026-07-17
+
+残りの宿題:
+- Resend のドメイン検証（sofcom.co.jp のDNS）→ 依頼者など**他人のメアドにも**ログインメール送信可に（今は自分のメアド限定）
+- owner なし車両の「あとから紐付け(claim)」/ trust_scores永続化 / 管理者機能の拡充（AIレビュー/信頼度/取引）/
+  メーターOCR / AIコスト監視 / DB直結のIPv4化（Session pooler）。
 - Step 5以降（後で）: Marketplace / Dream Garage / Partner / Notification / Global。
 
 進め方の指針:
