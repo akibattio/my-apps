@@ -63,6 +63,8 @@ jobs:
           python3 scripts/fetch_search_diagnostics.py
           # 月次時系列(最大14ヶ月・前年同月比/長期トレンド用)→ console/monthly.json
           python3 scripts/fetch_monthly_series.py || true
+          # 月次キーワード別(直近4ヶ月・レポートタブのキーワード分析用)→ console/keywords.json
+          python3 scripts/fetch_keywords_monthly.py || true
           # 監査（ads-google観点の機械チェック）→ console/audit.json（クライアント詳細で表示）
           python3 scripts/build_audits.py || true
           # 提案の下書き生成（監査・検索診断から）→ console/data.json の proposals（承認キュー）

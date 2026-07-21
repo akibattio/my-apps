@@ -126,6 +126,8 @@ export default function AdOpsConsole() {
   const [alertOps, setAlertOps] = useState({});
   const [approvals, setApprovals] = useState({});
   const [listMonth, setListMonth] = useState(() => new Date().toISOString().slice(0, 7)); // 契約一覧の対象月
+  const [reportClient, setReportClient] = useState(""); // レポートタブの対象クライアント
+  const [reportMonth, setReportMonth] = useState(""); // レポートタブの対象月（既定＝先月）
   const [budgets, setBudgets] = useState({}); // クライアント別 契約予算（媒体別内訳＋月次の変更/追加）
   const [showLog, setShowLog] = useState(false);
   useEffect(() => {
@@ -206,6 +208,7 @@ export default function AdOpsConsole() {
   const [daily, setDaily] = useState(null);
   const [audit, setAudit] = useState(null);
   const [monthly, setMonthly] = useState(null);
+  const [keywords, setKeywords] = useState(null);
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -229,9 +232,14 @@ export default function AdOpsConsole() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && j.byAccount) setMonthly(j); })
       .catch(() => {});
+    fetch("./keywords.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.byAccount) setKeywords(j); })
+      .catch(() => {});
   }, []);
   const auditMap = useMemo(() => (audit && audit.byAccount) || {}, [audit]);
   const monthlyMap = useMemo(() => (monthly && monthly.byAccount) || {}, [monthly]);
+  const keywordMap = useMemo(() => (keywords && keywords.byAccount) || {}, [keywords]);
   const monthlyGen = monthly && monthly.generated;
   // 日次時系列を client|media で引けるマップに（{days, byType}。Googleのみ・Metaは空）
   const dailyMap = useMemo(() => {
@@ -245,7 +253,7 @@ export default function AdOpsConsole() {
     const parse = () => {
       const h = decodeURIComponent((window.location.hash || "").replace(/^#/, ""));
       if (h.indexOf("client/") === 0) { setOpenClient(h.slice(7)); setView("client"); }
-      else if (["dash", "list", "contracts", "conn", "targets", "summary"].indexOf(h) >= 0) { setView(h); setOpenClient(null); }
+      else if (["dash", "list", "contracts", "report", "conn", "targets", "summary"].indexOf(h) >= 0) { setView(h); setOpenClient(null); }
       else { setView("dash"); setOpenClient(null); }
     };
     parse();
@@ -415,6 +423,7 @@ export default function AdOpsConsole() {
           <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={alertActive.length} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧（媒体別）" />
           <NavBtn id="contracts" icon={<span style={{ fontSize: 14 }}>💰</span>} label="契約一覧" />
+          <NavBtn id="report" icon={<span style={{ fontSize: 14 }}>📄</span>} label="レポート" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
         </div>
@@ -719,6 +728,151 @@ export default function AdOpsConsole() {
                 </div>
               </div>
               <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>実消化は monthly.json（当月分・Google/Meta）より。契約・追加は目標設定タブの「契約・予算」で登録すると全スタッフに共有されます。</div>
+            </>
+          );
+        })()}
+
+        {/* ===== レポート（クライアント提出用・媒体横断＋キーワード・PDF書き出し） ===== */}
+        {view === "report" && (() => {
+          const thisMonth = new Date().toISOString().slice(0, 7);
+          const rc = reportClient || (clients[0] && clients[0].client) || "";
+          const accts = A.filter((c) => c.client === rc);
+          const seriesOf = (c) => monthlyMap[`${c.client}|${c.media}`] || [];
+          const allMonths = [...new Set(accts.flatMap((c) => seriesOf(c).map((r) => r.month)))].filter(Boolean).sort();
+          const completed = allMonths.filter((m) => m < thisMonth);
+          const rm = (reportMonth && allMonths.includes(reportMonth)) ? reportMonth
+            : (completed[completed.length - 1] || allMonths[allMonths.length - 1] || "");
+          const yoy = rm ? `${+rm.slice(0, 4) - 1}-${rm.slice(5, 7)}` : "";
+          const cl = clients.find((c) => c.client === rc);
+          const rowOf = (c, mo) => seriesOf(c).find((r) => r.month === mo);
+          const sumMonth = (mo) => accts.reduce((a, c) => { const r = rowOf(c, mo); if (r) { a.cost += r.cost || 0; a.imp += r.imp || 0; a.clk += r.clk || 0; a.cv += r.cv || 0; a.has = true; } return a; }, { cost: 0, imp: 0, clk: 0, cv: 0, has: false });
+          const cur = sumMonth(rm), prev = sumMonth(yoy);
+          const der = (s) => ({ ...s, ctr: s.imp ? s.clk / s.imp * 100 : 0, cpc: s.clk ? s.cost / s.clk : 0, cpa: s.cv ? s.cost / s.cv : null });
+          const C = der(cur), P = der(prev);
+          const dpct = (a, b) => (b ? Math.round((a - b) / b * 100) : null);
+          const sel = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff" };
+          const YoY = ({ a, b, invert }) => {
+            const d = dpct(a, b);
+            if (d == null) return <span style={{ fontSize: 10.5, color: "#cbd5e1" }}>前年同月 —</span>;
+            const good = invert ? d <= 0 : d >= 0;
+            return <span style={{ fontSize: 10.5, color: d === 0 ? "#94a3b8" : (good ? "#047857" : "#b45309") }}>前年同月 {d > 0 ? "+" : ""}{d}%</span>;
+          };
+          const kwAccts = accts.filter((c) => c.media === "google" || c.media === "yahoo_search");
+          const kpi = (label, val, node) => (
+            <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: "12px 14px" }}>
+              <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{val}</div>
+              <div style={{ marginTop: 2 }}>{node}</div>
+            </div>
+          );
+          return (
+            <>
+              <div className="no-print" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12.5, color: "#64748b" }}>クライアント</span>
+                <select value={rc} onChange={(e) => { setReportClient(e.target.value); setReportMonth(""); }} style={{ ...sel, minWidth: 200 }}>
+                  {clients.map((c) => <option key={c.client} value={c.client}>{c.client}</option>)}
+                </select>
+                <span style={{ fontSize: 12.5, color: "#64748b" }}>対象月</span>
+                <select value={rm} onChange={(e) => setReportMonth(e.target.value)} style={sel}>
+                  {[...allMonths].reverse().map((m) => <option key={m} value={m}>{m.replace("-", "年") + "月"}</option>)}
+                  {allMonths.length === 0 && <option value="">データなし</option>}
+                </select>
+                <button onClick={() => window.print()} style={{ ...btnP, marginLeft: "auto" }}>📄 PDFで書き出し</button>
+              </div>
+
+              {/* レポート本体（印刷対象） */}
+              <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 14, padding: "22px 24px" }}>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>ソフトコミュニケーションズ 広告運用レポート</div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 22, fontWeight: 800 }}>{rc}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#0f766e" }}>{rm ? rm.replace("-", "年") + "月 レポート" : "（月データなし）"}</span>
+                  {cl && <span style={{ fontSize: 12, color: "#64748b" }}>月額規模 {man(cl.monthly)}/月</span>}
+                </div>
+                <div style={{ fontSize: 11.5, color: "#94a3b8", margin: "3px 0 18px" }}>媒体：{accts.map((c) => <span key={c.id} style={{ marginRight: 6 }}><MediaPill m={c.media} /></span>)}</div>
+
+                {!cur.has ? (
+                  <Empty text="この月の実績データがありません。対象月を変更してください。" />
+                ) : (
+                  <>
+                    {/* KPIサマリ（媒体横断・前年同月比） */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 10, marginBottom: 22 }}>
+                      {kpi("費用", yen(C.cost), <YoY a={C.cost} b={P.cost} />)}
+                      {kpi("コンバージョン", Math.round(C.cv) + "件", <YoY a={C.cv} b={P.cv} />)}
+                      {kpi("CPA", C.cpa ? yen(Math.round(C.cpa)) : "—", <YoY a={C.cpa || 0} b={P.cpa || 0} invert />)}
+                      {kpi("表示回数", C.imp.toLocaleString("ja-JP"), <YoY a={C.imp} b={P.imp} />)}
+                      {kpi("クリック", C.clk.toLocaleString("ja-JP"), <YoY a={C.clk} b={P.clk} />)}
+                      {kpi("CTR", C.ctr.toFixed(2) + "%", <YoY a={C.ctr} b={P.ctr} />)}
+                      {kpi("CPC", C.cpc ? yen(Math.round(C.cpc)) : "—", <YoY a={C.cpc || 0} b={P.cpc || 0} invert />)}
+                    </div>
+
+                    {/* 媒体別内訳 */}
+                    <SectionTitle icon={<Table2 size={15} color="#047857" />} title="媒体別内訳" />
+                    <div style={{ border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden", marginBottom: 22 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "8px 13px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                        <span>媒体</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span><span style={{ textAlign: "right" }}>CTR / CPC</span>
+                      </div>
+                      {accts.map((c, i) => {
+                        const r = rowOf(c, rm);
+                        return (
+                          <div key={c.id} style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "9px 13px", borderTop: i ? "1px solid #f1f5f4" : "none", fontSize: 12.5, alignItems: "center" }}>
+                            <span><MediaPill m={c.media} /></span>
+                            <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{r ? yen(r.cost) : "—"}</span>
+                            <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r ? Math.round(r.cv) : "—"}</span>
+                            <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r && r.cpa ? yen(r.cpa) : "—"}</span>
+                            <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#64748b" }}>{r && r.imp ? (r.clk / r.imp * 100).toFixed(2) + "% / " + yen(r.clk ? Math.round(r.cost / r.clk) : 0) : "—"}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* 月次推移（媒体ごと） */}
+                    <SectionTitle icon={<TrendingUp size={15} color="#047857" />} title="月次推移" />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
+                      {accts.map((c) => seriesOf(c).length > 0 && (
+                        <div key={c.id} style={{ border: "1px solid #e6ebe8", borderRadius: 10, padding: 13 }}>
+                          <div style={{ marginBottom: 6 }}><MediaPill m={c.media} /></div>
+                          <MonthlyTrend series={seriesOf(c)} generated={monthlyGen} target={c.target || (c.bench && c.bench.targetCpa)} bench={c.bench} />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* キーワード分析（検索：Google / Yahoo!検索） */}
+                    {kwAccts.length > 0 && (
+                      <>
+                        <SectionTitle icon={<KeyRound size={15} color="#047857" />} title="キーワード分析（費用上位）" note="検索広告の当月キーワード。Google／Yahoo!検索が対象。" />
+                        {kwAccts.map((c) => {
+                          const kws = (keywordMap[`${c.client}|${c.media}`] || {})[rm] || [];
+                          return (
+                            <div key={c.id} style={{ marginBottom: 18 }}>
+                              <div style={{ marginBottom: 6 }}><MediaPill m={c.media} /></div>
+                              {kws.length === 0 ? (
+                                <Empty text={`この月のキーワードデータがありません（毎日の取得で反映）。`} />
+                              ) : (
+                                <div style={{ border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+                                    <span>キーワード</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>クリック</span><span style={{ textAlign: "right" }}>CTR</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span>
+                                  </div>
+                                  {kws.map((k, i) => (
+                                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "6px 12px", borderTop: "1px solid #f5f7f6", fontSize: 11.5, alignItems: "center" }}>
+                                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.text}<span style={{ fontSize: 9.5, color: "#94a3b8", marginLeft: 5 }}>{k.match}</span></span>
+                                      <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{yen(k.cost)}</span>
+                                      <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{k.clk}</span>
+                                      <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#64748b" }}>{k.ctr}%</span>
+                                      <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{Math.round(k.cv)}</span>
+                                      <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{k.cpa ? yen(k.cpa) : "—"}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                    <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 8 }}>数値は Google/Meta/Yahoo! の実データ（当月）。前年同月比は12ヶ月前との比較。CPA/CPCの前年同月比は「下降が改善」。</div>
+                  </>
+                )}
+              </div>
             </>
           );
         })()}
