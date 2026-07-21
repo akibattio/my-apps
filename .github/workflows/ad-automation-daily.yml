@@ -37,6 +37,12 @@ jobs:
       GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
       GOOGLE_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_LOGIN_CUSTOMER_ID }}
       SOFCOM_META_SYSTEM_USER_TOKEN: ${{ secrets.SOFCOM_META_SYSTEM_USER_TOKEN }}
+      # LINEヤフー広告（未登録なら空→scriptsが自動スキップ）
+      YAHOO_ADS_CLIENT_ID: ${{ secrets.YAHOO_ADS_CLIENT_ID }}
+      YAHOO_ADS_CLIENT_SECRET: ${{ secrets.YAHOO_ADS_CLIENT_SECRET }}
+      YAHOO_ADS_REFRESH_TOKEN: ${{ secrets.YAHOO_ADS_REFRESH_TOKEN }}
+      YAHOO_ADS_BASE_ACCOUNT_ID: ${{ secrets.YAHOO_ADS_BASE_ACCOUNT_ID }}
+      YAHOO_ADS_API_VERSION: ${{ secrets.YAHOO_ADS_API_VERSION }}
       GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
       # 通知は「Webhookが登録済み かつ 朝8:30の実行(または手動)」のときだけ Google Chat へ。昼/夕は通知しない（ノイズ回避）。
       NOTIFY_CHANNEL: ${{ (secrets.GOOGLE_CHAT_WEBHOOK_URL != '' && (github.event_name != 'schedule' || github.event.schedule == '30 23 * * *')) && 'googlechat' || 'none' }}

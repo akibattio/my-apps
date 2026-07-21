@@ -35,6 +35,8 @@ console/data.json
 console/daily.json
 console/audit.json
 console/monthly.json
+# Yahooアカウント対応表（実accountId=個社情報・Git管理外。exampleはコミット）
+clients/yahoo_accounts.json
 
 # 実行ログ
 logs/

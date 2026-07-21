@@ -130,6 +130,10 @@ def main():
                 series, by_type = google_daily(acct, start, end)
             elif media == "meta":
                 series = meta_daily(acct, tok, start, end) if tok else {"__error__": "no meta token"}
+            elif media in ("yahoo", "yahoo_search", "yahoo_display"):
+                from fetch_yahoo_insights import yahoo_daily, yahoo_enabled
+                kind = "display" if media == "yahoo_display" else "search"
+                series = yahoo_daily(acct, kind, start, end) if yahoo_enabled() else {"__error__": "no yahoo creds"}
             else:
                 continue
         except Exception as e:

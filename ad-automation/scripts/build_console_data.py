@@ -191,6 +191,85 @@ def pull_google(bench_cfg, lm_days, start_id):
     return accounts, proposals
 
 
+# ---- LINEヤフー広告（検索/ディスプレイ）----
+def pull_yahoo(bench_cfg, lm_days, start_id):
+    """設定済みのYahooアカウント（clients/yahoo_accounts.json）の実績を取得。(accounts, proposals) を返す。読み取りのみ。
+
+    clients/yahoo_accounts.json の形（accountIdの実値のみ。トークンは.env）:
+      [{"client":"社名","kind":"search","accountId":"1462425"},
+       {"client":"社名","kind":"display","accountId":"1002817859"}]
+    未設定/未接続なら安全にスキップ（推測でデータを作らない）。"""
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from fetch_yahoo_insights import yahoo_enabled, yahoo_summary
+    except Exception:
+        print("fetch_yahoo_insights 読込不可のためYahooはスキップ"); return [], []
+    if not yahoo_enabled():
+        print("Yahoo接続情報が未設定のためYahooはスキップ"); return [], []
+    cfg_path = Path("clients/yahoo_accounts.json")
+    if not cfg_path.exists():
+        print("clients/yahoo_accounts.json が無いためYahooはスキップ（アカウント対応表を用意）"); return [], []
+    try:
+        entries = json.loads(cfg_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print("yahoo_accounts.json 読み込み失敗:", e); return [], []
+
+    import datetime as _dt
+    today = _dt.date.today()
+    d30s = (today - _dt.timedelta(days=30)).isoformat()
+    d7s = (today - _dt.timedelta(days=7)).isoformat()
+    first_this = today.replace(day=1)
+    lm_end = (first_this - _dt.timedelta(days=1))
+    lm_start = lm_end.replace(day=1)
+    end = today.isoformat()
+
+    accounts, proposals = [], []
+    i = start_id
+    for e in entries:
+        name, kind, acct = e.get("client"), (e.get("kind") or "search"), str(e.get("accountId") or "")
+        if not name or not acct:
+            continue
+        media = "yahoo_display" if kind == "display" else "yahoo_search"
+        try:
+            d30 = yahoo_summary(acct, kind, d30s, end)
+            d7 = yahoo_summary(acct, kind, d7s, end)
+            lm = yahoo_summary(acct, kind, lm_start.isoformat(), lm_end.isoformat())
+        except Exception as ex:
+            print(f"  Yahoo取得失敗 {name}({kind}): {str(ex)[:60]}")
+            accounts.append({"id": i + 1, "client": name, "tier": "mid", "monthly": None,
+                             "media": media, "kind": kind, "acct": acct, "status": "error",
+                             "tokenDays": None, "cp": 0, "sync": datetime.now(JST).strftime("%H:%M 取得"),
+                             "spend": 0, "cpa": 0, "target": None, "roas": None, "cv": 0, "ctr": 0, "is": None,
+                             "dailyBudget": 0, "lmDays": lm_days, "metrics": {"d7": {}, "lm": {}},
+                             "bench": dict(DEFAULT_BENCH), "error": str(ex)[:80]})
+            i += 1
+            continue
+        bench = dict(DEFAULT_BENCH); ov = bench_cfg.get(name)
+        if ov:
+            bench.update({k: v for k, v in ov.items() if not k.startswith("_")}); bench["source"] = "個社目標"
+        i += 1
+        accounts.append({
+            "id": i, "client": name, "tier": ov.get("tier", "mid") if ov else "mid",
+            "monthly": ov.get("monthly") if ov else None, "media": media, "kind": kind,
+            "acct": acct, "status": "ok", "tokenDays": None, "cp": 0,
+            "sync": datetime.now(JST).strftime("%H:%M 取得"),
+            "spend": d30["spend"], "cpa": d30["cpa"] or 0, "target": bench.get("targetCpa"),
+            "roas": d30["roas"], "cv": d30["cv"], "ctr": d30["ctr"], "is": None,
+            "dailyBudget": 0, "lmDays": lm_days,
+            "metrics": {"d7": d7, "lm": lm}, "bench": bench,
+        })
+        if d30["cv"] == 0 and d30["spend"] > 0:
+            proposals.append({
+                "id": f"y-{i}", "client": name, "media": media, "kind": "計測確認/配信見直し",
+                "cur": f"直近30日 CV0 で ¥{d30['spend']:,} 消化",
+                "next": "CV計測(コンバージョン設定)を確認、正常なら配信/KW見直し",
+                "reason": "コンバージョンが記録されていない。まず計測の健全性を確認（推測で断定せず計測担当へ）。",
+                "severity": "critical", "twoStep": False,
+            })
+    return accounts, proposals
+
+
 def main():
     load_env()
     tok = os.environ.get("SOFCOM_META_SYSTEM_USER_TOKEN", "").strip()
@@ -266,9 +345,17 @@ def main():
     g_accounts, g_proposals = pull_google(bench_cfg, lm_days, len(accounts))
     accounts += g_accounts
     proposals += g_proposals
+    google_n = len(g_accounts)
+
+    # LINEヤフー広告（検索/ディスプレイ）を統合（未接続なら自動スキップ）
+    print("LINEヤフー広告 を取得中…")
+    y_accounts, y_proposals = pull_yahoo(bench_cfg, lm_days, len(accounts))
+    accounts += y_accounts
+    proposals += y_proposals
+    yahoo_n = len(y_accounts)
 
     out = {
-        "label": "Meta＋Google 実データ",
+        "label": "Meta＋Google＋Yahoo 実データ" if yahoo_n else "Meta＋Google 実データ",
         "period": "直近30日",
         "generatedAt": datetime.now(JST).strftime("%Y-%m-%d %H:%M JST"),
         "googleMcc": re.sub(r"\D", "", os.environ.get("GOOGLE_LOGIN_CUSTOMER_ID", "") or ""),  # 媒体ページへのリンク用
@@ -277,7 +364,7 @@ def main():
     }
     Path("console").mkdir(exist_ok=True)
     Path("console/data.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {len(accounts)-meta_n}） / 提案{len(proposals)}件")
+    print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {google_n} / Yahoo {yahoo_n}） / 提案{len(proposals)}件")
     for a in accounts:
         m7, ml = a["metrics"]["d7"], a["metrics"]["lm"]
         print(f"  [{a['media']:6}] {a['client'][:20]:22} 日予算¥{a['dailyBudget']:>6,}/日 | 30日:¥{a['spend']:>7,} CV{a['cv']:>4} | 7日:¥{m7['spend']:>7,} | 先月:¥{ml['spend']:>7,}")

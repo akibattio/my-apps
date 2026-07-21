@@ -78,6 +78,10 @@ def main():
                 series = google_monthly(acct, start, end)
             elif media == "meta":
                 series = meta_monthly(acct, tok, start, end) if tok else []
+            elif media in ("yahoo", "yahoo_search", "yahoo_display"):
+                from fetch_yahoo_insights import yahoo_monthly, yahoo_enabled
+                kind = "display" if media == "yahoo_display" else "search"
+                series = yahoo_monthly(acct, kind, start, end) if yahoo_enabled() else []
             else:
                 continue
         except Exception as e:

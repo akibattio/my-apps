@@ -82,8 +82,13 @@ function platformUrl(media, acct, mcc, kind) {
   if (!d) return null;
   if (media === "google") return `https://ads.google.com/aw/${googleSection(kind)}?__c=${onlyDigits(mcc)}&uscid=${d}`;
   if (media === "meta") return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${d}`;
+  // LINEヤフー広告：検索/ディスプレイで管理画面が別。アカウントIDでキャンペーン管理へ。
+  if (media === "yahoo_search") return `https://ads-search.yahoo.co.jp/#/campaigns?accountId=${d}`;
+  if (media === "yahoo_display") return `https://ads-display.yahoo.co.jp/#/campaigns?accountId=${d}`;
   return null;
 }
+// 媒体キー→表示ラベル/系統。yahoo_search/yahoo_display はまとめて "yahoo" 扱い（フィルタ用）。
+function mediaFamily(m) { return (m || "").indexOf("yahoo") === 0 ? "yahoo" : m; }
 function DeliveryBadge({ c }) {
   const on = deliveryOf(c) === "active";
   return (
@@ -268,7 +273,8 @@ export default function AdOpsConsole() {
     };
   }), [DATA, targets]);
 
-  const rows = useMemo(() => A.filter((c) => media === "all" || c.media === media), [media, A]);
+  const rows = useMemo(() => A.filter((c) => media === "all" || mediaFamily(c.media) === media), [media, A]);
+  const hasYahoo = useMemo(() => A.some((c) => mediaFamily(c.media) === "yahoo"), [A]);
   const totals = useMemo(() => agg(rows), [rows]);
   const pKey = (p) => `${p.client}|${p.media}|${p.kind}`;
   const acctOf = (client, media) => (A.find((c) => c.client === client && c.media === media) || {}).acct;
@@ -335,7 +341,7 @@ export default function AdOpsConsole() {
         const acc = A.find((c) => c.client === a.client && c.media === a.media);
         return { ...a, key: `${a.client}|${a.media}|${a.kind}`, url: platformUrl(a.media, acc && acc.acct, mcc, a.kind) };
       })
-      .filter((a) => media === "all" || a.media === media)
+      .filter((a) => media === "all" || mediaFamily(a.media) === media)
       .sort((x, y) => (SEVRANK[x.severity] ?? 3) - (SEVRANK[y.severity] ?? 3));
   }, [dataInfo, A, media, alerts]);
   // 対応管理で「確認済み/様子見(期限内)」は主リストから外す
@@ -417,7 +423,7 @@ export default function AdOpsConsole() {
       <div style={{ padding: 24, maxWidth: 1240, margin: "0 auto" }}>
         {view === "summary" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-            <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />
+            <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />{hasYahoo && <MediaTab id="yahoo" label="Yahoo!" />}
           </div>
         )}
 
@@ -521,11 +527,12 @@ export default function AdOpsConsole() {
                 </Card>
               ))}
             </div>
-            <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体内訳" note="Google / Meta の合計。" />
+            <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体内訳" note="媒体（Google / Meta / Yahoo!）ごとの合計。" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
-              {[["google", "Google"], ["meta", "Meta"]].map(([mk, ml]) => {
-                const t = agg(A.filter((c) => c.media === mk));
-                const n = A.filter((c) => c.media === mk).length;
+              {[["google", "Google"], ["meta", "Meta"], ["yahoo", "Yahoo!"]].map(([mk, ml]) => {
+                const t = agg(A.filter((c) => mediaFamily(c.media) === mk));
+                const n = A.filter((c) => mediaFamily(c.media) === mk).length;
+                if (n === 0) return null;
                 return (
                   <Card key={mk}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}><MediaPill m={mk} /><span style={{ fontSize: 12, color: "#64748b" }}>{n}アカウント</span></div>
@@ -763,7 +770,7 @@ export default function AdOpsConsole() {
               <SectionTitle icon={<Table2 size={16} color="#047857" />} title="費用・成果一覧（媒体別）" note="アカウント（媒体）単位の一覧。クライアント・状態・媒体で絞り込み。行クリックで社別詳細へ。" />
               {/* フィルタ */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />
+                <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />{hasYahoo && <MediaTab id="yahoo" label="Yahoo!" />}
                 <span style={{ width: 1, height: 20, background: "#e2e8f0" }} />
                 <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} style={sel}>
                   <option value="all">すべてのクライアント</option>
@@ -1139,8 +1146,14 @@ function TableHead({ cols, which }) {
   return (<div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.3 }}>{cols.map((c) => <span key={c}>{c}</span>)}</div>);
 }
 function MediaPill({ m }) {
-  const g = m === "google";
-  return <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, margin: "0 2px", background: g ? "#e8f0fe" : "#eef0ff", color: g ? "#1a56db" : "#4338ca" }}>{g ? "Google" : "Meta"}</span>;
+  const S = {
+    google: { bg: "#e8f0fe", c: "#1a56db", label: "Google" },
+    meta: { bg: "#eef0ff", c: "#4338ca", label: "Meta" },
+    yahoo_search: { bg: "#fdeaea", c: "#d1341f", label: "Yahoo!検索" },
+    yahoo_display: { bg: "#fdeaea", c: "#b91c1c", label: "Yahoo!ディスプレイ" },
+  };
+  const s = S[m] || (String(m).indexOf("yahoo") === 0 ? { bg: "#fdeaea", c: "#d1341f", label: "Yahoo!" } : S.meta);
+  return <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, margin: "0 2px", background: s.bg, color: s.c }}>{s.label}</span>;
 }
 function LargePill() {
   return <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 999, marginLeft: 6, background: "#fdf6e3", color: "#b45309" }}><Star size={9} fill="#b45309" color="#b45309" />大型</span>;
