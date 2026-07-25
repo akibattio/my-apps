@@ -57,26 +57,48 @@ def _ask(name: str, secret: bool = False) -> str:
     return v
 
 
+def _extract_code(s: str) -> str:
+    """code の値、または 'https://localhost/?code=XXX' のようなURL全体を貼っても code を取り出す。"""
+    s = (s or "").strip()
+    if "code=" in s:
+        s = s.split("code=", 1)[1].split("&", 1)[0]
+    return urllib.parse.unquote(s).strip()
+
+
 def main() -> int:
     _load_env()
+    # --code <値> を渡せば、認可URL表示を飛ばして即トークン交換（非対話・terminal1行で完結）
+    code_arg = ""
+    argv = sys.argv[1:]
+    for i, a in enumerate(argv):
+        if a == "--code" and i + 1 < len(argv):
+            code_arg = argv[i + 1]
+        elif a.startswith("--code="):
+            code_arg = a.split("=", 1)[1]
+
     client_id = _ask("YAHOO_ADS_CLIENT_ID")
     client_secret = _ask("YAHOO_ADS_CLIENT_SECRET", secret=True)
     redirect_uri = _ask("YAHOO_ADS_REDIRECT_URI")
 
-    # 1) 認可URLを生成（人間がブラウザで開いて許可する）
-    auth = AUTHORIZE_URL + "?" + urllib.parse.urlencode({
-        "response_type": "code",
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "scope": "openid profile",  # ※必要スコープは要確認
-    })
-    print("\n[1] 次のURLをブラウザで開き、ビジネスIDでログイン→「許可」してください:\n")
-    print("   " + auth + "\n")
-    print("[2] リダイレクト先URLの code= の値をコピーして貼り付けてください。")
-    try:
-        code = input("認可コード code: ").strip()
-    except EOFError:
-        code = ""
+    if code_arg:
+        code = _extract_code(code_arg)
+    else:
+        # 1) 認可URLを生成（人間がブラウザで開いて許可する）
+        # Yahoo! JAPAN広告(biz-oauth)は refresh_token 取得に OIDC の scope=openid が必要。
+        # 環境変数 YAHOO_OAUTH_SCOPE で上書き可（例 "openid profile"）。
+        auth = AUTHORIZE_URL + "?" + urllib.parse.urlencode({
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": os.environ.get("YAHOO_OAUTH_SCOPE", "yahooads").strip(),
+        })
+        print("\n[1] 次のURLをブラウザで開き、ビジネスIDでログイン→「許可」してください:\n")
+        print("   " + auth + "\n")
+        print("[2] リダイレクト先URLの code= の値をコピーして貼り付けてください。")
+        try:
+            code = _extract_code(input("認可コード code: "))
+        except EOFError:
+            code = ""
     if not code:
         print("code が空です。中止します。", file=sys.stderr)
         return 2

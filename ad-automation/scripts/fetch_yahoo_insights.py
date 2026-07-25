@@ -26,11 +26,11 @@
   YAHOO_SEARCH_API_HOST        既定 https://ads-search.yahooapis.jp
   YAHOO_DISPLAY_API_HOST       既定 https://ads-display.yahooapis.jp
 
-⚠️ 稼働前チェック（creds取得後に1回のライブ実行で確定させる）:
-  - YAHOO_ADS_API_VERSION の最新値（検索/ディスプレイのリファレンス）
-  - OAuthトークンエンドポイントのホスト（LINEヤフー最新仕様）
-  - レポート定義のフィールド列挙名（COST/IMPS/CLICKS/CONVERSIONS/DAY/MONTH 等）とレポート種別
-  これらは下の CONFIG 定数に集約してあるので、確定後はここだけ直せばよい。
+確定事項（2026-07-25 実APIで疎通確認済み）:
+  - APIバージョン: 検索/ディスプレイとも v20（Server: ads-search/ads-display.yahooapis.jp/api/v20）
+  - OAuth: authorize/token = biz-oauth.yahoo.co.jp、scope=yahooads、refresh_token→access_token OK
+  - レポート: ReportDefinitionService add(reportDownloadFormat=CSV) → get(reportJobStatus) → download(reportJobId単数)でCSV直取得
+  - フィールド: DAY/MONTH/CAMPAIGN_NAME/COST/IMPS/CLICKS/CONVERSIONS（CSVヘッダは日本語。COL_ALIASESで吸収）
 """
 from __future__ import annotations
 import os, io, csv, sys, json, time, urllib.request, urllib.parse, urllib.error
@@ -42,7 +42,7 @@ PROJ = Path(__file__).resolve().parent.parent
 OAUTH_TOKEN_URL = os.environ.get("YAHOO_OAUTH_TOKEN_URL", "https://biz-oauth.yahoo.co.jp/oauth/v1/token")
 SEARCH_HOST = os.environ.get("YAHOO_SEARCH_API_HOST", "https://ads-search.yahooapis.jp")
 DISPLAY_HOST = os.environ.get("YAHOO_DISPLAY_API_HOST", "https://ads-display.yahooapis.jp")
-API_VERSION = os.environ.get("YAHOO_ADS_API_VERSION", "").strip()  # 空なら実行時に警告して停止
+API_VERSION = os.environ.get("YAHOO_ADS_API_VERSION", "v20").strip()  # 検索/ディスプレイとも v20（2026-07時点・リファレンス確認済み）
 
 # レポート定義のフィールド（列挙名は稼働前にリファレンスで確認）。日次は DAY、月次は MONTH を先頭に。
 REPORT_FIELDS_DAILY = ["DAY", "COST", "IMPS", "CLICKS", "CONVERSIONS"]
@@ -83,10 +83,12 @@ def yahoo_enabled() -> bool:
 
 
 def _base_url(kind: str) -> str:
-    if not API_VERSION:
-        raise RuntimeError("YAHOO_ADS_API_VERSION 未設定（例 v13 / v202XXX）。リファレンスで最新版を確認して .env に設定してください。")
-    host = SEARCH_HOST if kind == "search" else DISPLAY_HOST
-    return f"{host}/api/{API_VERSION}"
+    # .env は load_env() 後に os.environ へ入るため、モジュール定数ではなく呼び出し時に読む。
+    ver = os.environ.get("YAHOO_ADS_API_VERSION", API_VERSION).strip()
+    if not ver:
+        raise RuntimeError("YAHOO_ADS_API_VERSION 未設定（例 v20）。リファレンスで最新版を確認して .env に設定してください。")
+    host = os.environ.get("YAHOO_SEARCH_API_HOST", SEARCH_HOST) if kind == "search" else os.environ.get("YAHOO_DISPLAY_API_HOST", DISPLAY_HOST)
+    return f"{host}/api/{ver}"
 
 
 def yahoo_access_token() -> str:
@@ -124,10 +126,14 @@ def _post(url: str, account_id: str, body: dict) -> dict:
         return json.loads(r.read().decode("utf-8"))
 
 
-def _download(url: str) -> str:
+def _download_report(base: str, account_id: str, job_id: int) -> str:
+    """v20 レポートCSVダウンロード。/ReportDefinitionService/download に {accountId, reportJobId} をPOST → CSV本文。"""
     tok = yahoo_access_token()
-    req = urllib.request.Request(url, headers={
+    body = {"accountId": int(str(account_id).replace("-", "")), "reportJobId": job_id}
+    req = urllib.request.Request(f"{base}/ReportDefinitionService/download",
+                                 data=json.dumps(body).encode("utf-8"), method="POST", headers={
         "Authorization": f"Bearer {tok}",
+        "Content-Type": "application/json; charset=UTF-8",
         "x-z-base-account-id": str(os.environ.get("YAHOO_ADS_BASE_ACCOUNT_ID", "")).strip(),
     })
     with urllib.request.urlopen(req, timeout=120) as r:
@@ -147,14 +153,14 @@ def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: 
        検索/ディスプレイで差異があれば kind で分岐すること。"""
     base = _base_url(kind)
     date_range = {"startDate": start.replace("-", ""), "endDate": end.replace("-", "")}  # YYYYMMDD
+    # v20 スキーマ準拠（ads-search-api-documents design/v20）: 出力形式は reportDownloadFormat（format ではない）
     add_body = {"accountId": int(str(account_id).replace("-", "")), "operand": [{
         "reportName": f"adops_{kind}_{report_type}_{date_range['startDate']}_{date_range['endDate']}",
         "reportType": report_type,
         "reportDateRangeType": "CUSTOM_DATE",
         "dateRange": date_range,
         "fields": fields,
-        "format": "CSV",
-        "reportColumnHeader": "FIELD_NAME",   # 列見出しをフィールド列挙名にして解析を安定化（要確認）
+        "reportDownloadFormat": "CSV",
         "reportCompressType": "NONE",
         "reportSkipColumnHeader": "FALSE",
         "reportSkipReportSummary": "TRUE",
@@ -165,22 +171,24 @@ def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: 
     except Exception:
         raise RuntimeError(f"reportJobId 取得失敗: {json.dumps(add, ensure_ascii=False)[:300]}")
 
-    # ポーリング（COMPLETED まで）
-    dl_url = None
+    # ポーリング（COMPLETED まで）。v20の get 応答に downloadUrl は無く、reportJobStatus のみ。
+    acct_int = int(str(account_id).replace("-", ""))
+    completed = False
     for _ in range(POLL_MAX_TRIES):
         get = _rval(_post(f"{base}/ReportDefinitionService/get", account_id,
-                          {"accountId": int(str(account_id).replace("-", "")), "reportJobIds": [job_id]}))
+                          {"accountId": acct_int, "reportJobIds": [job_id]}))
         val = (get.get("values") or [{}])[0].get("reportDefinition", {})
         status = val.get("reportJobStatus")
         if status == "COMPLETED":
-            dl_url = val.get("downloadUrl") or val.get("reportDownloadUrl")
+            completed = True
             break
         if status in ("FAILED", "ABORTED"):
-            raise RuntimeError(f"レポート生成失敗 status={status} job={job_id}")
+            raise RuntimeError(f"レポート生成失敗 status={status} job={job_id} detail={val.get('reportJobErrorDetail')}")
         time.sleep(POLL_INTERVAL_SEC)
-    if not dl_url:
+    if not completed:
         raise RuntimeError(f"レポート未完了（タイムアウト） job={job_id}")
-    return _download(dl_url)
+    # v20: 専用 download エンドポイントに reportJobId(単数) をPOST → CSVバイトを直接取得
+    return _download_report(base, account_id, job_id)
 
 
 def _parse_csv(text: str) -> list[dict]:
@@ -282,7 +290,7 @@ def main():
     end = datetime.date.today().isoformat()
     start = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
     acct = os.environ.get("YAHOO_ADS_TEST_SEARCH_ACCOUNT_ID", "1462425")  # 検索テストアカウント
-    print(f"検索広告テストアカウント {acct} の {start}〜{end} を取得中…（version={API_VERSION or '未設定'}）")
+    print(f"検索広告テストアカウント {acct} の {start}〜{end} を取得中…（version={os.environ.get('YAHOO_ADS_API_VERSION', API_VERSION)}）")
     try:
         s = yahoo_summary(acct, "search", start, end)
         print("結果:", json.dumps(s, ensure_ascii=False))
