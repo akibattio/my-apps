@@ -209,6 +209,7 @@ export default function AdOpsConsole() {
   const [audit, setAudit] = useState(null);
   const [monthly, setMonthly] = useState(null);
   const [keywords, setKeywords] = useState(null);
+  const [breakdowns, setBreakdowns] = useState(null);
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -236,10 +237,15 @@ export default function AdOpsConsole() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && j.byAccount) setKeywords(j); })
       .catch(() => {});
+    fetch("./breakdowns.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.byAccount) setBreakdowns(j); })
+      .catch(() => {});
   }, []);
   const auditMap = useMemo(() => (audit && audit.byAccount) || {}, [audit]);
   const monthlyMap = useMemo(() => (monthly && monthly.byAccount) || {}, [monthly]);
   const keywordMap = useMemo(() => (keywords && keywords.byAccount) || {}, [keywords]);
+  const breakdownMap = useMemo(() => (breakdowns && breakdowns.byAccount) || {}, [breakdowns]);
   const monthlyGen = monthly && monthly.generated;
   // 日次時系列を client|media で引けるマップに（{days, byType}。Googleのみ・Metaは空）
   const dailyMap = useMemo(() => {
@@ -869,7 +875,25 @@ export default function AdOpsConsole() {
                         })}
                       </>
                     )}
-                    <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 8 }}>数値は Google/Meta/Yahoo! の実データ（当月）。前年同月比は12ヶ月前との比較。CPA/CPCの前年同月比は「下降が改善」。</div>
+
+                    {/* 広告の内訳（Google）：デバイス/曜日/時間帯/キャンペーンタイプ/キャンペーン/検索クエリ */}
+                    {(() => {
+                      const bd = (breakdownMap[`${rc}|google`] || {})[rm] || {};
+                      if (!Object.keys(bd).length) return null;
+                      return (
+                        <>
+                          <SectionTitle icon={<Table2 size={15} color="#047857" />} title="広告の内訳（Google・当月）" note="デバイス・曜日・時間帯・キャンペーン・検索クエリ別。表示/クリック/CTR/CPC/費用/CV/CVR/CPA。" />
+                          <BreakdownTable title="キャンペーンタイプ別（検索 / PMax / デマンド）" rows={bd.campaignType} col="タイプ" />
+                          <BreakdownTable title="デバイス別" rows={bd.device} col="デバイス" />
+                          <BreakdownTable title="曜日別" rows={bd.dayOfWeek} col="曜日" />
+                          <BreakdownTable title="時間帯別" rows={bd.hour} col="時間" />
+                          <BreakdownTable title="キャンペーン別（費用上位）" rows={bd.campaign} col="キャンペーン" />
+                          <BreakdownTable title="検索クエリ（費用上位）" rows={bd.searchTerm} col="検索語句" />
+                        </>
+                      );
+                    })()}
+
+                    <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 8 }}>数値は Google/Meta/Yahoo! の実データ（当月）。前年同月比は12ヶ月前との比較。CPA/CPCの前年同月比は「下降が改善」。内訳はGoogle広告のみ。</div>
                   </>
                 )}
               </div>
@@ -1326,6 +1350,36 @@ function StatCell({ label, value, d, dir, bad }) {
   );
 }
 function Empty({ text }) { return <div style={{ background: "#fff", border: "1px dashed #d7e0db", borderRadius: 10, padding: "18px 14px", fontSize: 12.5, color: "#94a3b8", textAlign: "center" }}>{text}</div>; }
+
+// クライアントレポート用 内訳テーブル（項目×表示/クリック/CTR/CPC/費用/CV/CVR/CPA＋総計）。
+function BreakdownTable({ title, rows, col }) {
+  if (!rows || !rows.length) return null;
+  const t = rows.reduce((a, r) => ({ imp: a.imp + r.imp, clk: a.clk + r.clk, cost: a.cost + r.cost, cv: a.cv + r.cv }), { imp: 0, clk: 0, cost: 0, cv: 0 });
+  const tmpl = "minmax(120px,1.7fr) minmax(58px,0.8fr) minmax(58px,0.8fr) minmax(46px,0.6fr) minmax(52px,0.7fr) minmax(72px,0.9fr) minmax(40px,0.55fr) minmax(48px,0.6fr) minmax(60px,0.8fr)";
+  const R = (v) => <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{v}</span>;
+  const ctr = (imp, clk) => imp ? (clk / imp * 100).toFixed(1) + "%" : "—";
+  const cvr = (clk, cv) => clk ? (cv / clk * 100).toFixed(1) + "%" : "—";
+  const hd = { display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "7px 12px", minWidth: 660 };
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", margin: "0 0 6px" }}>{title}</div>
+      <div style={{ border: "1px solid #e6ebe8", borderRadius: 10, overflowX: "auto", overflowY: "hidden" }}>
+        <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+          <span>{col}</span>{["表示", "クリック", "CTR", "CPC", "費用", "CV", "CVR", "CPA"].map((h) => <span key={h} style={{ textAlign: "right" }}>{h}</span>)}
+        </div>
+        {rows.map((r, i) => (
+          <div key={i} style={{ ...hd, borderTop: "1px solid #f5f7f6", fontSize: 11.5, alignItems: "center" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+            {R(r.imp.toLocaleString("ja-JP"))}{R(r.clk.toLocaleString("ja-JP"))}{R(ctr(r.imp, r.clk))}{R(r.clk ? yen(Math.round(r.cost / r.clk)) : "—")}{R(yen(r.cost))}{R(Math.round(r.cv))}{R(cvr(r.clk, r.cv))}{R(r.cv ? yen(Math.round(r.cost / r.cv)) : "—")}
+          </div>
+        ))}
+        <div style={{ ...hd, borderTop: "2px solid #e6ebe8", background: "#f8faf9", fontWeight: 700, fontSize: 11.5 }}>
+          <span>総計</span>{R(t.imp.toLocaleString("ja-JP"))}{R(t.clk.toLocaleString("ja-JP"))}{R(ctr(t.imp, t.clk))}{R(t.clk ? yen(Math.round(t.cost / t.clk)) : "—")}{R(yen(t.cost))}{R(Math.round(t.cv))}{R(cvr(t.clk, t.cv))}{R(t.cv ? yen(Math.round(t.cost / t.cv)) : "—")}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // 1クライアントの契約・追加の編集フォーム（対象月）。契約=媒体別内訳（自由記述）、追加=キャンペーン等。保存で months[月] に反映。
 function BudgetClientEditor({ eb, onSave }) {

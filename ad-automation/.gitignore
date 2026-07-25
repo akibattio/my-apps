@@ -36,6 +36,7 @@ console/daily.json
 console/audit.json
 console/monthly.json
 console/keywords.json
+console/breakdowns.json
 
 # 実行ログ
 logs/
