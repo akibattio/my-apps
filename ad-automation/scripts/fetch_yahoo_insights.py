@@ -147,22 +147,11 @@ def _rval(resp: dict) -> dict:
 
 def _report_type(kind: str, level: str) -> str:
     """レポート種別。検索とディスプレイで列挙が異なる。
-    - 検索: 口座=ACCOUNT / キャンペーン=CAMPAIGN（実APIで取得成功・稼働中）
-    - ディスプレイ: reportType列挙にACCOUNTが無く AD が該当。ただし下記のfollow-up参照。
-
-    ▼ ディスプレイ広告レポート follow-up（2026-07-25 調査。未解決）:
-      - リクエスト構造が検索と別：operandに reportType(文字列) ではなく
-        reportTypeCondition:{reportType:"AD"} を入れる（構造自体は受理される）。
-      - フィールド名は検索と同じで有効（DAY/MONTH/COST/IMPS/CLICKS/CONVERSIONS/CAMPAIGN_NAME、
-        getReportFieldsで確認）。
-      - 矛盾：getReportFields は reportType=AD を受理するのに、ReportDefinitionService/add は
-        reportTypeCondition/reportType="AD" を code0001 "Invalid Request" で拒否（全fields組合せでNG）。
-        master OpenAPI と v20実体の不一致の可能性。要ヤフーサポート確認 or 追加調査。
-      - 対象は現状2アカウントのみ（メディナビAICEバナー1002800117 / SCコーポレートYDA1002776580）。
-      解決したら、display分岐で reportTypeCondition を組み立てるよう _report_csv を改修すること。"""
-    if kind == "display":
-        return "AD"
-    return "CAMPAIGN" if level == "campaign" else "ACCOUNT"
+    ★ 検索とディスプレイでレポート指定方法が違う（2026-07-25 実APIで確認）:
+    - 検索: operandに reportType 文字列を入れる。口座=ACCOUNT / キャンペーン=CAMPAIGN。
+    - ディスプレイ: reportType/reportTypeCondition は**付けない**（フィールドの粒度で自動判定。
+      公式bestpractice例に準拠）。付けると Invalid Request になる。"""
+    return "" if kind == "display" else ("CAMPAIGN" if level == "campaign" else "ACCOUNT")
 
 
 def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: str, level: str = "account") -> str:
@@ -171,10 +160,9 @@ def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: 
     report_type = _report_type(kind, level)
     base = _base_url(kind)
     date_range = {"startDate": start.replace("-", ""), "endDate": end.replace("-", "")}  # YYYYMMDD
-    # v20 スキーマ準拠（ads-search-api-documents design/v20）: 出力形式は reportDownloadFormat（format ではない）
-    add_body = {"accountId": int(str(account_id).replace("-", "")), "operand": [{
-        "reportName": f"adops_{kind}_{report_type}_{date_range['startDate']}_{date_range['endDate']}",
-        "reportType": report_type,
+    # v20 スキーマ準拠: 出力形式は reportDownloadFormat（format ではない）
+    op = {
+        "reportName": f"adops_{kind}_{level}_{date_range['startDate']}_{date_range['endDate']}",
         "reportDateRangeType": "CUSTOM_DATE",
         "dateRange": date_range,
         "fields": fields,
@@ -182,7 +170,10 @@ def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: 
         "reportCompressType": "NONE",
         "reportSkipColumnHeader": "FALSE",
         "reportSkipReportSummary": "TRUE",
-    }]}
+    }
+    if report_type:  # 検索のみ reportType を指定（ディスプレイは付けない）
+        op["reportType"] = report_type
+    add_body = {"accountId": int(str(account_id).replace("-", "")), "operand": [op]}
     add = _rval(_post(f"{base}/ReportDefinitionService/add", account_id, add_body))
     try:
         job_id = add["values"][0]["reportDefinition"]["reportJobId"]
