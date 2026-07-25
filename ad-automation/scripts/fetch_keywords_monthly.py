@@ -39,18 +39,26 @@ def google_keywords(cid, start, end):
     agg = {}  # (month, text, match) -> sums
     for r in ga.search(customer_id=re.sub(r"\D", "", cid), query=f"""
         SELECT segments.month, ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type,
+               ad_group_criterion.quality_info.quality_score,
                metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions
         FROM keyword_view WHERE segments.date BETWEEN '{start}' AND '{end}'"""):
         k = r.ad_group_criterion.keyword
         mo = str(r.segments.month)[:7]
         key = (mo, k.text, k.match_type.name)
-        e = agg.setdefault(key, {"imp": 0, "clk": 0, "cost": 0.0, "cv": 0.0})
+        e = agg.setdefault(key, {"imp": 0, "clk": 0, "cost": 0.0, "cv": 0.0, "qs": 0})
         m = r.metrics
         e["imp"] += int(m.impressions or 0); e["clk"] += int(m.clicks or 0)
         e["cost"] += (m.cost_micros or 0) / 1e6; e["cv"] += float(m.conversions or 0)
+        try:
+            qs = int(r.ad_group_criterion.quality_info.quality_score or 0)
+            if qs:
+                e["qs"] = max(e["qs"], qs)  # 品質スコアは現時点値。複数広告グループ跨ぎは最大を採用
+        except Exception:
+            pass
     by_month = {}
     for (mo, text, match), v in agg.items():
         row = {"text": text, "match": match, "imp": v["imp"], "clk": v["clk"],
+               "qs": v.get("qs") or None,
                "ctr": round(v["clk"] / v["imp"] * 100, 2) if v["imp"] else 0,
                "cpc": round(v["cost"] / v["clk"]) if v["clk"] else 0,
                "cost": round(v["cost"]), "cv": round(v["cv"], 1),

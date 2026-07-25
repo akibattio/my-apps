@@ -855,12 +855,13 @@ export default function AdOpsConsole() {
                                 <Empty text={`この月のキーワードデータがありません（毎日の取得で反映）。`} />
                               ) : (
                                 <div style={{ border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
-                                  <div style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
-                                    <span>キーワード</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>クリック</span><span style={{ textAlign: "right" }}>CTR</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+                                    <span>キーワード</span><span style={{ textAlign: "center" }}>品質</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>クリック</span><span style={{ textAlign: "right" }}>CTR</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span>
                                   </div>
                                   {kws.map((k, i) => (
-                                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.8fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "6px 12px", borderTop: "1px solid #f5f7f6", fontSize: 11.5, alignItems: "center" }}>
+                                    <div key={i} style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "6px 12px", borderTop: "1px solid #f5f7f6", fontSize: 11.5, alignItems: "center" }}>
                                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.text}<span style={{ fontSize: 9.5, color: "#94a3b8", marginLeft: 5 }}>{k.match}</span></span>
+                                      <span style={{ textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: k.qs == null ? "#cbd5e1" : k.qs >= 7 ? "#047857" : k.qs >= 4 ? "#d97706" : "#dc2626" }}>{k.qs == null ? "—" : k.qs}</span>
                                       <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{yen(k.cost)}</span>
                                       <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{k.clk}</span>
                                       <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#64748b" }}>{k.ctr}%</span>
@@ -885,9 +886,12 @@ export default function AdOpsConsole() {
                           <SectionTitle icon={<Table2 size={15} color="#047857" />} title="広告の内訳（Google・当月）" note="デバイス・曜日・時間帯・キャンペーン・検索クエリ別。表示/クリック/CTR/CPC/費用/CV/CVR/CPA。" />
                           <BreakdownTable title="キャンペーンタイプ別（検索 / PMax / デマンド）" rows={bd.campaignType} col="タイプ" />
                           <BreakdownTable title="デバイス別" rows={bd.device} col="デバイス" />
+                          <BreakdownTable title="都道府県別" rows={bd.prefecture} col="都道府県" />
                           <BreakdownTable title="曜日別" rows={bd.dayOfWeek} col="曜日" />
                           <BreakdownTable title="時間帯別" rows={bd.hour} col="時間" />
                           <BreakdownTable title="キャンペーン別（費用上位）" rows={bd.campaign} col="キャンペーン" />
+                          <BreakdownTable title="広告グループ別（費用上位）" rows={bd.adGroup} col="広告グループ" />
+                          <BreakdownTable title="広告別（クリエイティブ・費用上位）" rows={bd.ad} col="広告" />
                           <BreakdownTable title="検索クエリ（費用上位）" rows={bd.searchTerm} col="検索語句" />
                         </>
                       );
