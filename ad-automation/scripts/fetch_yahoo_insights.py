@@ -47,10 +47,12 @@ API_VERSION = os.environ.get("YAHOO_ADS_API_VERSION", "").strip()  # 空なら�
 # レポート定義のフィールド（列挙名は稼働前にリファレンスで確認）。日次は DAY、月次は MONTH を先頭に。
 REPORT_FIELDS_DAILY = ["DAY", "COST", "IMPS", "CLICKS", "CONVERSIONS"]
 REPORT_FIELDS_MONTHLY = ["MONTH", "COST", "IMPS", "CLICKS", "CONVERSIONS"]
+REPORT_FIELDS_CAMPAIGN = ["CAMPAIGN_NAME", "COST", "IMPS", "CLICKS", "CONVERSIONS"]  # ad-report連携用（キャンペーン別）
 # CSVヘッダ→内部キーの対応（NAME/FIELD_NAME どちらのヘッダでも拾えるよう別名を許容）
 COL_ALIASES = {
     "date": {"DAY", "Day", "日", "日付"},
     "month": {"MONTH", "Month", "月"},
+    "name": {"CAMPAIGN_NAME", "CAMPAIGN", "Campaign", "キャンペーン名", "キャンペーン"},
     "cost": {"COST", "Cost", "コスト", "費用"},
     "imp": {"IMPS", "IMPRESSIONS", "Impressions", "インプレッション数", "インプレッション"},
     "clk": {"CLICKS", "Clicks", "クリック数", "クリック"},
@@ -137,16 +139,17 @@ def _rval(resp: dict) -> dict:
     return (resp or {}).get("rval", resp or {})
 
 
-def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: str) -> str:
+def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: str, report_type: str = "ACCOUNT") -> str:
     """レポート定義 add → get(ポーリング) → download の非同期フローでCSV文字列を得る。読み取りのみ。
 
+    report_type: "ACCOUNT"（日次/月次サマリ）/ "CAMPAIGN"（キャンペーン別・ad-report連携用）。
     ⚠️ operand の各キー名/種別は稼働前にリファレンスで要確認（CONFIG参照）。ここは1系統で書いてあるが
        検索/ディスプレイで差異があれば kind で分岐すること。"""
     base = _base_url(kind)
     date_range = {"startDate": start.replace("-", ""), "endDate": end.replace("-", "")}  # YYYYMMDD
     add_body = {"accountId": int(str(account_id).replace("-", "")), "operand": [{
-        "reportName": f"adops_{kind}_{date_range['startDate']}_{date_range['endDate']}",
-        "reportType": "ACCOUNT",
+        "reportName": f"adops_{kind}_{report_type}_{date_range['startDate']}_{date_range['endDate']}",
+        "reportType": report_type,
         "reportDateRangeType": "CUSTOM_DATE",
         "dateRange": date_range,
         "fields": fields,
@@ -240,6 +243,21 @@ def yahoo_monthly(account_id: str, kind: str, start: str, end: str) -> list[dict
         out.append({"month": mo, "imp": x["imp"], "clk": x["clk"], "cost": x["cost"],
                     "cv": round(cv, 1), "cpa": round(x["cost"] / cv) if cv else None})
     return sorted(out, key=lambda r: r["month"])
+
+
+def yahoo_campaigns(account_id: str, kind: str, start: str, end: str) -> list[dict]:
+    """キャンペーン別（期間合計）。ad-report連携用。type は kind から検索/ディスプレイを付与。"""
+    rows = _parse_csv(_report_csv(account_id, kind, REPORT_FIELDS_CAMPAIGN, start, end, report_type="CAMPAIGN"))
+    typ = "ディスプレイ" if kind == "display" else "検索"
+    agg = {}
+    for x in rows:
+        name = x.get("name")
+        if not name:
+            continue
+        e = agg.setdefault(name, {"cost": 0, "imp": 0, "clk": 0, "cv": 0.0})
+        e["cost"] += x["cost"]; e["imp"] += x["imp"]; e["clk"] += x["clk"]; e["cv"] += x["cv"]
+    return [{"name": n, "type": typ, "cost": round(v["cost"]), "impressions": v["imp"],
+             "clicks": v["clk"], "conversions": round(v["cv"])} for n, v in agg.items()]
 
 
 def yahoo_summary(account_id: str, kind: str, start: str, end: str) -> dict:

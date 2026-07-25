@@ -1,6 +1,7 @@
 [
-  {"_comment": "LINEヤフー広告のアカウント対応表。これを clients/yahoo_accounts.json としてコピーし実値を入れる。accountIdの実値のみ記載（トークン等の秘密は.env）。clientはdata.jsonの表示名＝benchmarks.jsonのキーと一致させる。"},
-  {"client": "＜社名＞", "kind": "search",  "accountId": "0000000"},
-  {"client": "＜社名＞", "kind": "display", "accountId": "0000000000"},
+  {"_comment": "LINEヤフー広告のアカウント対応表。これを clients/yahoo_accounts.json としてコピーし実値を入れる。accountIdの実値のみ記載（トークン等の秘密は.env）。clientはdata.jsonの表示名＝benchmarks.jsonのキーと一致させる。slugは ad-report/pipeline/clients.json の識別子（ad-report連携エクスポート用・任意）。"},
+  {"client": "＜社名＞", "slug": "subaco",  "kind": "search",  "accountId": "0000000"},
+  {"client": "＜社名＞", "slug": "subaco",  "kind": "display", "accountId": "0000000000"},
+  {"client": "＜社名＞", "slug": "ricelog", "kind": "search",  "accountId": "0000000"},
   {"_test": "疎通確認用テストアカウント（本番環境で使用可）", "検索": "1462425", "ディスプレイ": "1002817859", "x-z-base-account-id": "1001994926"}
 ]

@@ -45,6 +45,20 @@ YAHOO_ADS_REDIRECT_URI=＜アプリ登録時のリダイレクトURIと完全一
 - `fetch_daily_series.py` / `fetch_monthly_series.py` … media が yahoo系なら `yahoo_daily`/`yahoo_monthly` を呼ぶ
 - フロント（`console/ad_ops_console.jsx`）… MediaPill/媒体タブ/媒体内訳/媒体別リンクが Yahoo! に対応（`mediaFamily()` で yahoo系をまとめて絞込み）
 
+## 4.5 ad-report（別アプリ・クライアント向けHTML）への受け渡し
+
+役割分担：**取得＝ad-automation（このリポ）／表示＝ad-report**（~/ClaudeCode/ad-report・Node）。ad-reportはYahoo APIに直結せず、こちらが出すJSONを取り込む。契約: `~/ClaudeCode/ad-report/docs/yahoo-ingest-contract.md`。
+
+```
+# 先月分をエクスポート（slugは yahoo_accounts.json の "slug"＝ad-reportのclients.json識別子）
+python3 scripts/export_yahoo_for_adreport.py            # 先月
+python3 scripts/export_yahoo_for_adreport.py 2026-06    # 月指定
+python3 scripts/export_yahoo_for_adreport.py 2026-06 --sample   # creds無しでサンプル書き出し（疎通確認）
+```
+- 出力: `~/ClaudeCode/ad-report/pipeline/yahoo/<slug>-<YYYY-MM>.json`（キャンペーン別・検索/ディスプレイ混在）
+- 反映は ad-report 側で `node generate.js --customer=<ID> --month=<YYYY-MM>` → Netlify（あちらの操作）
+- `yahoo_accounts.json` の各エントリに `slug`（subaco/ricelog 等）を付ける
+
 ## 5. レポート（クライアント提出）への合流 設計
 
 有料広告レポートはコンソールと別建て（`out/` のHTML・`google_report_*` が生成）。Yahooの入れ方：
