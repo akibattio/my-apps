@@ -232,6 +232,8 @@ def _parse_csv(text: str) -> list[dict]:
                 return 0.0
         rec = {"imp": int(num("imp")), "clk": int(num("clk")),
                "cost": round(num("cost")), "cv": round(num("cv"), 1)}
+        if "name" in idx and idx["name"] < len(r):  # キャンペーン名等（キャンペーン別レポート用）
+            rec["name"] = (r[idx["name"]] or "").strip().strip('"')
         if "date" in idx and idx["date"] < len(r):
             d = (r[idx["date"]] or "").strip()
             rec["date"] = d if "-" in d else (f"{d[:4]}-{d[4:6]}-{d[6:8]}" if len(d) >= 8 else d)

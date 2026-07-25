@@ -37,6 +37,7 @@ def _month_span(ym: str):
     y, m = int(ym[:4]), int(ym[5:7])
     start = datetime.date(y, m, 1)
     end = datetime.date(y + (m // 12), (m % 12) + 1, 1) - datetime.timedelta(days=1)
+    end = min(end, datetime.date.today())  # 当月は未来日を渡さない（ディスプレイAPIは未来日でV0001）
     return start.isoformat(), end.isoformat()
 
 
