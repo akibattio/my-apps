@@ -145,12 +145,19 @@ def _rval(resp: dict) -> dict:
     return (resp or {}).get("rval", resp or {})
 
 
-def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: str, report_type: str = "ACCOUNT") -> str:
-    """レポート定義 add → get(ポーリング) → download の非同期フローでCSV文字列を得る。読み取りのみ。
+def _report_type(kind: str, level: str) -> str:
+    """レポート種別。検索とディスプレイで列挙が異なる。
+    - 検索: 口座=ACCOUNT / キャンペーン=CAMPAIGN
+    - ディスプレイ: 口座もキャンペーンも AD（reportType列挙にACCOUNTが無い。fieldsで粒度を区別）"""
+    if kind == "display":
+        return "AD"
+    return "CAMPAIGN" if level == "campaign" else "ACCOUNT"
 
-    report_type: "ACCOUNT"（日次/月次サマリ）/ "CAMPAIGN"（キャンペーン別・ad-report連携用）。
-    ⚠️ operand の各キー名/種別は稼働前にリファレンスで要確認（CONFIG参照）。ここは1系統で書いてあるが
-       検索/ディスプレイで差異があれば kind で分岐すること。"""
+
+def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: str, level: str = "account") -> str:
+    """レポート定義 add → get(ポーリング) → download の非同期フローでCSV文字列を得る。読み取りのみ。
+    level: "account"（日次/月次サマリ）/ "campaign"（キャンペーン別・ad-report連携用）。"""
+    report_type = _report_type(kind, level)
     base = _base_url(kind)
     date_range = {"startDate": start.replace("-", ""), "endDate": end.replace("-", "")}  # YYYYMMDD
     # v20 スキーマ準拠（ads-search-api-documents design/v20）: 出力形式は reportDownloadFormat（format ではない）
@@ -255,7 +262,7 @@ def yahoo_monthly(account_id: str, kind: str, start: str, end: str) -> list[dict
 
 def yahoo_campaigns(account_id: str, kind: str, start: str, end: str) -> list[dict]:
     """キャンペーン別（期間合計）。ad-report連携用。type は kind から検索/ディスプレイを付与。"""
-    rows = _parse_csv(_report_csv(account_id, kind, REPORT_FIELDS_CAMPAIGN, start, end, report_type="CAMPAIGN"))
+    rows = _parse_csv(_report_csv(account_id, kind, REPORT_FIELDS_CAMPAIGN, start, end, level="campaign"))
     typ = "ディスプレイ" if kind == "display" else "検索"
     agg = {}
     for x in rows:

@@ -1,0 +1,12 @@
+[
+  {"_comment": "LINEヤフー広告のアカウント対応表。client=data.json/benchmarks.jsonの表示名（媒体グループ化に使用）。kind=search/display。accountId=実ID。slug=ad-report識別子（ad-report連携時のみ）。MCC=1001994926（x-z-base-account-id）。サービス中のみ。2026-07-25 管理画面より。"},
+  {"_pending_display": "ディスプレイ広告(メディナビAICEバナー=1002800117 / SCコーポレートYDA=1002776580)はレポートAPI仕様が検索と異なり未対応。follow-upで追加予定。"},
+
+  {"client": "【メディナビ】AICE", "kind": "search", "accountId": "1454216"},
+  {"client": "【東海グランド】TOOGU", "kind": "search", "accountId": "1430574"},
+  {"client": "【展示会ブース装飾】", "kind": "search", "accountId": "1413623"},
+  {"client": "【EM生活】公式オンラインショップ", "kind": "search", "accountId": "1413568"},
+  {"client": "【SUBACO】", "slug": "subaco", "kind": "search", "accountId": "1368983"},
+  {"client": "【あんじゅホーム】", "kind": "search", "accountId": "1368982"},
+  {"client": "【EM生活】暮らしの発酵 日々", "kind": "search", "accountId": "1360679"}
+]
