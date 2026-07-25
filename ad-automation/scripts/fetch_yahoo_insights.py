@@ -147,8 +147,19 @@ def _rval(resp: dict) -> dict:
 
 def _report_type(kind: str, level: str) -> str:
     """レポート種別。検索とディスプレイで列挙が異なる。
-    - 検索: 口座=ACCOUNT / キャンペーン=CAMPAIGN
-    - ディスプレイ: 口座もキャンペーンも AD（reportType列挙にACCOUNTが無い。fieldsで粒度を区別）"""
+    - 検索: 口座=ACCOUNT / キャンペーン=CAMPAIGN（実APIで取得成功・稼働中）
+    - ディスプレイ: reportType列挙にACCOUNTが無く AD が該当。ただし下記のfollow-up参照。
+
+    ▼ ディスプレイ広告レポート follow-up（2026-07-25 調査。未解決）:
+      - リクエスト構造が検索と別：operandに reportType(文字列) ではなく
+        reportTypeCondition:{reportType:"AD"} を入れる（構造自体は受理される）。
+      - フィールド名は検索と同じで有効（DAY/MONTH/COST/IMPS/CLICKS/CONVERSIONS/CAMPAIGN_NAME、
+        getReportFieldsで確認）。
+      - 矛盾：getReportFields は reportType=AD を受理するのに、ReportDefinitionService/add は
+        reportTypeCondition/reportType="AD" を code0001 "Invalid Request" で拒否（全fields組合せでNG）。
+        master OpenAPI と v20実体の不一致の可能性。要ヤフーサポート確認 or 追加調査。
+      - 対象は現状2アカウントのみ（メディナビAICEバナー1002800117 / SCコーポレートYDA1002776580）。
+      解決したら、display分岐で reportTypeCondition を組み立てるよう _report_csv を改修すること。"""
     if kind == "display":
         return "AD"
     return "CAMPAIGN" if level == "campaign" else "ACCOUNT"
