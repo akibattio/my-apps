@@ -52,7 +52,9 @@ REPORT_FIELDS_CAMPAIGN = ["CAMPAIGN_NAME", "COST", "IMPS", "CLICKS", "CONVERSION
 COL_ALIASES = {
     "date": {"DAY", "Day", "日", "日付"},
     "month": {"MONTH", "Month", "月"},
-    "name": {"CAMPAIGN_NAME", "CAMPAIGN", "Campaign", "キャンペーン名", "キャンペーン"},
+    "name": {"CAMPAIGN_NAME", "CAMPAIGN", "Campaign", "キャンペーン名", "キャンペーン",
+             "DEVICE", "デバイス", "KEYWORD", "キーワード",
+             "SEARCH_QUERY", "検索クエリー", "検索クエリ", "SEARCH_TERM"},
     "cost": {"COST", "Cost", "コスト", "費用"},
     "imp": {"IMPS", "IMPRESSIONS", "Impressions", "インプレッション数", "インプレッション"},
     "clk": {"CLICKS", "Clicks", "クリック数", "クリック"},
@@ -154,10 +156,14 @@ def _report_type(kind: str, level: str) -> str:
     return "" if kind == "display" else ("CAMPAIGN" if level == "campaign" else "ACCOUNT")
 
 
-def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: str, level: str = "account") -> str:
+def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: str, level: str = "account", report_type: str = None) -> str:
     """レポート定義 add → get(ポーリング) → download の非同期フローでCSV文字列を得る。読み取りのみ。
-    level: "account"（日次/月次サマリ）/ "campaign"（キャンペーン別・ad-report連携用）。"""
-    report_type = _report_type(kind, level)
+    level: "account"/"campaign"。report_type: 明示指定（検索のみ有効。DEVICE=ACCOUNT/キーワード=KEYWORDS/クエリ=SEARCH_QUERY）。
+    ディスプレイは常に reportType を付けない。"""
+    if kind == "display":
+        report_type = ""
+    elif report_type is None:
+        report_type = _report_type(kind, level)
     base = _base_url(kind)
     date_range = {"startDate": start.replace("-", ""), "endDate": end.replace("-", "")}  # YYYYMMDD
     # v20 スキーマ準拠: 出力形式は reportDownloadFormat（format ではない）
@@ -277,6 +283,49 @@ def yahoo_campaigns(account_id: str, kind: str, start: str, end: str) -> list[di
         e["cost"] += x["cost"]; e["imp"] += x["imp"]; e["clk"] += x["clk"]; e["cv"] += x["cv"]
     return [{"name": n, "type": typ, "cost": round(v["cost"]), "impressions": v["imp"],
              "clicks": v["clk"], "conversions": round(v["cv"])} for n, v in agg.items()]
+
+
+def yahoo_devices(account_id: str, kind: str, start: str, end: str) -> list[dict]:
+    """デバイス別（検索: reportType=ACCOUNT+DEVICE ／ ディスプレイ: DEVICEフィールドのみ）。"""
+    rt = None if kind == "display" else "ACCOUNT"
+    rows = _parse_csv(_report_csv(account_id, kind, ["DEVICE", "COST", "IMPS", "CLICKS", "CONVERSIONS"], start, end, report_type=rt))
+    agg = {}
+    for x in rows:
+        n = x.get("name")
+        if not n:
+            continue
+        e = agg.setdefault(n, {"cost": 0, "imp": 0, "clk": 0, "cv": 0.0})
+        e["cost"] += x["cost"]; e["imp"] += x["imp"]; e["clk"] += x["clk"]; e["cv"] += x["cv"]
+    return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
+            for n, v in agg.items()]
+
+
+def yahoo_search_keywords(account_id: str, start: str, end: str, top: int = 30) -> list[dict]:
+    """検索広告のキーワード別（上位・費用順）。検索アカウントのみ。"""
+    rows = _parse_csv(_report_csv(account_id, "search", ["KEYWORD", "COST", "IMPS", "CLICKS", "CONVERSIONS"], start, end, report_type="KEYWORDS"))
+    agg = {}
+    for x in rows:
+        n = x.get("name")
+        if not n:
+            continue
+        e = agg.setdefault(n, {"cost": 0, "clk": 0, "cv": 0.0})
+        e["cost"] += x["cost"]; e["clk"] += x["clk"]; e["cv"] += x["cv"]
+    out = [{"kw": n, "clicks": v["clk"], "cost": round(v["cost"]), "conversions": round(v["cv"])} for n, v in agg.items()]
+    return sorted(out, key=lambda r: r["cost"], reverse=True)[:top]
+
+
+def yahoo_search_queries(account_id: str, start: str, end: str, top: int = 30) -> list[dict]:
+    """検索広告の検索クエリ別（上位・費用順）。検索アカウントのみ。"""
+    rows = _parse_csv(_report_csv(account_id, "search", ["SEARCH_QUERY", "COST", "CLICKS", "CONVERSIONS"], start, end, report_type="SEARCH_QUERY"))
+    agg = {}
+    for x in rows:
+        n = x.get("name")
+        if not n:
+            continue
+        e = agg.setdefault(n, {"cost": 0, "clk": 0})
+        e["cost"] += x["cost"]; e["clk"] += x["clk"]
+    out = [{"q": n, "clicks": v["clk"], "cost": round(v["cost"])} for n, v in agg.items()]
+    return sorted(out, key=lambda r: r["cost"], reverse=True)[:top]
 
 
 def yahoo_summary(account_id: str, kind: str, start: str, end: str) -> dict:

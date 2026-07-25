@@ -41,6 +41,67 @@ def _month_span(ym: str):
     return start.isoformat(), end.isoformat()
 
 
+def _months_ago_start(ym: str, n: int) -> str:
+    """ym の (n-1)ヶ月前の月初（月次推移レンジ用）。"""
+    y, m = int(ym[:4]), int(ym[5:7])
+    m -= (n - 1)
+    while m <= 0:
+        m += 12; y -= 1
+    return datetime.date(y, m, 1).isoformat()
+
+
+def _build_payload(slug, accs, ym, start, end):
+    """スラッグ配下（検索＋ディスプレイ）を合算し ad-report契約のリッチJSONを組む。取れる項目だけ入れる。"""
+    campaigns, dev, daily, monthly, kws, qrs = [], {}, {}, {}, {}, {}
+    mon_start = _months_ago_start(ym, 12)  # monthly は直近12ヶ月
+
+    def add(bucket, key, cost=0, imp=None, clk=0, cv=0):
+        e = bucket.setdefault(key, {"cost": 0, "imp": 0, "clk": 0, "cv": 0})
+        e["cost"] += cost or 0; e["imp"] += imp or 0; e["clk"] += clk or 0; e["cv"] += cv or 0
+
+    for a in accs:
+        kind = "display" if a.get("kind") == "display" else "search"
+        acct = str(a["accountId"])
+        def safe(fn, *args):
+            try:
+                return fn(*args)
+            except Exception as ex:
+                print(f"  取得失敗 {slug}/{kind}/{fn.__name__}: {str(ex)[:60]}")
+                return []
+        campaigns += safe(Y.yahoo_campaigns, acct, kind, start, end)
+        for d in safe(Y.yahoo_devices, acct, kind, start, end):
+            add(dev, d["name"], d["cost"], d["impressions"], d["clicks"], d["conversions"])
+        for d in safe(Y.yahoo_daily, acct, kind, start, end):
+            add(daily, d["date"], d.get("cost"), d.get("imp"), d.get("clk"), d.get("cv"))
+        for m in safe(Y.yahoo_monthly, acct, kind, mon_start, end):
+            add(monthly, m["month"], m.get("cost"), m.get("imp"), m.get("clk"), m.get("cv"))
+        if kind == "search":
+            for k in safe(Y.yahoo_search_keywords, acct, start, end):
+                add(kws, k["kw"], k["cost"], 0, k["clicks"], k.get("conversions", 0))
+            for q in safe(Y.yahoo_search_queries, acct, start, end):
+                add(qrs, q["q"], q["cost"], 0, q["clicks"], 0)
+
+    if not campaigns and not any([dev, daily, monthly]):
+        return None
+    payload = {"campaigns": campaigns}
+    if dev:
+        payload["devices"] = [{"name": n, "cost": v["cost"], "impressions": v["imp"], "clicks": v["clk"], "conversions": v["cv"]}
+                              for n, v in sorted(dev.items(), key=lambda kv: kv[1]["cost"], reverse=True)]
+    if daily:
+        payload["daily"] = [{"date": d, "cost": v["cost"], "clicks": v["clk"], "conversions": v["cv"]}
+                            for d, v in sorted(daily.items())]
+    if monthly:
+        payload["monthly"] = [{"ym": m[:7], "cost": v["cost"], "clicks": v["clk"], "conversions": v["cv"]}
+                              for m, v in sorted(monthly.items())]
+    if kws:
+        payload["keywords"] = [{"kw": n, "clicks": v["clk"], "cost": v["cost"], "conversions": v["cv"]}
+                               for n, v in sorted(kws.items(), key=lambda kv: kv[1]["cost"], reverse=True)[:30]]
+    if qrs:
+        payload["queries"] = [{"q": n, "clicks": v["clk"], "cost": v["cost"]}
+                              for n, v in sorted(qrs.items(), key=lambda kv: kv[1]["cost"], reverse=True)[:30]]
+    return payload
+
+
 def _sample(slug: str) -> dict:
     return {"campaigns": [
         {"name": f"検索_一般（{slug}）", "type": "検索", "cost": 42000, "impressions": 15000, "clicks": 520, "conversions": 4},
@@ -81,21 +142,14 @@ def main() -> int:
         if sample:
             payload = _sample(slug)
         else:
-            campaigns = []
-            for a in accs:
-                kind = "display" if a.get("kind") == "display" else "search"
-                try:
-                    campaigns += Y.yahoo_campaigns(str(a["accountId"]), kind, start, end)
-                except Exception as ex:
-                    print(f"  取得失敗 {slug}/{kind}: {str(ex)[:70]}")
-            if not campaigns:
-                print(f"  {slug}: {ym} のキャンペーン実績なし → 出力スキップ（推測で埋めない）")
+            payload = _build_payload(slug, accs, ym, start, end)
+            if payload is None:
+                print(f"  {slug}: {ym} の実績なし → 出力スキップ（推測で埋めない）")
                 continue
-            payload = {"campaigns": campaigns}
         out = out_dir / f"{slug}-{ym}.json"
         out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        n = len(payload["campaigns"])
-        print(f"  出力 {out}  （{n}キャンペーン{'・サンプル' if sample else ''}）")
+        extra = "+".join(k for k in ("devices", "daily", "keywords", "queries", "monthly") if payload.get(k))
+        print(f"  出力 {out}  （{len(payload['campaigns'])}キャンペーン{'・' + extra if extra else ''}{'・サンプル' if sample else ''}）")
         wrote += 1
 
     print(f"完了: {wrote}ファイルを {out_dir} に出力（{ym}）。")
