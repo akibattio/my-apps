@@ -17,10 +17,12 @@
 <script src="./vendor/babel.min.js"></script>
 <style>
   body { margin: 0; }
-  #root { min-height: 100vh; }
+  /* 全体を均一に拡大して視認性を上げる（各所px直書きのため zoom で一括スケール）。数値を変えれば拡大率調整可 */
+  #root { min-height: 100vh; zoom: 1.15; }
   .boot { font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; padding: 40px; color: #64748b; }
   /* 月初レポート：印刷/PDF時はナビ・ボタン等を隠し、開いている社の詳細だけを出す */
   @media print {
+    #root { zoom: 1 !important; }  /* 印刷/PDFは従来サイズ（A4に収める） */
     .no-print { display: none !important; }
     body { background: #fff !important; }
     @page { margin: 12mm; }
