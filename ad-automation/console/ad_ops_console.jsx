@@ -65,6 +65,10 @@ const RANK = { good: 0, unset: 1, warning: 2, critical: 3 };
 const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "unset" : "good");
 // 配信ステータス：直近7日にインプレッション（or 消化）があれば配信中、無ければ停止中
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
+// 顧客レポート（ad-report / Netlify）へのリンク。URLを入れるとヘッダーに「顧客レポート↗」が出る。空なら非表示。
+// クライアント提出レポートは ad-report に一本化。コンソールの「社内レポート」タブは社内確認用。
+const AD_REPORT_URL = "";
+
 // 媒体（Google広告/Meta広告マネージャ）の該当ページURL。alertの種類(kind)から「修正する画面」を選ぶ。
 const onlyDigits = (s) => (s || "").replace(/\D/g, "");
 function googleSection(kind) {
@@ -423,13 +427,14 @@ export default function AdOpsConsole() {
             <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#f4c542" }}><Bell size={15} /><b>{pending.length}</b><span style={{ color: "#a7c4b5" }}>承認待ち</span></span>
             <span style={{ display: "flex", alignItems: "center", gap: 5, color: connIssues ? "#f4a3a3" : "#a7c4b5" }}><Cable size={15} /><b>{connIssues}</b><span style={{ color: "#a7c4b5" }}>接続要確認</span></span>
             <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#a7c4b5" }}><ShieldCheck size={14} /> 承認ゲート ON</span>
+            {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, color: "#0f2a1f", background: "#f4c542", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "5px 11px" }}>📄 顧客レポート ↗</a>}
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
           <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={alertActive.length} />
           <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧（媒体別）" />
           <NavBtn id="contracts" icon={<span style={{ fontSize: 14 }}>💰</span>} label="契約一覧" />
-          <NavBtn id="report" icon={<span style={{ fontSize: 14 }}>📄</span>} label="レポート" />
+          <NavBtn id="report" icon={<span style={{ fontSize: 14 }}>📄</span>} label="社内レポート" />
           <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
           <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
         </div>
