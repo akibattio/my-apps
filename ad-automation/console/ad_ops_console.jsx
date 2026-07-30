@@ -415,9 +415,9 @@ export default function AdOpsConsole() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f6f7f6", color: "#0f172a",
+    <div style={{ minHeight: "100vh", background: "#eef2f0", color: "#0f172a",
       fontFamily: "-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" }}>
-      <div className="no-print" style={{ background: "#0f2a1f", color: "#fff", padding: "14px 24px" }}>
+      <div className="no-print" style={{ background: "linear-gradient(118deg,#0b2318 0%,#123020 55%,#17392a 100%)", color: "#fff", padding: "16px 24px", boxShadow: "0 2px 16px rgba(11,35,24,.22)", position: "sticky", top: 0, zIndex: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700 }}>広告運用コンソール</div>
@@ -503,7 +503,7 @@ export default function AdOpsConsole() {
                     <Clock size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />承認ログ {approvalLog.length}件 {showLog ? "▲" : "▼"}
                   </button>
                   {showLog && (
-                    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden", marginTop: 8 }}>
+                    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden", marginTop: 8 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.9fr 1.4fr 0.8fr 0.5fr", padding: "8px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
                         <span>クライアント</span><span>媒体</span><span>提案</span><span>判断・理由</span><span>担当・日時</span><span></span>
                       </div>
@@ -615,7 +615,7 @@ export default function AdOpsConsole() {
                   const tok = c.tokenDays >= 999 ? "無期限" : c.tokenDays === 0 ? "失効" : `残 ${c.tokenDays}日`;
                   const tokC = c.tokenDays >= 999 ? "#047857" : c.tokenDays === 0 ? "#dc2626" : c.tokenDays <= 7 ? "#d97706" : "#475569";
                   return (
-                    <div key={c.id} style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: 15 }}>
+                    <div key={c.id} style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 15 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <MediaPill m={c.media} /><DeliveryBadge c={c} />
@@ -653,7 +653,7 @@ export default function AdOpsConsole() {
               {cAlerts.length > 0 && (
                 <>
                   <SectionTitle icon={<AlertTriangle size={16} color="#d97706" />} title="この社のアラート" />
-                  <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
+                  <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden" }}>
                     {cAlerts.map((al, i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 13px", borderTop: i ? "1px solid #f1f5f4" : "none" }}>
                         <Circle size={9} fill={SEV[al.sev].dot} color={SEV[al.sev].dot} />
@@ -693,7 +693,7 @@ export default function AdOpsConsole() {
                 </select>
                 <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>今月の予算 合計 <b style={{ color: "#0f2a1f" }}>{fmtYen(totBudget)}</b>{totActual ? ` ／ 実消化 ${fmtYen(totActual)}（${Math.round(totActual / totBudget * 100)}%）` : ""}</span>
               </div>
-              <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 10, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
                   <span>クライアント</span><span>契約（媒体別）＋追加</span><span style={{ textAlign: "right" }}>今月の予算</span><span style={{ textAlign: "right" }}>実消化 / 消化率</span>
                 </div>
@@ -770,7 +770,7 @@ export default function AdOpsConsole() {
           };
           const kwAccts = accts.filter((c) => c.media === "google" || c.media === "yahoo_search");
           const kpi = (label, val, node) => (
-            <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: "12px 14px" }}>
               <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{val}</div>
               <div style={{ marginTop: 2 }}>{node}</div>
@@ -792,7 +792,7 @@ export default function AdOpsConsole() {
               </div>
 
               {/* レポート本体（印刷対象） */}
-              <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 14, padding: "22px 24px" }}>
+              <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, padding: "22px 24px" }}>
                 <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>ソフトコミュニケーションズ 広告運用レポート</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 22, fontWeight: 800 }}>{rc}</span>
@@ -818,7 +818,7 @@ export default function AdOpsConsole() {
 
                     {/* 媒体別内訳 */}
                     <SectionTitle icon={<Table2 size={15} color="#047857" />} title="媒体別内訳" />
-                    <div style={{ border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden", marginBottom: 22 }}>
+                    <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden", marginBottom: 22 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "8px 13px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
                         <span>媒体</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span><span style={{ textAlign: "right" }}>CTR / CPC</span>
                       </div>
@@ -840,7 +840,7 @@ export default function AdOpsConsole() {
                     <SectionTitle icon={<TrendingUp size={15} color="#047857" />} title="月次推移" />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
                       {accts.map((c) => seriesOf(c).length > 0 && (
-                        <div key={c.id} style={{ border: "1px solid #e6ebe8", borderRadius: 10, padding: 13 }}>
+                        <div key={c.id} style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", padding: 13 }}>
                           <div style={{ marginBottom: 6 }}><MediaPill m={c.media} /></div>
                           <MonthlyTrend series={seriesOf(c)} generated={monthlyGen} target={c.target || (c.bench && c.bench.targetCpa)} bench={c.bench} />
                         </div>
@@ -859,7 +859,7 @@ export default function AdOpsConsole() {
                               {kws.length === 0 ? (
                                 <Empty text={`この月のキーワードデータがありません（毎日の取得で反映）。`} />
                               ) : (
-                                <div style={{ border: "1px solid #e6ebe8", borderRadius: 10, overflow: "hidden" }}>
+                                <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden" }}>
                                   <div style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
                                     <span>キーワード</span><span style={{ textAlign: "center" }}>品質</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>クリック</span><span style={{ textAlign: "right" }}>CTR</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span>
                                   </div>
@@ -914,7 +914,7 @@ export default function AdOpsConsole() {
         {view === "conn" && (
           <>
             <SectionTitle icon={<Cable size={16} color="#047857" />} title="接続ステータス" note="何がアクティブで、どのアカウントに繋がっているか。行クリックで社別に。" />
-            <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
               <TableHead which="conn" cols={["クライアント", "連携先", "アカウントID", "接続状態", "トークン期限", "稼働CP", "最終同期"]} />
               {A.map((c, i) => {
                 const s = CONN[c.status];
@@ -974,7 +974,7 @@ export default function AdOpsConsole() {
                   <button onClick={() => { setClientFilter("all"); setFlagFilter("all"); setMedia("all"); }} style={{ border: "none", background: "none", color: "#047857", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>絞り込み解除</button>}
                 <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{listRows.length}件</span>
               </div>
-              <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
                 <div style={head}>
                   <span>クライアント</span><span>媒体</span><span>消化（前月比）</span><span>CPA（前月比）</span><span>CV</span><span>状態</span>
                 </div>
@@ -1032,13 +1032,13 @@ function agg(list) {
   const roas = r.length ? r.reduce((s, c) => s + c.roas, 0) / r.length : 0;
   return { spend, cv: Math.round(cvRaw), cpa, roas };
 }
-const btnP = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "none", background: "#047857", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" };
+const btnP = { display: "flex", alignItems: "center", gap: 6, padding: "8px 17px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#0a9268,#047857)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 1px 2px rgba(4,120,87,.35)" };
 const btnS = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer" };
 
 function ProposalCard({ p, decide, onClient, hideClient, url }) {
   const s = SEV[p.severity];
   return (
-    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderLeft: `3px solid ${s.dot}`, borderRadius: 10, padding: 14 }}>
+    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderLeft: `3px solid ${s.dot}`, borderRadius: 10, padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {!hideClient && <button onClick={() => onClient && onClient(p.client)} style={{ fontWeight: 700, fontSize: 14, background: "none", border: "none", padding: 0, cursor: onClient ? "pointer" : "default", color: "#0f2a1f" }}>{p.client}</button>}
@@ -1059,7 +1059,7 @@ function ProposalCard({ p, decide, onClient, hideClient, url }) {
     </div>
   );
 }
-function Card({ children }) { return <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: "14px 16px" }}>{children}</div>; }
+function Card({ children }) { return <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, padding: "15px 17px", boxShadow: "0 1px 3px rgba(16,42,31,.05), 0 1px 2px rgba(16,42,31,.03)" }}>{children}</div>; }
 
 // 全運用アカウント（社）のカードグリッド。健全性の低い順・アラート表示・クリックで社別詳細。
 function PortfolioGrid({ clients, onOpen }) {
@@ -1072,7 +1072,7 @@ function PortfolioGrid({ clients, onOpen }) {
         const hlabel = HLABEL[hk];
         return (
           <button key={cl.client} onClick={() => onOpen(cl.client)} style={{ textAlign: "left", cursor: "pointer",
-            background: "#fff", border: "1px solid #e6ebe8", borderLeft: `3px solid ${HC[hk]}`, borderRadius: 12, padding: 15 }}>
+            background: "#fff", border: "1px solid #eaeeec", borderLeft: `3px solid ${HC[hk]}`, borderRadius: 12, padding: 15 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>{cl.client}{cl.tier === "large" && <LargePill />}</div>
               <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700, color: HC[hk] }}>
@@ -1153,7 +1153,7 @@ function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, 
 
   if (!items.length && !nh) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderTop: "3px solid #047857", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ background: "#fff", border: "1px solid #eaeeec", borderTop: "3px solid #047857", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
         <ShieldCheck size={20} color="#047857" />
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>本日、要対応はありません</div>
@@ -1163,7 +1163,7 @@ function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, 
     );
   }
   return (
-    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderTop: `3px solid ${items.length ? accent : "#047857"}`, borderRadius: 12, padding: "14px 16px 12px", marginBottom: 20 }}>
+    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderTop: `3px solid ${items.length ? accent : "#047857"}`, borderRadius: 12, padding: "14px 16px 12px", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <AlertTriangle size={18} color={items.length ? accent : "#047857"} />
@@ -1261,7 +1261,7 @@ function ClientBudgetCard({ cl, bud, monthlyMap, asOfDate }) {
   const projCv = cvMTD != null ? Math.round((cvMTD / elapsed) * daysInMonth) : null;
   const projC = projPct == null ? "#475569" : Math.abs(projPct - 100) <= 10 ? "#047857" : projPct > 100 ? "#dc2626" : "#d97706";
   const paceC = pace == null ? "#94a3b8" : pace > 110 ? "#dc2626" : pace >= 45 ? "#047857" : "#d97706";
-  const box = { background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: 15, marginBottom: 22 };
+  const box = { background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 15, marginBottom: 22 };
   const lbl = { fontSize: 10.5, color: "#94a3b8" };
   return (
     <div style={box}>
@@ -1372,7 +1372,7 @@ function BreakdownTable({ title, rows, col }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", margin: "0 0 6px" }}>{title}</div>
-      <div style={{ border: "1px solid #e6ebe8", borderRadius: 10, overflowX: "auto", overflowY: "hidden" }}>
+      <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflowX: "auto", overflowY: "hidden" }}>
         <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
           <span>{col}</span>{["表示", "クリック", "CTR", "CPC", "費用", "CV", "CVR", "CPA"].map((h) => <span key={h} style={{ textAlign: "right" }}>{h}</span>)}
         </div>
@@ -1479,7 +1479,7 @@ function BudgetEditor({ clients, budgets, onSave }) {
         <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} style={{ ...inp, width: 150 }} />
         <span style={{ fontSize: 11.5, color: "#94a3b8" }}>行をクリックで開閉。契約は変更月のみ・追加はその月のみ有効。</span>
       </div>
-      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
         {clients.map((cl, i) => {
           const eb = effectiveBudget(budgets[cl.client], month, cl.monthly);
           const isOpen = open === cl.client;
@@ -1554,7 +1554,7 @@ function TargetEditor({ clients, targets, onSave }) {
         <button onClick={exportJson} style={btnS}>{copied ? "コピー済" : "benchmarks.json をコピー"}</button>
         {saved && <span style={{ fontSize: 12, color: "#047857", fontWeight: 700 }}>保存しました。アラート/基準チェックに反映されます。</span>}
       </div>
-      <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
         <div style={head}>
           <span>クライアント</span><span style={{ textAlign: "right" }}>現CPA</span><span style={{ textAlign: "right" }}>CV</span>
           <span style={{ textAlign: "right" }}>目標CPA(円)</span><span style={{ textAlign: "right" }}>CPC上限(円)</span><span style={{ textAlign: "right" }}>月予算(万円)</span><span style={{ textAlign: "right" }}>監視頻度</span>
@@ -1608,7 +1608,7 @@ function TargetHistory({ history }) {
         {history.length > 0 && <button onClick={copyCsv} style={btnS}>{copied ? "コピー済" : "履歴をCSVでコピー"}</button>}
       </div>
       {history.length > 0 && (
-        <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
             <span>日時</span><span>クライアント</span><span>項目</span><span>変更前 → 変更後</span><span>担当</span>
           </div>
@@ -2039,7 +2039,7 @@ function MonthlyReport({ c, days, byType }) {
   const cell = { padding: "6px 10px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11 };
   return (
-    <div style={{ background: "#fff", border: "1px solid #e6ebe8", borderRadius: 12, padding: 16 }}>
+    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
         <span style={{ fontWeight: 700, fontSize: 14 }}>{c.client}{c.tier === "large" && <LargePill />}</span>
         <MediaPill m={c.media} />

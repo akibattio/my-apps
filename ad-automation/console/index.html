@@ -16,9 +16,11 @@
 </script>
 <script src="./vendor/babel.min.js"></script>
 <style>
-  body { margin: 0; }
+  body { margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; background: #eef2f0; }
   /* 全体を均一に拡大して視認性を上げる（各所px直書きのため zoom で一括スケール）。数値を変えれば拡大率調整可 */
   #root { min-height: 100vh; zoom: 1.15; }
+  /* スタイリッシュ化：カード等のホバーで軽く浮く／リンク・ボタンの遷移をなめらかに */
+  a, button { transition: background .15s ease, box-shadow .15s ease, transform .1s ease, opacity .15s ease; }
   .boot { font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; padding: 40px; color: #64748b; }
   /* 月初レポート：印刷/PDF時はナビ・ボタン等を隠し、開いている社の詳細だけを出す */
   @media print {
