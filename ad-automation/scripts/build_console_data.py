@@ -52,7 +52,8 @@ def sum_action(actions, types):
 def metrics_for(acc, preset, tok):
     ins = get(f"{acc}/insights", {"level": "account", "date_preset": preset,
               "fields": "spend,impressions,reach,frequency,clicks,ctr,cpc,cpm,actions,action_values"}, tok)
-    row = (ins.get("data") or [{}])[0] if "__error__" not in ins else {}
+    err = ins.get("__error__") if isinstance(ins, dict) else "invalid response"
+    row = (ins.get("data") or [{}])[0] if not err else {}
     spend = round(float(row.get("spend", 0) or 0))
     imp = int(float(row.get("impressions", 0) or 0))
     clk = int(float(row.get("clicks", 0) or 0))
@@ -64,8 +65,10 @@ def metrics_for(acc, preset, tok):
     rev = sum_action(row.get("action_values"), CV_ACTIONS)
     cpa = round(spend / cv) if cv else None
     roas = round(rev / spend, 1) if spend and rev else None
+    # 取得失敗を 0 実績と誤認させないため ok/error を返す（呼び出し側が status に反映）
     return {"spend": spend, "imp": imp, "clk": clk, "ctr": ctr, "cpc": cpc,
-            "cpm": cpm, "freq": freq, "cv": cv, "cpa": cpa, "roas": roas}
+            "cpm": cpm, "freq": freq, "cv": cv, "cpa": cpa, "roas": roas,
+            "ok": err is None, "error": err}
 
 
 # 全社既定の基準（CLAUDE.md §2）。個社は clients/<社名> の目標で上書きする想定。
@@ -320,7 +323,7 @@ def main():
         accounts.append({
             "id": i, "client": name, "tier": ov.get("tier", "mid") if ov else "mid",
             "monthly": ov.get("monthly") if ov else None, "media": "meta",
-            "acct": acc, "status": "ok", "tokenDays": 60, "cp": cp,
+            "acct": acc, "status": "ok" if (d30.get("ok") and d7.get("ok") and lm.get("ok")) else "error", "tokenDays": 60, "cp": cp,
             "sync": datetime.now(JST).strftime("%H:%M 取得"),
             # 概要/一覧用サマリ（直近30日）
             "spend": d30["spend"], "cpa": d30["cpa"] or 0, "target": bench.get("targetCpa"),
@@ -330,7 +333,7 @@ def main():
             "metrics": {"d7": d7, "lm": lm},
             "bench": bench,
         })
-        if d30["cv"] == 0 and d30["spend"] > 0:
+        if d30.get("ok") and d30["cv"] == 0 and d30["spend"] > 0:
             proposals.append({
                 "id": f"live-{i}", "client": name, "media": "meta", "kind": "計測確認/配信見直し",
                 "cur": f"直近30日 CV0 で ¥{d30['spend']:,} 消化",

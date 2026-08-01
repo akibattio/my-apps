@@ -7,7 +7,12 @@ cd "$PROJ" || { echo "cd failed"; exit 1; }
 mkdir -p logs
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh start ==="
-  /usr/bin/python3 scripts/build_console_data.py
+  # 最重要データ取得。ここが失敗したら、古い console/data.json で監査・提案・監視を走らせないよう中断する
+  if ! /usr/bin/python3 scripts/build_console_data.py; then
+    echo "!! build_console_data.py が失敗。古いデータでの監査・提案・監視を避けるため中断します。"
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh ABORTED ==="
+    exit 1
+  fi
   # 日次時系列(過去35日)を取得＝急変検知(インプ急停止/消化大幅増減/CPC高騰)のベースライン
   /usr/bin/python3 scripts/fetch_daily_series.py
   # Google検索の診断(IS変動/不要検索クエリ)
