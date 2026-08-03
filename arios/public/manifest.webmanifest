@@ -1,0 +1,32 @@
+{
+  "name": "ARIOS — 車の履歴書",
+  "short_name": "ARIOS",
+  "description": "写真を撮るだけで、その車の消えない履歴書ができる。一台ごとの歴史を100年残す信頼インフラ。",
+  "start_url": "/garage",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b0c",
+  "theme_color": "#0b0b0c",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

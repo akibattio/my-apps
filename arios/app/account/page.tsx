@@ -26,50 +26,56 @@ export default async function AccountPage() {
   const isAdmin = isAdminEmail(user.email);
 
   return (
-    <main className="mx-auto min-h-dvh max-w-xl px-6 py-10">
-      <header className="mb-8 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">マイページ</h1>
+    <main className="mx-auto max-w-xl px-6 py-10">
+      <header className="mb-8 flex items-end justify-between">
+        <div>
+          <p className="text-xs tracking-[0.3em] text-accent">ACCOUNT</p>
+          <h1 className="mt-1 text-2xl font-semibold">マイページ</h1>
+        </div>
         <form action={signOut}>
-          <button type="submit" className="text-xs text-muted">
+          <button
+            type="submit"
+            className="rounded-full border border-border px-4 py-2 text-xs text-muted"
+          >
             ログアウト
           </button>
         </form>
       </header>
 
-      <section className="mb-8 rounded-xl border border-neutral-800 p-5">
-        <p className="text-xs tracking-widest text-muted">ACCOUNT</p>
-        <p className="mt-2 text-sm text-muted">メールアドレス</p>
-        <p className="text-foreground">{user.email}</p>
-        <p className="mt-3 text-sm text-muted">登録した車</p>
-        <p className="text-foreground">{vehicleCount ?? 0} 台</p>
+      <section className="mb-8 grid grid-cols-2 gap-3">
+        <div className="col-span-2 rounded-2xl border border-border bg-card p-5">
+          <p className="text-sm text-muted">メールアドレス</p>
+          <p className="mt-1 break-all text-foreground">{user.email}</p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <p className="text-sm text-muted">登録した車</p>
+          <p className="mt-1 text-2xl font-semibold text-foreground">
+            {vehicleCount ?? 0}
+            <span className="ml-1 text-sm font-normal text-muted">台</span>
+          </p>
+        </div>
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <p className="text-sm text-muted">権限</p>
+          <p className="mt-1 text-lg font-medium text-foreground">
+            {isAdmin ? "管理者" : "オーナー"}
+          </p>
+        </div>
       </section>
 
       <section className="mb-8">
         <AccountForm initialName={ownerRow?.name ?? ""} />
       </section>
 
-      <nav className="space-y-3">
-        <Link
-          href="/garage"
-          className="block rounded-full bg-accent px-6 py-4 text-center font-medium text-black"
-        >
-          マイガレージ
-        </Link>
-        {isAdmin && (
+      {isAdmin && (
+        <nav>
           <Link
             href="/admin"
             className="block rounded-full border border-accent px-6 py-4 text-center font-medium text-accent"
           >
-            管理者ダッシュボード
+            管理者ダッシュボード ›
           </Link>
-        )}
-        <Link
-          href="/"
-          className="block text-center text-sm text-muted underline-offset-4 hover:underline"
-        >
-          トップへ
-        </Link>
-      </nav>
+        </nav>
+      )}
     </main>
   );
 }
