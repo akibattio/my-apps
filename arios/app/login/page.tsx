@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import LoginForm from "./LoginForm";
+import Wordmark from "../Wordmark";
 import { getCurrentUser } from "@/lib/auth";
 
-export const metadata = { title: "ログイン — ARIOS" };
+export const metadata = { title: "ログイン — ARIOS GARAGE" };
 
 export default async function LoginPage() {
   // 既にログイン済みならガレージへ
@@ -13,8 +14,8 @@ export default async function LoginPage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-10">
       <header className="mb-8">
-        <p className="text-xs tracking-[0.3em] text-accent">ARIOS</p>
-        <h1 className="mt-4 text-2xl font-semibold">
+        <Wordmark align="left" />
+        <h1 className="mt-5 text-2xl font-semibold">
           ログインして
           <br />
           ガレージを開く

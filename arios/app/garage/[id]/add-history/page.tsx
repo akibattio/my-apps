@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import AddHistoryForm from "./AddHistoryForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "出来事を追加 — ARIOS" };
+export const metadata = { title: "出来事を追加 — ARIOS GARAGE" };
 
 export default async function AddHistoryPage({
   params,

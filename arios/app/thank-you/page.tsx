@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "登録ありがとうございます — ARIOS" };
+export const metadata = { title: "登録ありがとうございます — ARIOS GARAGE" };
 
 // Thank You。登録直後に表示し、作った車の Timeline への導線を出す。
 export default async function ThankYouPage({

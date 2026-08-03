@@ -6,7 +6,7 @@ import { signOut } from "@/app/auth/actions";
 import AccountForm from "./AccountForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マイページ — ARIOS" };
+export const metadata = { title: "マイページ — ARIOS GARAGE" };
 
 export default async function AccountPage() {
   const user = await getCurrentUser();

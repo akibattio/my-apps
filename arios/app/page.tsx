@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Wordmark from "./Wordmark";
 
 // Top（公開・訪問者）。アプリのランディング。下タブバーから各機能へ。
 const PRINCIPLES = [
@@ -20,8 +21,10 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-xl px-6 pt-14">
       <header className="text-center">
-        <p className="text-sm tracking-[0.4em] text-accent">ARIOS</p>
-        <h1 className="mt-6 text-3xl leading-snug font-semibold">
+        <div className="flex justify-center">
+          <Wordmark />
+        </div>
+        <h1 className="mt-8 text-3xl leading-snug font-semibold">
           一台ごとの歴史を、
           <br />
           100年残す。

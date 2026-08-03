@@ -3,14 +3,14 @@ import "./globals.css";
 import TabBar from "./TabBar";
 
 export const metadata: Metadata = {
-  title: "ARIOS — 一台ごとの歴史を100年残す信頼インフラ",
+  title: "ARIOS GARAGE — 一台ごとの歴史を100年残す",
   description:
-    "車の売買サイトではなく、一台の乗り物の人生を一本の時間軸で記録する Vehicle Timeline。History is never deleted.",
+    "写真を撮るだけで、その車の消えない履歴書ができる。一台の乗り物の人生を一本の時間軸で記録する Vehicle Timeline。History is never deleted.",
   manifest: "/manifest.webmanifest",
-  applicationName: "ARIOS",
+  applicationName: "ARIOS GARAGE",
   appleWebApp: {
     capable: true,
-    title: "ARIOS",
+    title: "ARIOS GARAGE",
     statusBarStyle: "black-translucent",
   },
   icons: {

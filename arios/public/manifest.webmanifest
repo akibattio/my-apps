@@ -1,6 +1,6 @@
 {
-  "name": "ARIOS — 車の履歴書",
-  "short_name": "ARIOS",
+  "name": "ARIOS GARAGE — 車の履歴書",
+  "short_name": "ARIOS GARAGE",
   "description": "写真を撮るだけで、その車の消えない履歴書ができる。一台ごとの歴史を100年残す信頼インフラ。",
   "start_url": "/garage",
   "scope": "/",

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import RegisterForm from "./RegisterForm";
 
-export const metadata = { title: "愛車を登録 — ARIOS" };
+export const metadata = { title: "愛車を登録 — ARIOS GARAGE" };
 
 // Register（公開・ログイン不要）。写真 → 最小限の手入力 → 登録。
 export default function RegisterPage() {

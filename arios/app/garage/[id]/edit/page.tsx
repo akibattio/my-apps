@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import EditVehicleForm from "./EditVehicleForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "登録内容を編集 — ARIOS" };
+export const metadata = { title: "登録内容を編集 — ARIOS GARAGE" };
 
 export default async function EditVehiclePage({
   params,

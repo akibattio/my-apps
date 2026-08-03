@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureOwner, isAdminEmail } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マイガレージ — ARIOS" };
+export const metadata = { title: "マイガレージ — ARIOS GARAGE" };
 
 export default async function GaragePage() {
   const owner = await ensureOwner();
