@@ -5,7 +5,8 @@
   --background: #0b0b0c;
   --foreground: #f5f5f4;
   --muted: #9ca3af;
-  --accent: #c8a24a; /* 100年・信頼・歴史を象徴する落ち着いた金 */
+  --accent: #c8a24a; /* 100年・信頼・歴史を象徴する落ち着いた金（文字・装飾のアクセント） */
+  --primary: #ffc61a; /* 主要ボタン。愛車のイエローに合わせた鮮やかな黄 */
   --card: #141416;
   --border: #26262a;
 }
@@ -15,6 +16,7 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-primary: var(--primary);
   --color-card: var(--card);
   --color-border: var(--border);
 }

@@ -56,7 +56,7 @@ export default function AddHistoryForm({
             className={
               "rounded-full px-4 py-2 text-sm " +
               (type === t.value
-                ? "bg-accent font-medium text-black"
+                ? "bg-primary font-medium text-black"
                 : "border border-neutral-700 text-muted")
             }
           >
@@ -124,7 +124,7 @@ export default function AddHistoryForm({
       <button
         type="submit"
         disabled={isPending}
-        className="w-full rounded-full bg-accent px-6 py-4 font-medium text-black disabled:opacity-60"
+        className="w-full rounded-full bg-primary px-6 py-4 font-medium text-black disabled:opacity-60"
       >
         {isPending ? "追加中…" : "Timelineに追加"}
       </button>

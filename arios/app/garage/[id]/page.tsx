@@ -102,7 +102,7 @@ export default async function GarageVehiclePage({
 
       <Link
         href={`/garage/${id}/add-history`}
-        className="mt-10 block rounded-full bg-accent px-6 py-4 text-center font-medium text-black"
+        className="mt-10 block rounded-full bg-primary px-6 py-4 text-center font-medium text-black"
       >
         ＋ 出来事を追加
       </Link>

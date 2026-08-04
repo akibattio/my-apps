@@ -69,7 +69,7 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={busy}
-        className="w-full rounded-full bg-accent px-6 py-4 font-medium text-black disabled:opacity-60"
+        className="w-full rounded-full bg-primary px-6 py-4 font-medium text-black disabled:opacity-60"
       >
         {busy ? "送信中…" : "ログインリンクを送る"}
       </button>

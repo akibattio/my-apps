@@ -24,14 +24,17 @@ export default function Home() {
         <div className="flex justify-center">
           <Wordmark />
         </div>
-        <h1 className="mt-8 text-3xl leading-snug font-semibold">
+        <p className="mt-4 pl-[0.5em] text-[11px] tracking-[0.5em] text-accent">
+          LIFE LINE
+        </p>
+        <h1 className="mt-7 text-3xl leading-snug font-semibold">
           一台ごとの歴史を、
           <br />
           100年残す。
         </h1>
         <p className="mt-5 text-left leading-relaxed text-muted">
           ARIOS
-          は車の売買サイトではありません。一台の乗り物の人生を一本の時間軸で記録する
+          は車の売買サイトではありません。一台の車の人生を一本の時間軸で記録する
           Vehicle Timeline
           です。歴史が育った結果として、売買が自然に生まれます。
         </p>
@@ -39,7 +42,7 @@ export default function Home() {
 
       <Link
         href="/register"
-        className="mt-8 block rounded-full bg-accent px-6 py-4 text-center font-semibold text-black shadow-lg shadow-accent/10"
+        className="mt-8 block rounded-full bg-primary px-6 py-4 text-center font-semibold text-black shadow-lg shadow-primary/20"
       >
         愛車を登録する
       </Link>

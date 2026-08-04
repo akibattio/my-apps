@@ -57,7 +57,7 @@ export default async function GaragePage() {
           </p>
           <Link
             href="/register"
-            className="mt-6 inline-block rounded-full bg-accent px-8 py-3 font-semibold text-black"
+            className="mt-6 inline-block rounded-full bg-primary px-8 py-3 font-semibold text-black"
           >
             愛車を登録する
           </Link>
@@ -98,7 +98,7 @@ export default async function GaragePage() {
 
           <Link
             href="/register"
-            className="mt-8 block rounded-full bg-accent px-6 py-4 text-center font-semibold text-black shadow-lg shadow-accent/10"
+            className="mt-8 block rounded-full bg-primary px-6 py-4 text-center font-semibold text-black shadow-lg shadow-accent/10"
           >
             ＋ 車を登録
           </Link>

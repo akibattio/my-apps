@@ -5,7 +5,7 @@ import TabBar from "./TabBar";
 export const metadata: Metadata = {
   title: "ARIOS GARAGE — 一台ごとの歴史を100年残す",
   description:
-    "写真を撮るだけで、その車の消えない履歴書ができる。一台の乗り物の人生を一本の時間軸で記録する Vehicle Timeline。History is never deleted.",
+    "写真を撮るだけで、その車の消えない履歴書ができる。一台の車の人生を一本の時間軸で記録する Vehicle Timeline。History is never deleted.",
   manifest: "/manifest.webmanifest",
   applicationName: "ARIOS GARAGE",
   appleWebApp: {

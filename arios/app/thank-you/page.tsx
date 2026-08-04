@@ -23,7 +23,7 @@ export default async function ThankYouPage({
       {v ? (
         <Link
           href={`/passport/${v}`}
-          className="mt-10 rounded-full bg-accent px-8 py-4 font-medium text-black"
+          className="mt-10 rounded-full bg-primary px-8 py-4 font-medium text-black"
         >
           Timelineを見る
         </Link>

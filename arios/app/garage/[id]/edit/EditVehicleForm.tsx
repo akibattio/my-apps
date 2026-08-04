@@ -46,7 +46,7 @@ export default function EditVehicleForm({
       <button
         type="submit"
         disabled={isPending}
-        className="w-full rounded-full bg-accent px-6 py-4 font-medium text-black disabled:opacity-60"
+        className="w-full rounded-full bg-primary px-6 py-4 font-medium text-black disabled:opacity-60"
       >
         {isPending ? "保存中…" : "変更を保存する"}
       </button>
