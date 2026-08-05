@@ -311,6 +311,16 @@ export default function AdOpsConsole() {
     putState("approvals", next);
   };
   const undecide = (key) => { const n = { ...approvals }; delete n[key]; setApprovals(n); try { localStorage.setItem("adops_approvals", JSON.stringify(n)); } catch (e) {} putState("approvals", n); };
+  // アラート（今日の要対応）への承認/却下。提案と同じ approvals ストア（KV共有・承認ログ）に記録。キーは alert: 接頭辞で衝突回避。
+  const decideAlert = (a, decision) => {
+    let reason = "";
+    if (decision === "rejected") { reason = (window.prompt("却下の理由（記録されます）", "") || "").trim(); }
+    const key = "alert:" + a.key;
+    const next = { ...approvals, [key]: { decision, reason, by: (operator || "").trim() || "担当", at: new Date().toLocaleString("ja-JP"), client: a.client, media: a.media, kind: a.kind, next: a.action || "対応方針", source: "alert" } };
+    setApprovals(next);
+    try { localStorage.setItem("adops_approvals", JSON.stringify(next)); } catch (e) {}
+    putState("approvals", next);
+  };
   const approvalLog = Object.entries(approvals).map(([key, v]) => ({ key, ...v }));
   // クライアント別 契約予算（契約ベース＋月次の変更/追加）— localStorage＋共有(KV)
   const saveBudgets = (next) => { setBudgets(next); try { localStorage.setItem("adops_budgets", JSON.stringify(next)); } catch (e) {} putState("budgets", next); };
@@ -364,6 +374,7 @@ export default function AdOpsConsole() {
   }, [dataInfo, A, media, alerts]);
   // 対応管理で「確認済み/様子見(期限内)」は主リストから外す
   const alertActive = serverAlerts.filter((a) => {
+    if (approvals["alert:" + a.key]) return false; // 承認/却下済みは未対応から外す
     const op = alertOps[a.key];
     if (!op) return true;
     if (op.status === "ack") return false;
@@ -451,11 +462,13 @@ export default function AdOpsConsole() {
         {view === "dash" && (
           <>
             {/* ① 今日の要対応（画面トップ固定・最優先）— 運用者はまずここだけ見れば良い */}
-            <TodayActions items={alertActive} handled={alertHandled} ops={alertOps} onClient={goClient}
+            <TodayActions items={alertActive} handled={alertHandled} ops={alertOps} approvals={approvals} onClient={goClient}
               onAck={(k) => setAlertOp(k, { status: "ack" })}
               onSnooze={(k) => setAlertOp(k, { status: "snooze", until: new Date(Date.now() + 3 * 864e5).toISOString() })}
               onMemo={(k, v) => setAlertOp(k, { memo: v })}
               onClear={clearAlertOp}
+              onDecide={decideAlert}
+              onUndo={(a) => undecide("alert:" + a.key)}
               generatedAt={dataInfo && dataInfo.alertsGeneratedAt} />
 
             {/* 上部：全体集計(クリックで詳細ページ)・アラート・健全性 */}
@@ -1104,7 +1117,7 @@ function PortfolioGrid({ clients, onOpen }) {
   );
 }
 // ① 今日の要対応：運用者がまず見るパネル。重要度順・事実+推奨対応つき・確認済み/様子見/メモで対応管理。
-function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, onClear, generatedAt }) {
+function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooze, onMemo, onClear, onDecide, onUndo, generatedAt }) {
   const [editKey, setEditKey] = useState(null);
   const [draft, setDraft] = useState("");
   const [showHandled, setShowHandled] = useState(false);
@@ -1139,7 +1152,8 @@ function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, 
             </div>
           ) : (
             <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              <button style={btn} onClick={() => onAck(a.key)}>✓ 確認済み</button>
+              <button style={{ ...btn, background: "linear-gradient(180deg,#0a9268,#047857)", color: "#fff", border: "none", boxShadow: "0 1px 2px rgba(4,120,87,.3)" }} onClick={() => onDecide && onDecide(a, "approved")}><Check size={12} style={{ verticalAlign: "-2px" }} /> 承認</button>
+              <button style={{ ...btn, color: "#b91c1c", borderColor: "#f0c9c9" }} onClick={() => onDecide && onDecide(a, "rejected")}><X size={12} style={{ verticalAlign: "-2px" }} /> 却下</button>
               <button style={btn} onClick={() => onSnooze(a.key)}>様子見3日</button>
               <button style={btn} onClick={() => { setEditKey(a.key); setDraft(op.memo || ""); }}>メモ</button>
               {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ ...btn, textDecoration: "none", color: a.media === "google" ? "#1a56db" : "#4338ca", borderColor: "#c7d2fe" }}>↗ {a.media === "google" ? "Google広告" : "Meta"}を開く</a>}
@@ -1190,14 +1204,17 @@ function TodayActions({ items, handled, ops, onClient, onAck, onSnooze, onMemo, 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8, marginTop: 8 }}>
               {handled.map((a) => {
                 const op = (ops && ops[a.key]) || {};
-                const st = op.status === "ack" ? "確認済み" : op.status === "snooze" ? `様子見〜${(op.until || "").slice(0, 10)}` : "";
+                const dec = approvals && approvals["alert:" + a.key];
+                const st = dec ? ((dec.decision === "approved" ? "✅ 承認" : "🚫 却下") + (dec.reason ? `・${dec.reason}` : ""))
+                  : op.status === "ack" ? "確認済み" : op.status === "snooze" ? `様子見〜${(op.until || "").slice(0, 10)}` : "";
+                const by = dec ? dec.by : op.by;
                 return (
                   <div key={a.key} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", border: "1px solid #f1f5f4", borderRadius: 8, background: "#fafbfa", opacity: 0.85 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{a.client}<MediaPill m={a.media} />{a.kind && <span style={{ marginLeft: 4, color: "#94a3b8" }}>{a.kind}</span>}</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>{st}{op.by ? `・${op.by}` : ""}{op.memo ? `・📝${op.memo}` : ""}</div>
+                      <div style={{ fontSize: 11, color: dec ? (dec.decision === "approved" ? "#047857" : "#b91c1c") : "#94a3b8", marginTop: 1, fontWeight: dec ? 700 : 400 }}>{st}{by ? `・${by}` : ""}{op.memo ? `・📝${op.memo}` : ""}</div>
                     </div>
-                    <button style={{ ...btn, flexShrink: 0 }} onClick={() => onClear(a.key)}>戻す</button>
+                    <button style={{ ...btn, flexShrink: 0 }} onClick={() => dec ? (onUndo && onUndo(a)) : onClear(a.key)}>戻す</button>
                   </div>
                 );
               })}
