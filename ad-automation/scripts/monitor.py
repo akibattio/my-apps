@@ -17,6 +17,7 @@ console/data.json（毎朝の取得結果）を各アカウントの基準(CLAUD
 通知先（.env・いずれか）:
   NOTIFY_CHANNEL = googlechat | email | slack | none(既定)
   googlechat: GOOGLE_CHAT_WEBHOOK_URL
+  ※2026-07-30: GitHub Secret に GOOGLE_CHAT_WEBHOOK_URL 登録済み。CIの朝8:30/手動/push実行時にChatへ通知。
   slack:      SLACK_WEBHOOK_URL
   email:      SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, ALERT_FROM, ALERT_TO
 """
