@@ -369,6 +369,7 @@ export default function AdOpsConsole() {
         const acc = A.find((c) => c.client === a.client && c.media === a.media);
         return { ...a, key: `${a.client}|${a.media}|${a.kind}`, url: platformUrl(a.media, acc && acc.acct, mcc, a.kind) };
       })
+      .filter((a) => a.severity !== "warning")  // 注意レベルは今日の要対応に出さない（要対応=critical・提案=info のみ）
       .filter((a) => media === "all" || mediaFamily(a.media) === media)
       .sort((x, y) => (SEVRANK[x.severity] ?? 3) - (SEVRANK[y.severity] ?? 3));
   }, [dataInfo, A, media, alerts]);
