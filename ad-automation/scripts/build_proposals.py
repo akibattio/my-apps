@@ -28,6 +28,31 @@ AUDIT_MAP = [
 ]
 SEV = {"fail": "critical", "warn": "warning"}
 
+# kind → 期待効果（若手が「やると何が良くなるか」を一目で分かるように）
+IMPACT = {
+    "計測確認": "計測が直れば最適化の前提が整い、全体の成果改善につながる",
+    "計測整理": "入札最適化の精度が上がる（重複・不要CVによる数値の歪みを解消）",
+    "除外KW追加": "無駄クリックの削減でCPA改善が見込める",
+    "予算調整": "表示機会の回収でCV増が見込める",
+    "予算再配分": "同じ予算で効率の良い配信へ寄せ、CV増が見込める",
+    "広告文/LP改善": "品質スコア改善によりCPC低下が見込める",
+    "アカウント整理": "管理の明確化・オペミス予防（数値影響は小）",
+    "アセット追加": "表示面の拡大でCTR/表示回数の改善が見込める",
+}
+
+
+def confidence(a):
+    """提案の信頼度（データ量ベース）。CV・費用が十分なら高、薄いと低。若手が"どこまで信じるか"の目安に。"""
+    if not a:
+        return "中"
+    cv = a.get("cv") or 0
+    spend = a.get("spend") or 0
+    if cv >= 10 and spend >= 100000:
+        return "高"
+    if cv < 3 or spend < 30000:
+        return "低"
+    return "中"
+
 
 def main():
     dpath = CONSOLE / "data.json"
@@ -36,6 +61,7 @@ def main():
     data = json.loads(dpath.read_text(encoding="utf-8"))
     accts = data.get("accounts", [])
     tier = {f"{a.get('client')}|{a.get('media')}": a.get("tier") for a in accts}
+    acct_by_key = {f"{a.get('client')}|{a.get('media')}": a for a in accts}
 
     audit = {}
     ap = CONSOLE / "audit.json"
@@ -62,6 +88,7 @@ def main():
             props.append({
                 "id": f"a{n}", "client": client, "media": media, "kind": hit[1],
                 "cur": f.get("title", ""), "next": hit[2], "reason": f.get("detail", ""),
+                "impact": IMPACT.get(hit[1], ""), "confidence": confidence(acct_by_key.get(key)),
                 "severity": SEV.get(f["sev"], "warning"),
                 "twoStep": tier.get(key) == "large", "source": "監査",
             })
@@ -79,6 +106,8 @@ def main():
             "cur": f"CV0で費用消化のクエリ {len(waste)}件・計¥{total:,.0f}",
             "next": f"「{top.get('query', top.get('text',''))}」など{len(waste)}語を除外に追加（下書き）",
             "reason": "情報収集目的等でCVに繋がらない検索語。除外でCPA改善が見込める。",
+            "impact": f"無駄消化 約¥{total:,.0f} の抑制でCPA改善が見込める",
+            "confidence": confidence(acct_by_key.get(f"{client}|google")),
             "severity": "warning", "twoStep": tier.get(key) == "large", "source": "検索診断",
         })
 

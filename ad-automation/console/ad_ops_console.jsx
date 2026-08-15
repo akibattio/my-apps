@@ -1142,13 +1142,15 @@ function ProposalCard({ p, decide, onClient, hideClient, url }) {
           {!hideClient && <button onClick={() => onClient && onClient(p.client)} style={{ fontWeight: 700, fontSize: 14, background: "none", border: "none", padding: 0, cursor: onClient ? "pointer" : "default", color: "#0f2a1f" }}>{p.client}</button>}
           <MediaPill m={p.media} /><span style={{ fontSize: 11, color: "#64748b" }}>{p.kind}</span>
           {p.twoStep && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: "#eef2ff", color: "#4338ca" }}>二段階承認</span>}
+          {p.confidence && <span title="データ量から見た確からしさ" style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: p.confidence === "高" ? "#e7f5ef" : p.confidence === "中" ? "#fdf1e3" : "#eef1f4", color: p.confidence === "高" ? "#047857" : p.confidence === "中" ? "#b45309" : "#64748b" }}>信頼度 {p.confidence}</span>}
         </div>
         <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText }}>{s.label}</span>
       </div>
       <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
         <span style={{ color: "#64748b" }}>{p.cur}</span><ChevronRight size={14} color="#94a3b8" /><span style={{ fontWeight: 700, color: "#0f2a1f" }}>{p.next}</span>
       </div>
-      <div style={{ fontSize: 12.5, color: "#475569", background: "#f8faf9", borderRadius: 8, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 }}><b style={{ color: "#047857" }}>AI </b>{p.reason}</div>
+      <div style={{ fontSize: 12.5, color: "#475569", background: "#f8faf9", borderRadius: 8, padding: "8px 10px", marginBottom: 8, lineHeight: 1.6 }}><b style={{ color: "#047857" }}>AI </b>{p.reason}</div>
+      {p.impact && <div style={{ fontSize: 12, color: "#0f766e", marginBottom: 10, background: "#f2f8f5", border: "1px solid #dbe7e1", borderRadius: 8, padding: "6px 10px" }}><b>📈 期待効果 </b>{p.impact}</div>}
       <Playbook kind={p.kind} />
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={() => decide(p, "approved")} style={btnP}><Check size={15} />{p.twoStep ? "レビュー承認" : "承認"}</button>
