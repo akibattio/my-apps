@@ -1049,6 +1049,90 @@ function agg(list) {
 const btnP = { display: "flex", alignItems: "center", gap: 6, padding: "8px 17px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#0a9268,#047857)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 1px 2px rgba(4,120,87,.35)" };
 const btnS = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer" };
 
+// プレイブック：症状(kind)ごとに「なぜ問題か・原因候補・対応手順・確認」。若手が迷わず動くための型（CLAUDE.md準拠）。
+const PLAYBOOK = [
+  { m: /無駄消化/, t: "無駄消化（費用が出てCV0）",
+    why: "費用が出ているのに成果ゼロ。計測不具合か配信のズレの疑い。放置は予算の垂れ流し。",
+    causes: ["CV計測タグ/コンバージョン設定の不具合・重複", "検索語句や配信面が狙いとズレ", "広告とLPの不一致", "学習不足（開始直後）"],
+    steps: ["まずCV計測を確認（タグ・重複・直近の変更）", "正常なら検索語句レポートで無駄語を除外", "広告↔LPの整合を確認", "必要なら日予算/入札を一旦抑える"],
+    check: "計測が正常か他媒体/GA4と突合。推測で断定せず計測担当へ（CLAUDE.md §3）。" },
+  { m: /インプ|急停止|配信停止/, t: "インプ急停止（表示が急減）",
+    why: "表示が急に止まる＝停止/予算切れ/否認/入札負けの可能性。機会損失が発生。",
+    causes: ["キャンペーン/広告の一時停止・審査否認", "予算・アカウント残高切れ", "入札低下で表示されない", "支払い/アカウント停止"],
+    steps: ["意図的な停止でないか担当に即確認", "広告の審査状況・否認を確認", "残高/日予算を確認", "入札・IS(表示シェア)を確認"],
+    check: "接続エラー(トークン)でないかも確認。意図停止なら承認せず記録。" },
+  { m: /消化ペース高/, t: "消化ペース高（予算オーバー傾向）",
+    why: "月予算を超える軌道。月末の予算切れや超過請求のリスク。",
+    causes: ["日予算が過大", "CV好調で自動入札が伸ばしている", "季節・キャンペーン要因"],
+    steps: ["月末着地予測を確認", "成果(CPA)が良ければ増額提案、悪ければ日予算を調整", "契約予算(契約一覧)と整合を確認"],
+    check: "±20%超は上長承認、増額は+30%/回まで（CLAUDE.md §2.2）。" },
+  { m: /消化ペース低/, t: "消化ペース低（予算が使えていない）",
+    why: "表示機会を取り切れていない/配信制限。使うべき予算が余っている。",
+    causes: ["入札・予算が低い", "ターゲットが狭い", "審査・在庫不足", "配信オフ/停止"],
+    steps: ["IS損失(予算/ランク)を確認", "入札・予算・ターゲット拡大を検討", "配信状況・審査を確認"],
+    check: "学習期間中/データ不足でないか（早すぎる判断を避ける）。" },
+  { m: /CTR|クリック率|クリエイティブ|差し替|広告文/, t: "CTR低下・クリエイティブ疲弊",
+    why: "広告の魅力低下や訴求ズレ。CPC上昇・品質スコア低下につながる。",
+    causes: ["クリエイティブ疲弊（同じ広告の長期配信）", "検索語句と広告文のズレ", "競合増", "フリークエンシー過多(Meta)"],
+    steps: ["疲弊なら新クリエイティブ/広告文を下書き(PAUSED)で用意", "検索語句と広告文の整合を確認", "Metaはオーディエンス拡大も検討"],
+    check: "医療・美容は表現ガイドライン厳守。迷う表現は薬機/医療広告確認者へ（CLAUDE.md §3.2）。" },
+  { m: /除外|検索クエリ|検索語句|検索クエリー/, t: "除外KW追加（無駄クリック抑制）",
+    why: "CV0で費用を食う検索語句を除外してCPAを改善。",
+    causes: ["情報収集目的の語", "意図と無関係な語", "広すぎるマッチタイプ"],
+    steps: ["検索語句レポートで費用上位×CV0を抽出", "狙いと無関係な語を除外KWに追加(下書き)", "完全一致/フレーズの範囲に注意"],
+    check: "除外しすぎて機会損失しないか。新規は必ずPAUSED/下書き。" },
+  { m: /予算/, t: "予算調整・再配分",
+    why: "効率の良い配信へ寄せる/機会損失を回収して成果を最大化。",
+    causes: ["媒体タイプ/キャンペーン間で効率差", "予算過不足", "IS損失(予算)"],
+    steps: ["媒体タイプ別/キャンペーン別のCPA・IS損失を比較", "効率の悪い側→良い側へ移動 or 増額", "契約予算と整合を確認"],
+    check: "±20%超は上長、+30%/回上限、大型は二段階承認。" },
+  { m: /計測/, t: "計測整理・確認",
+    why: "重複・不要なCVアクションは数値を歪め、自動入札を誤らせる。",
+    causes: ["CVアクションの重複", "不要な旧CVが残存", "計測タグの二重設置"],
+    steps: ["CVアクション一覧を確認", "重複/不要を整理し主要CVに一本化", "変更前後で数値を検証"],
+    check: "変更は計測担当と。推測で消さない。" },
+  { m: /品質スコア|QS|LP|関連性/, t: "広告文/LP改善（品質スコア）",
+    why: "KWと広告文/LPの関連性不足で品質スコアが低くCPCが高い。",
+    causes: ["広告文にKWが入っていない", "LPと広告訴求の不一致", "LPの表示速度/内容"],
+    steps: ["低QSキーワードを抽出", "広告文にKWを反映", "LPの見出し/内容を広告と整合"],
+    check: "医療・美容の表現規定を確認。" },
+  { m: /入札|CPA/, t: "入札調整",
+    why: "CPAが目標から乖離。入札で軌道修正する。",
+    causes: ["目標CPA超過/未達", "自動入札の学習状態", "競合・季節"],
+    steps: ["目標CPA比を確認", "上限CPA/tCPAを調整", "急な変更は学習リセットに注意"],
+    check: "大型は二段階承認。急激な増減は避ける。" },
+  { m: /整理|アーカイブ|アカウント/, t: "アカウント整理",
+    why: "停止キャンペーンの放置は管理を煩雑にしミスを誘発。",
+    causes: ["終了/停止の放置", "命名規則の乱れ"],
+    steps: ["停止/終了をアーカイブ", "命名規則で整理"],
+    check: "配信中を誤ってアーカイブしない。" },
+  { m: /接続|トークン/, t: "接続エラー・トークン期限",
+    why: "データ取得が止まり監視できなくなる。運用の目が塞がる。",
+    causes: ["トークン失効/期限接近", "システムユーザー/権限", "支払い停止"],
+    steps: ["接続担当へ即連絡", "トークン/システムユーザーを更新"],
+    check: "個人アカウント依存を避け組織所有へ（CLAUDE.md §3.3）。" },
+];
+function playbookFor(kind) { if (!kind) return null; for (const p of PLAYBOOK) { if (p.m.test(kind)) return p; } return null; }
+function Playbook({ kind }) {
+  const pb = playbookFor(kind);
+  const [open, setOpen] = useState(false);
+  if (!pb) return null;
+  const stop = (e) => e.stopPropagation();
+  return (
+    <div onClick={stop} style={{ marginBottom: 10 }}>
+      <button onClick={() => setOpen((v) => !v)} style={{ border: "1px solid #dbe7e1", background: "#f2f8f5", color: "#0f766e", borderRadius: 8, padding: "4px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>💡 考え方・対応手順 {open ? "▲" : "▼"}</button>
+      {open && (
+        <div style={{ marginTop: 6, fontSize: 12, color: "#334155", background: "#f8faf9", border: "1px solid #eaeeec", borderRadius: 8, padding: "10px 12px", lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, color: "#0f2a1f", marginBottom: 4 }}>{pb.t}</div>
+          <div style={{ marginBottom: 5 }}><b style={{ color: "#b45309" }}>なぜ </b>{pb.why}</div>
+          <div style={{ marginBottom: 5 }}><b style={{ color: "#64748b" }}>原因候補</b><ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>{pb.causes.map((c, i) => <li key={i}>{c}</li>)}</ul></div>
+          <div style={{ marginBottom: 5 }}><b style={{ color: "#047857" }}>対応手順</b><ol style={{ margin: "2px 0 0", paddingLeft: 18 }}>{pb.steps.map((s, i) => <li key={i}>{s}</li>)}</ol></div>
+          <div><b style={{ color: "#4338ca" }}>確認 </b>{pb.check}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 function ProposalCard({ p, decide, onClient, hideClient, url }) {
   const s = SEV[p.severity];
   return (
@@ -1065,6 +1149,7 @@ function ProposalCard({ p, decide, onClient, hideClient, url }) {
         <span style={{ color: "#64748b" }}>{p.cur}</span><ChevronRight size={14} color="#94a3b8" /><span style={{ fontWeight: 700, color: "#0f2a1f" }}>{p.next}</span>
       </div>
       <div style={{ fontSize: 12.5, color: "#475569", background: "#f8faf9", borderRadius: 8, padding: "8px 10px", marginBottom: 10, lineHeight: 1.6 }}><b style={{ color: "#047857" }}>AI </b>{p.reason}</div>
+      <Playbook kind={p.kind} />
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={() => decide(p, "approved")} style={btnP}><Check size={15} />{p.twoStep ? "レビュー承認" : "承認"}</button>
         <button onClick={() => decide(p, "rejected")} style={btnS}><X size={15} /> 却下</button>
@@ -1143,6 +1228,7 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
           </div>
           <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{a.fact}</div>
           {a.action && <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}><b style={{ color: "#047857" }}>対応 </b>{a.action}</div>}
+          <div style={{ marginTop: 5 }}><Playbook kind={a.kind} /></div>
           {op.memo && editKey !== a.key && <div style={{ fontSize: 11.5, color: "#0f2a1f", marginTop: 3, background: "#fff8e1", borderRadius: 6, padding: "3px 7px" }}>📝 {op.memo}</div>}
           {editKey === a.key ? (
             <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 5 }}>
