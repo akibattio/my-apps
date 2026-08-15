@@ -209,19 +209,43 @@ def search_check(a: dict, cadence, today) -> list[dict]:
     return out
 
 
+MEDIA_JP = {"google": "Google", "meta": "Meta",
+            "yahoo_search": "Yahoo!検索", "yahoo_display": "Yahoo!ディスプレイ"}
+
+
 def build_message(alerts: list[dict], period: str, generated: str) -> str:
+    # 注意(warn)は出さない（要対応=critical・提案=info のみ。コンソール表示と統一）
+    alerts = [x for x in alerts if x["severity"] != "warn"]
     crit = [x for x in alerts if x["severity"] == "critical"]
-    warn = [x for x in alerts if x["severity"] == "warn"]
     info = [x for x in alerts if x["severity"] == "info"]
-    head = (f"【広告運用 監視アラート】{generated}\n"
-            f"対象:{period} ／ 重度{len(crit)}・悪化{len(warn)}・注意{len(info)}")
+    head = f"🔔 広告運用アラート  {generated}\n対象:{period}"
     if not alerts:
-        return head + "\n\nしきい値抵触なし。全アカウント正常。"
-    lines = [head, ""]
-    for x in sorted(alerts, key=lambda y: SEV_ORDER[y["severity"]]):
-        lines.append(f"[{SEV_JP[x['severity']]}] {x['client']}（{x['media']}）: {x['kind']} — {x['fact']} → 承認:{x['approve']}")
-    lines.append("\n※すべて下書き（未適用）。適用は承認後のみ（CLAUDE.md §0）。")
-    return "\n".join(lines)
+        return head + "\n\n✅ 要対応なし（全アカウント基準内）"
+
+    # クライアントごとにまとめる。クライアントは「最悪重要度→件数」で並べる
+    by_client = {}
+    for x in alerts:
+        by_client.setdefault(x["client"], []).append(x)
+
+    def worst(items):
+        return min(SEV_ORDER.get(i["severity"], 3) for i in items)
+
+    blocks = []
+    for client in sorted(by_client, key=lambda c: (worst(by_client[c]), -len(by_client[c]))):
+        items = sorted(by_client[client], key=lambda y: SEV_ORDER.get(y["severity"], 3))
+        lines = [f"■ {client}"]
+        for x in items:
+            icon = "🔴" if x["severity"] == "critical" else "🟢"
+            media = MEDIA_JP.get(x["media"], x["media"])
+            lines.append(f"　{icon} {x['kind']}（{media}）")
+            lines.append(f"　　{x['fact']}")
+            if x.get("approve"):
+                lines.append(f"　　→ 対応: {x['approve']}")
+        blocks.append("\n".join(lines))
+
+    return (f"{head}\n要対応 {len(crit)} ・ 提案 {len(info)}\n\n"
+            + "\n\n".join(blocks)
+            + "\n\n※すべて下書き（未適用）。適用は承認後のみ。")
 
 
 def notify(msg: str) -> str:
