@@ -41,6 +41,19 @@ IMPACT = {
 }
 
 
+def action_value(kind, a):
+    """推奨アクションの具体数値の目安（若手が"どこまで/いくつに"を掴めるように）。適用は承認後・人が実施。"""
+    if not a:
+        return ""
+    db = a.get("dailyBudget") or 0
+    if "予算" in kind and db:
+        return f"日予算の目安: 現在¥{db:,} → 上限¥{round(db * 1.3):,}（+30%/回まで・要確認）"
+    if ("入札" in kind or "CPA" in kind) and a.get("target") and a.get("cpa"):
+        t = a["target"]; c = a["cpa"]
+        return f"目標CPA ¥{t:,} / 現在 ¥{c:,}（{round((c / t - 1) * 100):+d}%）→ 上限CPAを目標付近へ"
+    return ""
+
+
 def confidence(a):
     """提案の信頼度（データ量ベース）。CV・費用が十分なら高、薄いと低。若手が"どこまで信じるか"の目安に。"""
     if not a:
@@ -88,7 +101,8 @@ def main():
             props.append({
                 "id": f"a{n}", "client": client, "media": media, "kind": hit[1],
                 "cur": f.get("title", ""), "next": hit[2], "reason": f.get("detail", ""),
-                "impact": IMPACT.get(hit[1], ""), "confidence": confidence(acct_by_key.get(key)),
+                "impact": IMPACT.get(hit[1], ""), "actionValue": action_value(hit[1], acct_by_key.get(key)),
+                "confidence": confidence(acct_by_key.get(key)),
                 "severity": SEV.get(f["sev"], "warning"),
                 "twoStep": tier.get(key) == "large", "source": "監査",
             })
@@ -107,6 +121,7 @@ def main():
             "next": f"「{top.get('query', top.get('text',''))}」など{len(waste)}語を除外に追加（下書き）",
             "reason": "情報収集目的等でCVに繋がらない検索語。除外でCPA改善が見込める。",
             "impact": f"無駄消化 約¥{total:,.0f} の抑制でCPA改善が見込める",
+            "actionValue": f"除外候補 {len(waste)}語（先頭:「{top.get('query', top.get('text',''))}」）／抑制目安 約¥{total:,.0f}",
             "confidence": confidence(acct_by_key.get(f"{client}|google")),
             "severity": "warning", "twoStep": tier.get(key) == "large", "source": "検索診断",
         })

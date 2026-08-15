@@ -43,14 +43,14 @@ const man = (n) => (n ? (n / 10000).toLocaleString("ja-JP") + "万" : "—");
 const SEV = {
   critical: { label: "要対応", dot: "#dc2626", chip: "#fef2f2", chipText: "#b91c1c" },
   warning: { label: "注意", dot: "#d97706", chip: "#fffbeb", chipText: "#b45309" },
-  info: { label: "提案", dot: "#047857", chip: "#ecfdf5", chipText: "#047857" },
+  info: { label: "提案", dot: "#0891b2", chip: "#ecfdf5", chipText: "#0891b2" },
 };
 const CONN = {
-  ok: { label: "正常", c: "#047857", bg: "#ecfdf5" },
+  ok: { label: "正常", c: "#0891b2", bg: "#ecfdf5" },
   warn: { label: "期限接近", c: "#d97706", bg: "#fffbeb" },
   error: { label: "エラー", c: "#dc2626", bg: "#fef2f2" },
 };
-const HC = { good: "#047857", unset: "#94a3b8", warning: "#d97706", critical: "#dc2626" };
+const HC = { good: "#0891b2", unset: "#94a3b8", warning: "#d97706", critical: "#dc2626" };
 const HLABEL = { good: "良好", unset: "目標未設定", warning: "注意", critical: "要対応" };
 const cpcOf = (c) => (c.metrics && c.metrics.d7 ? c.metrics.d7.cpc : null);
 const cpcOver = (c) => { const mx = c.bench && c.bench.cpcMax, v = cpcOf(c); return mx && v && v > mx; };
@@ -96,8 +96,8 @@ function mediaFamily(m) { return (m || "").indexOf("yahoo") === 0 ? "yahoo" : m;
 function DeliveryBadge({ c }) {
   const on = deliveryOf(c) === "active";
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: on ? "#ecfdf5" : "#f1f5f4", color: on ? "#047857" : "#64748b" }}>
-      <Circle size={7} fill={on ? "#047857" : "#94a3b8"} color={on ? "#047857" : "#94a3b8"} />{on ? "配信中" : "停止中"}
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: on ? "#ecfdf5" : "#f1f5f4", color: on ? "#0891b2" : "#64748b" }}>
+      <Circle size={7} fill={on ? "#0891b2" : "#94a3b8"} color={on ? "#0891b2" : "#94a3b8"} />{on ? "配信中" : "停止中"}
     </span>
   );
 }
@@ -413,33 +413,33 @@ export default function AdOpsConsole() {
     <button onClick={() => { setView(id); if (id !== "client") setOpenClient(null); }} style={{
       display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 8, border: "none",
       cursor: "pointer", fontSize: 13, fontWeight: 600,
-      background: view === id ? "#0f2a1f" : "transparent", color: view === id ? "#fff" : "#a7c4b5" }}>
+      background: view === id ? "#0e3a46" : "transparent", color: view === id ? "#fff" : "#a9d4de" }}>
       {icon}{label}
       {badge > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
-        background: view === id ? "#f4c542" : "#c98a2b", color: "#0f2a1f" }}>{badge}</span>}
+        background: view === id ? "#f59e0b" : "#d97706", color: "#0e3a46" }}>{badge}</span>}
     </button>
   );
   const MediaTab = ({ id, label }) => (
     <button onClick={() => setMedia(id)} style={{
       padding: "5px 13px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-      border: "1px solid " + (media === id ? "#047857" : "#e2e8f0"),
-      background: media === id ? "#047857" : "#fff", color: media === id ? "#fff" : "#475569" }}>{label}</button>
+      border: "1px solid " + (media === id ? "#0891b2" : "#e2e8f0"),
+      background: media === id ? "#0891b2" : "#fff", color: media === id ? "#fff" : "#475569" }}>{label}</button>
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#eef2f0", color: "#0f172a",
+    <div style={{ minHeight: "100vh", background: "#eef4f7", color: "#0f172a",
       fontFamily: "-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" }}>
-      <div className="no-print" style={{ background: "linear-gradient(118deg,#0b2318 0%,#123020 55%,#17392a 100%)", color: "#fff", padding: "16px 24px", boxShadow: "0 2px 16px rgba(11,35,24,.22)", position: "sticky", top: 0, zIndex: 20 }}>
+      <div className="no-print" style={{ background: "linear-gradient(118deg,#0b3a46 0%,#0e5566 52%,#0e7a90 100%)", color: "#fff", padding: "16px 24px", boxShadow: "0 2px 16px rgba(11,58,70,.28)", position: "sticky", top: 0, zIndex: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
             <div style={{ fontSize: 17, fontWeight: 700 }}>広告運用コンソール</div>
-            <div style={{ fontSize: 11.5, color: "#a7c4b5" }}>ソフコミ ・ {dataInfo ? `実データ（${dataInfo.period || ""}・${dataInfo.generatedAt || ""}）` : "サンプルデータ"} ・ {clients.length}社 / {A.length}連携</div>
+            <div style={{ fontSize: 11.5, color: "#a9d4de" }}>ソフコミ ・ {dataInfo ? `実データ（${dataInfo.period || ""}・${dataInfo.generatedAt || ""}）` : "サンプルデータ"} ・ {clients.length}社 / {A.length}連携</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12.5 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#f4c542" }}><Bell size={15} /><b>{pending.length}</b><span style={{ color: "#a7c4b5" }}>承認待ち</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: connIssues ? "#f4a3a3" : "#a7c4b5" }}><Cable size={15} /><b>{connIssues}</b><span style={{ color: "#a7c4b5" }}>接続要確認</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#a7c4b5" }}><ShieldCheck size={14} /> 承認ゲート ON</span>
-            {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, color: "#0f2a1f", background: "#f4c542", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "5px 11px" }}>📄 顧客レポート ↗</a>}
+            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#f59e0b" }}><Bell size={15} /><b>{pending.length}</b><span style={{ color: "#a9d4de" }}>承認待ち</span></span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, color: connIssues ? "#f4a3a3" : "#a9d4de" }}><Cable size={15} /><b>{connIssues}</b><span style={{ color: "#a9d4de" }}>接続要確認</span></span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#a9d4de" }}><ShieldCheck size={14} /> 承認ゲート ON</span>
+            {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, color: "#0e3a46", background: "#f59e0b", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "5px 11px" }}>📄 顧客レポート ↗</a>}
           </div>
         </div>
         <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
@@ -486,20 +486,20 @@ export default function AdOpsConsole() {
               const pendingTotal = pending.length + crit;  // 承認待ち提案 ＋ 未対応の要対応アラート
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 20 }}>
-                  <button onClick={() => setView("summary")} style={{ textAlign: "left", cursor: "pointer", background: "#0f2a1f", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px" }}>
-                    <div style={{ fontSize: 12, color: "#a7c4b5", marginBottom: 6 }}>全体集計</div>
+                  <button onClick={() => setView("summary")} style={{ textAlign: "left", cursor: "pointer", background: "#0e3a46", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px" }}>
+                    <div style={{ fontSize: 12, color: "#a9d4de", marginBottom: 6 }}>全体集計</div>
                     <div style={{ fontSize: 22, fontWeight: 700 }}>{yen(totals.spend)}</div>
-                    <div style={{ fontSize: 11, marginTop: 4, color: "#a7c4b5", display: "flex", alignItems: "center", gap: 3 }}>総広告費・{clients.length}社 ／ 詳細を見る <ChevronRight size={12} /></div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: "#a9d4de", display: "flex", alignItems: "center", gap: 3 }}>総広告費・{clients.length}社 ／ 詳細を見る <ChevronRight size={12} /></div>
                   </button>
                   <Card>
                     <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>今日の要対応</div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: alertActive.length ? "#dc2626" : "#047857" }}>{alertActive.length}件</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: alertActive.length ? "#dc2626" : "#0891b2" }}>{alertActive.length}件</div>
                     <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8" }}>{crit ? `うち要対応 ${crit}件` : (alertHandled.length ? `対応済/様子見 ${alertHandled.length}件` : "重大なし")}</div>
                   </Card>
                   <Card>
                     <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>健全性（{rows.length}アカウント）</div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", fontSize: 12, fontWeight: 700 }}>
-                      <span style={{ color: "#047857" }}>● 良好 {g}</span>
+                      <span style={{ color: "#0891b2" }}>● 良好 {g}</span>
                       <span style={{ color: "#d97706" }}>● 注意 {w}</span>
                       <span style={{ color: "#dc2626" }}>● 要対応 {cr}</span>
                       {nt > 0 && <button onClick={() => setView("targets")} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "#64748b", fontWeight: 700, fontSize: 12 }}>● 目標未設定 {nt}</button>}
@@ -507,7 +507,7 @@ export default function AdOpsConsole() {
                   </Card>
                   <Card>
                     <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>対応状況</div>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: pendingTotal ? "#dc2626" : "#047857" }}>未対応 {pendingTotal}件</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: pendingTotal ? "#dc2626" : "#0891b2" }}>未対応 {pendingTotal}件</div>
                     <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8", lineHeight: 1.5 }}>
                       承認待ち提案 {pending.length}・要対応 {crit}<br />対応済 {doneN}（承認{approvedN}・却下{rejectedN}）{operators.length ? ` ・ 対応者${operators.length}名` : ""}
                     </div>
@@ -518,9 +518,9 @@ export default function AdOpsConsole() {
 
             {/* 承認キュー（全幅）— 提案を確認して適用。適用は承認分のみ。 */}
             <div style={{ marginTop: 22 }}>
-              <SectionTitle icon={<Zap size={16} color="#047857" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ（書き込みは承認後のみ）。" />
+              <SectionTitle icon={<Zap size={16} color="#0891b2" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ（書き込みは承認後のみ）。" />
               {pending.length === 0 && <Empty text="承認待ちはありません。" />}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(480px,1fr))", gap: 10 }}>
                 {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} url={propUrl(p)} />)}
               </div>
               {approvalLog.length > 0 && (
@@ -538,7 +538,7 @@ export default function AdOpsConsole() {
                           <span style={{ fontWeight: 600 }}>{l.client}</span>
                           <span><MediaPill m={l.media} /></span>
                           <span style={{ color: "#475569" }}>{l.kind}</span>
-                          <span style={{ color: l.decision === "approved" ? "#047857" : "#dc2626", fontWeight: 700 }}>{l.decision === "approved" ? "承認" : "却下"}{l.reason ? <span style={{ color: "#94a3b8", fontWeight: 400 }}>・{l.reason}</span> : null}</span>
+                          <span style={{ color: l.decision === "approved" ? "#0891b2" : "#dc2626", fontWeight: 700 }}>{l.decision === "approved" ? "承認" : "却下"}{l.reason ? <span style={{ color: "#94a3b8", fontWeight: 400 }}>・{l.reason}</span> : null}</span>
                           <span style={{ color: "#94a3b8", fontSize: 11 }}>{l.by}・{l.at}</span>
                           <span><button onClick={() => undecide(l.key)} style={{ fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 6, border: "1px solid #d7e0db", background: "#fff", cursor: "pointer", color: "#475569" }}>戻す</button></span>
                         </div>
@@ -554,10 +554,10 @@ export default function AdOpsConsole() {
         {/* ===== 全体集計（ダッシュボードからのクリックで表示） ===== */}
         {view === "summary" && (
           <>
-            <button onClick={() => setView("dash")} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, padding: 0 }}>
+            <button onClick={() => setView("dash")} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#0891b2", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, padding: 0 }}>
               <ArrowLeft size={15} /> ダッシュボードに戻る
             </button>
-            <SectionTitle icon={<LayoutDashboard size={16} color="#047857" />} title="全体集計" note={dataInfo ? `${dataInfo.period || ""}・${dataInfo.generatedAt || ""}（媒体タブで絞込み可）` : "サンプルデータ"} />
+            <SectionTitle icon={<LayoutDashboard size={16} color="#0891b2" />} title="全体集計" note={dataInfo ? `${dataInfo.period || ""}・${dataInfo.generatedAt || ""}（媒体タブで絞込み可）` : "サンプルデータ"} />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 12, marginBottom: 22 }}>
               {[
                 { label: "総広告費", value: yen(totals.spend), sub: dataInfo ? dataInfo.period : "今月累計" },
@@ -568,12 +568,12 @@ export default function AdOpsConsole() {
               ].map((k) => (
                 <Card key={k.label}>
                   <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{k.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: k.alert ? "#dc2626" : "#0f2a1f" }}>{k.value}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: k.alert ? "#dc2626" : "#0e3a46" }}>{k.value}</div>
                   <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8" }}>{k.sub}</div>
                 </Card>
               ))}
             </div>
-            <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体内訳" note="媒体（Google / Meta / Yahoo!）ごとの合計。" />
+            <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="媒体内訳" note="媒体（Google / Meta / Yahoo!）ごとの合計。" />
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>
               {[["google", "Google"], ["meta", "Meta"], ["yahoo", "Yahoo!"]].map(([mk, ml]) => {
                 const t = agg(A.filter((c) => mediaFamily(c.media) === mk));
@@ -611,10 +611,10 @@ export default function AdOpsConsole() {
           return (
             <>
               <div className="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <button onClick={() => { setView("list"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#047857", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
+                <button onClick={() => { setView("list"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#0891b2", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
                   <ArrowLeft size={15} /> 一覧に戻る
                 </button>
-                <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, border: "1px solid #047857", background: "#fff", color: "#047857", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
+                <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, border: "1px solid #0891b2", background: "#fff", color: "#0891b2", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
                   🖨 レポート印刷／PDF
                 </button>
               </div>
@@ -634,18 +634,18 @@ export default function AdOpsConsole() {
 
               <ClientBudgetCard cl={cl} bud={budgets[cl.client]} monthlyMap={monthlyMap} />
 
-              <SectionTitle icon={<Table2 size={16} color="#047857" />} title="媒体別" note="この社の各アカウントの接続と成果。手法別（検索/PMax等）・週次も表示。" />
+              <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="媒体別" note="この社の各アカウントの接続と成果。手法別（検索/PMax等）・週次も表示。" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
                 {cl.accts.map((c) => {
                   const s = CONN[c.status]; const h = healthOf(c);
                   const tok = c.tokenDays >= 999 ? "無期限" : c.tokenDays === 0 ? "失効" : `残 ${c.tokenDays}日`;
-                  const tokC = c.tokenDays >= 999 ? "#047857" : c.tokenDays === 0 ? "#dc2626" : c.tokenDays <= 7 ? "#d97706" : "#475569";
+                  const tokC = c.tokenDays >= 999 ? "#0891b2" : c.tokenDays === 0 ? "#dc2626" : c.tokenDays <= 7 ? "#d97706" : "#475569";
                   return (
                     <div key={c.id} style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 15 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                         <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <MediaPill m={c.media} /><DeliveryBadge c={c} />
-                          {platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc) && <a className="no-print" href={platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10.5, fontWeight: 700, color: c.media === "google" ? "#1a56db" : "#4338ca", textDecoration: "none", border: "1px solid #c7d2fe", borderRadius: 6, padding: "2px 8px" }}>↗ {c.media === "google" ? "Google広告" : "Meta"}を開く</a>}
+                          {platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc) && <a className="no-print" href={platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10.5, fontWeight: 700, color: platformColor(c.media), textDecoration: "none", border: "1px solid #c7d2fe", borderRadius: 6, padding: "2px 8px" }}>↗ {platformLabel(c.media)}を開く</a>}
                         </span>
                         <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: s.c }}><Circle size={8} fill={s.c} color={s.c} />{s.label}</span>
                       </div>
@@ -670,7 +670,7 @@ export default function AdOpsConsole() {
               </div>
 
               <div className="no-print">
-                <SectionTitle icon={<Zap size={16} color="#047857" />} title="この社の承認待ち" note={cProps.length ? "" : "承認待ちはありません。"} />
+                <SectionTitle icon={<Zap size={16} color="#0891b2" />} title="この社の承認待ち" note={cProps.length ? "" : "承認待ちはありません。"} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: cProps.length ? 22 : 8 }}>
                   {cProps.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={null} hideClient url={propUrl(p)} />)}
                 </div>
@@ -708,7 +708,7 @@ export default function AdOpsConsole() {
           const totActual = rows.reduce((s, r) => s + (r.act ? r.act.cost : 0), 0);
           const sel = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff" };
           const tmpl = "1.4fr 2.1fr 0.9fr 1.2fr";
-          const pctC = (p) => p == null ? "#94a3b8" : p > 110 ? "#dc2626" : p >= 90 ? "#d97706" : "#047857";
+          const pctC = (p) => p == null ? "#94a3b8" : p > 110 ? "#dc2626" : p >= 90 ? "#d97706" : "#0891b2";
           return (
             <>
               <SectionTitle icon={<span style={{ fontSize: 15 }}>💰</span>} title="契約一覧（今月の予算）" note="全クライアントの契約（媒体別）＋追加（キャンペーン等）＝今月の予算を一覧。実消化との対比つき。契約・追加の登録は目標設定タブから。行クリックで社別詳細へ。" />
@@ -717,7 +717,7 @@ export default function AdOpsConsole() {
                 <select value={listMonth} onChange={(e) => setListMonth(e.target.value)} style={sel}>
                   {monthOpts.map((m) => <option key={m} value={m}>{m.replace("-", "年") + "月"}</option>)}
                 </select>
-                <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>今月の予算 合計 <b style={{ color: "#0f2a1f" }}>{fmtYen(totBudget)}</b>{totActual ? ` ／ 実消化 ${fmtYen(totActual)}（${Math.round(totActual / totBudget * 100)}%）` : ""}</span>
+                <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>今月の予算 合計 <b style={{ color: "#0e3a46" }}>{fmtYen(totBudget)}</b>{totActual ? ` ／ 実消化 ${fmtYen(totActual)}（${Math.round(totActual / totBudget * 100)}%）` : ""}</span>
               </div>
               <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 10, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
@@ -744,7 +744,7 @@ export default function AdOpsConsole() {
                         ))}
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{fmtYen(r.eb.total)}</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0e3a46", fontVariantNumeric: "tabular-nums" }}>{fmtYen(r.eb.total)}</div>
                         {r.eb.addsTotal > 0 && <div style={{ fontSize: 10, color: "#64748b" }}>契約{fmtYen(r.eb.contractTotal)}＋追加{fmtYen(r.eb.addsTotal)}</div>}
                       </div>
                       <div style={{ textAlign: "right" }}>
@@ -760,7 +760,7 @@ export default function AdOpsConsole() {
                 })}
                 <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 10, padding: "11px 14px", borderTop: "2px solid #e6ebe8", background: "#f8faf9", fontWeight: 700 }}>
                   <span style={{ fontSize: 12.5 }}>合計（{rows.length}社）</span><span></span>
-                  <span style={{ textAlign: "right", fontSize: 13.5, color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{fmtYen(totBudget)}</span>
+                  <span style={{ textAlign: "right", fontSize: 13.5, color: "#0e3a46", fontVariantNumeric: "tabular-nums" }}>{fmtYen(totBudget)}</span>
                   <span style={{ textAlign: "right", fontSize: 12.5, color: pctC(totBudget ? Math.round(totActual / totBudget * 100) : null), fontVariantNumeric: "tabular-nums" }}>{totActual ? `${fmtYen(totActual)}（${Math.round(totActual / totBudget * 100)}%）` : "—"}</span>
                 </div>
               </div>
@@ -792,13 +792,13 @@ export default function AdOpsConsole() {
             const d = dpct(a, b);
             if (d == null) return <span style={{ fontSize: 10.5, color: "#cbd5e1" }}>前年同月 —</span>;
             const good = invert ? d <= 0 : d >= 0;
-            return <span style={{ fontSize: 10.5, color: d === 0 ? "#94a3b8" : (good ? "#047857" : "#b45309") }}>前年同月 {d > 0 ? "+" : ""}{d}%</span>;
+            return <span style={{ fontSize: 10.5, color: d === 0 ? "#94a3b8" : (good ? "#0891b2" : "#b45309") }}>前年同月 {d > 0 ? "+" : ""}{d}%</span>;
           };
           const kwAccts = accts.filter((c) => c.media === "google" || c.media === "yahoo_search");
           const kpi = (label, val, node) => (
             <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: "12px 14px" }}>
               <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{val}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#0e3a46", fontVariantNumeric: "tabular-nums" }}>{val}</div>
               <div style={{ marginTop: 2 }}>{node}</div>
             </div>
           );
@@ -822,7 +822,7 @@ export default function AdOpsConsole() {
                 <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>ソフトコミュニケーションズ 広告運用レポート</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 22, fontWeight: 800 }}>{rc}</span>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: "#0f766e" }}>{rm ? rm.replace("-", "年") + "月 レポート" : "（月データなし）"}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#0e7490" }}>{rm ? rm.replace("-", "年") + "月 レポート" : "（月データなし）"}</span>
                   {cl && <span style={{ fontSize: 12, color: "#64748b" }}>月額規模 {man(cl.monthly)}/月</span>}
                 </div>
                 <div style={{ fontSize: 11.5, color: "#94a3b8", margin: "3px 0 18px" }}>媒体：{accts.map((c) => <span key={c.id} style={{ marginRight: 6 }}><MediaPill m={c.media} /></span>)}</div>
@@ -843,7 +843,7 @@ export default function AdOpsConsole() {
                     </div>
 
                     {/* 媒体別内訳 */}
-                    <SectionTitle icon={<Table2 size={15} color="#047857" />} title="媒体別内訳" />
+                    <SectionTitle icon={<Table2 size={15} color="#0891b2" />} title="媒体別内訳" />
                     <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden", marginBottom: 22 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "8px 13px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
                         <span>媒体</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span><span style={{ textAlign: "right" }}>CTR / CPC</span>
@@ -863,7 +863,7 @@ export default function AdOpsConsole() {
                     </div>
 
                     {/* 月次推移（媒体ごと） */}
-                    <SectionTitle icon={<TrendingUp size={15} color="#047857" />} title="月次推移" />
+                    <SectionTitle icon={<TrendingUp size={15} color="#0891b2" />} title="月次推移" />
                     <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
                       {accts.map((c) => seriesOf(c).length > 0 && (
                         <div key={c.id} style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", padding: 13 }}>
@@ -876,7 +876,7 @@ export default function AdOpsConsole() {
                     {/* キーワード分析（検索：Google / Yahoo!検索） */}
                     {kwAccts.length > 0 && (
                       <>
-                        <SectionTitle icon={<KeyRound size={15} color="#047857" />} title="キーワード分析（費用上位）" note="検索広告の当月キーワード。Google／Yahoo!検索が対象。" />
+                        <SectionTitle icon={<KeyRound size={15} color="#0891b2" />} title="キーワード分析（費用上位）" note="検索広告の当月キーワード。Google／Yahoo!検索が対象。" />
                         {kwAccts.map((c) => {
                           const kws = (keywordMap[`${c.client}|${c.media}`] || {})[rm] || [];
                           return (
@@ -892,7 +892,7 @@ export default function AdOpsConsole() {
                                   {kws.map((k, i) => (
                                     <div key={i} style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "6px 12px", borderTop: "1px solid #f5f7f6", fontSize: 11.5, alignItems: "center" }}>
                                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.text}<span style={{ fontSize: 9.5, color: "#94a3b8", marginLeft: 5 }}>{k.match}</span></span>
-                                      <span style={{ textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: k.qs == null ? "#cbd5e1" : k.qs >= 7 ? "#047857" : k.qs >= 4 ? "#d97706" : "#dc2626" }}>{k.qs == null ? "—" : k.qs}</span>
+                                      <span style={{ textAlign: "center", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: k.qs == null ? "#cbd5e1" : k.qs >= 7 ? "#0891b2" : k.qs >= 4 ? "#d97706" : "#dc2626" }}>{k.qs == null ? "—" : k.qs}</span>
                                       <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{yen(k.cost)}</span>
                                       <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{k.clk}</span>
                                       <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: "#64748b" }}>{k.ctr}%</span>
@@ -914,7 +914,7 @@ export default function AdOpsConsole() {
                       if (!Object.keys(bd).length) return null;
                       return (
                         <>
-                          <SectionTitle icon={<Table2 size={15} color="#047857" />} title="広告の内訳（Google・当月）" note="デバイス・曜日・時間帯・キャンペーン・検索クエリ別。表示/クリック/CTR/CPC/費用/CV/CVR/CPA。" />
+                          <SectionTitle icon={<Table2 size={15} color="#0891b2" />} title="広告の内訳（Google・当月）" note="デバイス・曜日・時間帯・キャンペーン・検索クエリ別。表示/クリック/CTR/CPC/費用/CV/CVR/CPA。" />
                           <BreakdownTable title="キャンペーンタイプ別（検索 / PMax / デマンド）" rows={bd.campaignType} col="タイプ" />
                           <BreakdownTable title="デバイス別" rows={bd.device} col="デバイス" />
                           <BreakdownTable title="都道府県別" rows={bd.prefecture} col="都道府県" />
@@ -939,13 +939,13 @@ export default function AdOpsConsole() {
         {/* ===== 接続ステータス ===== */}
         {view === "conn" && (
           <>
-            <SectionTitle icon={<Cable size={16} color="#047857" />} title="接続ステータス" note="何がアクティブで、どのアカウントに繋がっているか。行クリックで社別に。" />
+            <SectionTitle icon={<Cable size={16} color="#0891b2" />} title="接続ステータス" note="何がアクティブで、どのアカウントに繋がっているか。行クリックで社別に。" />
             <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
               <TableHead which="conn" cols={["クライアント", "連携先", "アカウントID", "接続状態", "トークン期限", "稼働CP", "最終同期"]} />
               {A.map((c, i) => {
                 const s = CONN[c.status];
                 const tok = c.tokenDays >= 999 ? "無期限" : c.tokenDays === 0 ? "失効" : `残 ${c.tokenDays}日`;
-                const tokC = c.tokenDays >= 999 ? "#047857" : c.tokenDays === 0 ? "#dc2626" : c.tokenDays <= 7 ? "#d97706" : "#475569";
+                const tokC = c.tokenDays >= 999 ? "#0891b2" : c.tokenDays === 0 ? "#dc2626" : c.tokenDays <= 7 ? "#d97706" : "#475569";
                 return (
                   <div key={c.id} onClick={() => goClient(c.client)} style={{ display: "grid", gridTemplateColumns: "1.4fr 0.8fr 1fr 0.9fr 0.9fr 0.6fr 0.8fr", alignItems: "center", padding: "10px 14px", fontSize: 12.5, borderTop: i ? "1px solid #f1f5f4" : "none", background: c.status !== "ok" ? s.bg : "#fff", cursor: "pointer" }}>
                     <span style={{ fontWeight: 600 }}>{c.client}{c.tier === "large" && <LargePill />}</span>
@@ -980,7 +980,7 @@ export default function AdOpsConsole() {
           const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
           return (
             <>
-              <SectionTitle icon={<Table2 size={16} color="#047857" />} title="費用・成果一覧（媒体別）" note="アカウント（媒体）単位の一覧。クライアント・状態・媒体で絞り込み。行クリックで社別詳細へ。" />
+              <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="費用・成果一覧（媒体別）" note="アカウント（媒体）単位の一覧。クライアント・状態・媒体で絞り込み。行クリックで社別詳細へ。" />
               {/* フィルタ */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
                 <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />{hasYahoo && <MediaTab id="yahoo" label="Yahoo!" />}
@@ -997,7 +997,7 @@ export default function AdOpsConsole() {
                   <option value="good">良好</option>
                 </select>
                 {(clientFilter !== "all" || flagFilter !== "all" || media !== "all") &&
-                  <button onClick={() => { setClientFilter("all"); setFlagFilter("all"); setMedia("all"); }} style={{ border: "none", background: "none", color: "#047857", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>絞り込み解除</button>}
+                  <button onClick={() => { setClientFilter("all"); setFlagFilter("all"); setMedia("all"); }} style={{ border: "none", background: "none", color: "#0891b2", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>絞り込み解除</button>}
                 <span style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{listRows.length}件</span>
               </div>
               <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
@@ -1013,8 +1013,8 @@ export default function AdOpsConsole() {
                     <div key={c.id} onClick={() => goClient(c.client)} style={{ display: "grid", gridTemplateColumns: tmpl, alignItems: "center", padding: "10px 14px", fontSize: 12.5, borderTop: i ? "1px solid #f1f5f4" : "none", cursor: "pointer" }}>
                       <span style={{ fontWeight: 600 }}>{c.client}{c.tier === "large" && <LargePill />}</span>
                       <span style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}><MediaPill m={c.media} /><DeliveryBadge c={c} /></span>
-                      <span><span style={{ color: "#0f2a1f", fontWeight: 600 }}>{yen(c.spend)}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.spend, lm.spend)} dir={0} /></span></span>
-                      <span><span style={{ color: overT ? "#dc2626" : "#0f2a1f", fontWeight: overT ? 700 : 600 }}>{c.cpa ? yen(c.cpa) : "—"}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.cpa, lm.cpa)} dir={-1} /></span>{c.target ? <span style={{ color: "#94a3b8", fontSize: 10.5 }}> /目標{yen(c.target)}</span> : null}</span>
+                      <span><span style={{ color: "#0e3a46", fontWeight: 600 }}>{yen(c.spend)}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.spend, lm.spend)} dir={0} /></span></span>
+                      <span><span style={{ color: overT ? "#dc2626" : "#0e3a46", fontWeight: overT ? 700 : 600 }}>{c.cpa ? yen(c.cpa) : "—"}</span> <span style={{ fontSize: 10.5 }}><DeltaTag v={pct(c.cpa, lm.cpa)} dir={-1} /></span>{c.target ? <span style={{ color: "#94a3b8", fontSize: 10.5 }}> /目標{yen(c.target)}</span> : null}</span>
                       <span style={{ color: "#475569" }}>{c.cv}件</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 5, color: HC[h], fontWeight: 600 }}><Circle size={8} fill={HC[h]} color={HC[h]} />{HLABEL[h]}</span>
                     </div>
@@ -1028,7 +1028,7 @@ export default function AdOpsConsole() {
         {/* ===== 目標設定 ===== */}
         {view === "targets" && (
           <>
-            <SectionTitle icon={<Target size={16} color="#047857" />} title="目標設定" note="各クライアントの目標CPA・月予算を登録。保存するとアラート/基準チェックに即反映（この端末に保存）。恒久保存はエクスポートして benchmarks.json へ。" />
+            <SectionTitle icon={<Target size={16} color="#0891b2" />} title="目標設定" note="各クライアントの目標CPA・月予算を登録。保存するとアラート/基準チェックに即反映（この端末に保存）。恒久保存はエクスポートして benchmarks.json へ。" />
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
               <span style={{ fontSize: 12.5, color: "#64748b" }}>担当者</span>
               <input value={operator} onChange={(e) => saveOperator(e.target.value)} placeholder="名前（変更履歴に記録）"
@@ -1058,7 +1058,7 @@ function agg(list) {
   const roas = r.length ? r.reduce((s, c) => s + c.roas, 0) / r.length : 0;
   return { spend, cv: Math.round(cvRaw), cpa, roas };
 }
-const btnP = { display: "flex", alignItems: "center", gap: 6, padding: "8px 17px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#0a9268,#047857)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 1px 2px rgba(4,120,87,.35)" };
+const btnP = { display: "flex", alignItems: "center", gap: 6, padding: "8px 17px", borderRadius: 9, border: "none", background: "linear-gradient(180deg,#06b6d4,#0891b2)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 1px 2px rgba(8,145,178,.35)" };
 const btnS = { display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer" };
 
 // プレイブック：症状(kind)ごとに「なぜ問題か・原因候補・対応手順・確認」。若手が迷わず動くための型（CLAUDE.md準拠）。
@@ -1132,13 +1132,13 @@ function Playbook({ kind }) {
   const stop = (e) => e.stopPropagation();
   return (
     <div onClick={stop} style={{ marginBottom: 10 }}>
-      <button onClick={() => setOpen((v) => !v)} style={{ border: "1px solid #dbe7e1", background: "#f2f8f5", color: "#0f766e", borderRadius: 8, padding: "4px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>💡 考え方・対応手順 {open ? "▲" : "▼"}</button>
+      <button onClick={() => setOpen((v) => !v)} style={{ border: "1px solid #cfe8ee", background: "#ecf7fa", color: "#0e7490", borderRadius: 8, padding: "4px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>💡 考え方・対応手順 {open ? "▲" : "▼"}</button>
       {open && (
         <div style={{ marginTop: 6, fontSize: 12, color: "#334155", background: "#f8faf9", border: "1px solid #eaeeec", borderRadius: 8, padding: "10px 12px", lineHeight: 1.6 }}>
-          <div style={{ fontWeight: 700, color: "#0f2a1f", marginBottom: 4 }}>{pb.t}</div>
+          <div style={{ fontWeight: 700, color: "#0e3a46", marginBottom: 4 }}>{pb.t}</div>
           <div style={{ marginBottom: 5 }}><b style={{ color: "#b45309" }}>なぜ </b>{pb.why}</div>
           <div style={{ marginBottom: 5 }}><b style={{ color: "#64748b" }}>原因候補</b><ul style={{ margin: "2px 0 0", paddingLeft: 18 }}>{pb.causes.map((c, i) => <li key={i}>{c}</li>)}</ul></div>
-          <div style={{ marginBottom: 5 }}><b style={{ color: "#047857" }}>対応手順</b><ol style={{ margin: "2px 0 0", paddingLeft: 18 }}>{pb.steps.map((s, i) => <li key={i}>{s}</li>)}</ol></div>
+          <div style={{ marginBottom: 5 }}><b style={{ color: "#0891b2" }}>対応手順</b><ol style={{ margin: "2px 0 0", paddingLeft: 18 }}>{pb.steps.map((s, i) => <li key={i}>{s}</li>)}</ol></div>
           <div><b style={{ color: "#4338ca" }}>確認 </b>{pb.check}</div>
         </div>
       )}
@@ -1147,27 +1147,35 @@ function Playbook({ kind }) {
 }
 function ProposalCard({ p, decide, onClient, hideClient, url }) {
   const s = SEV[p.severity];
+  // 左＝クライアント名/媒体/種別・信頼度など「何の・どの提案か」、右＝内容と操作。左右2カラム（狭幅では自動で縦積み）
   return (
-    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderLeft: `3px solid ${s.dot}`, borderRadius: 10, padding: 14 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          {!hideClient && <button onClick={() => onClient && onClient(p.client)} style={{ fontWeight: 700, fontSize: 14, background: "none", border: "none", padding: 0, cursor: onClient ? "pointer" : "default", color: "#0f2a1f" }}>{p.client}</button>}
-          <MediaPill m={p.media} /><span style={{ fontSize: 11, color: "#64748b" }}>{p.kind}</span>
+    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderLeft: `3px solid ${s.dot}`, borderRadius: 10, padding: 14, display: "grid", gridTemplateColumns: "minmax(150px,190px) 1fr", gap: 16, alignItems: "start" }}>
+      {/* 左カラム：クライアント名・媒体・種別・バッジ */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 7, borderRight: "1px solid #f1f5f4", paddingRight: 12, minWidth: 0 }}>
+        {!hideClient && <button onClick={() => onClient && onClient(p.client)} style={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.35, textAlign: "left", background: "none", border: "none", padding: 0, cursor: onClient ? "pointer" : "default", color: "#0e3a46" }}>{p.client}</button>}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><MediaPill m={p.media} /><span style={{ fontSize: 11.5, fontWeight: 700, color: "#475569" }}>{p.kind}</span></div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+          {p.confidence && <span title="データ量から見た確からしさ" style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: p.confidence === "高" ? "#e7f5ef" : p.confidence === "中" ? "#fdf1e3" : "#eef1f4", color: p.confidence === "高" ? "#0891b2" : p.confidence === "中" ? "#b45309" : "#64748b" }}>信頼度 {p.confidence}</span>}
           {p.twoStep && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: "#eef2ff", color: "#4338ca" }}>二段階承認</span>}
-          {p.confidence && <span title="データ量から見た確からしさ" style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: p.confidence === "高" ? "#e7f5ef" : p.confidence === "中" ? "#fdf1e3" : "#eef1f4", color: p.confidence === "高" ? "#047857" : p.confidence === "中" ? "#b45309" : "#64748b" }}>信頼度 {p.confidence}</span>}
         </div>
-        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText }}>{s.label}</span>
       </div>
-      <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-        <span style={{ color: "#64748b" }}>{p.cur}</span><ChevronRight size={14} color="#94a3b8" /><span style={{ fontWeight: 700, color: "#0f2a1f" }}>{p.next}</span>
-      </div>
-      <div style={{ fontSize: 12.5, color: "#475569", background: "#f8faf9", borderRadius: 8, padding: "8px 10px", marginBottom: 8, lineHeight: 1.6 }}><b style={{ color: "#047857" }}>AI </b>{p.reason}</div>
-      {p.impact && <div style={{ fontSize: 12, color: "#0f766e", marginBottom: 10, background: "#f2f8f5", border: "1px solid #dbe7e1", borderRadius: 8, padding: "6px 10px" }}><b>📈 期待効果 </b>{p.impact}</div>}
-      <Playbook kind={p.kind} />
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => decide(p, "approved")} style={btnP}><Check size={15} />{p.twoStep ? "レビュー承認" : "承認"}</button>
-        <button onClick={() => decide(p, "rejected")} style={btnS}><X size={15} /> 却下</button>
-        {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ ...btnS, textDecoration: "none", marginLeft: "auto", color: p.media === "google" ? "#1a56db" : "#4338ca" }}>↗ 修正画面</a>}
+      {/* 右カラム：内容と操作 */}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText }}>{s.label}</span>
+        </div>
+        <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+          <span style={{ color: "#64748b" }}>{p.cur}</span><ChevronRight size={14} color="#94a3b8" /><span style={{ fontWeight: 700, color: "#0e3a46" }}>{p.next}</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: "#475569", background: "#f8faf9", borderRadius: 8, padding: "8px 10px", marginBottom: 8, lineHeight: 1.6 }}><b style={{ color: "#0891b2" }}>AI </b>{p.reason}</div>
+        {p.impact && <div style={{ fontSize: 12, color: "#0e7490", marginBottom: 8, background: "#ecf7fa", border: "1px solid #cfe8ee", borderRadius: 8, padding: "6px 10px" }}><b>📈 期待効果 </b>{p.impact}</div>}
+        {p.actionValue && <div style={{ fontSize: 12, color: "#92400e", marginBottom: 10, background: "#fff8ec", border: "1px solid #fde3bf", borderRadius: 8, padding: "6px 10px" }}><b>🎯 目安 </b>{p.actionValue}</div>}
+        <Playbook kind={p.kind} />
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => decide(p, "approved")} style={btnP}><Check size={15} />{p.twoStep ? "レビュー承認" : "承認"}</button>
+          <button onClick={() => decide(p, "rejected")} style={btnS}><X size={15} /> 却下</button>
+          {url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ ...btnS, textDecoration: "none", marginLeft: "auto", color: platformColor(p.media) }}>↗ 修正画面</a>}
+        </div>
       </div>
     </div>
   );
@@ -1224,7 +1232,7 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
   const crit = items.filter((i) => i.severity === "critical").length;
   const warn = items.filter((i) => i.severity === "warning").length;
   const info = items.filter((i) => i.severity === "info").length;
-  const accent = crit ? "#dc2626" : warn ? "#d97706" : "#047857";
+  const accent = crit ? "#dc2626" : warn ? "#d97706" : "#0891b2";
   const nh = (handled || []).length;
   const btn = { fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 6, border: "1px solid #d7e0db", background: "#fff", cursor: "pointer", color: "#475569" };
   const stop = (e) => e.stopPropagation();
@@ -1236,14 +1244,14 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
       <div key={a.key} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", border: "1px solid #eef1f0", borderLeft: `3px solid ${s.dot}`, borderRadius: 8, background: "#fcfdfc", cursor: onClient ? "pointer" : "default" }}>
         <span style={{ flexShrink: 0, marginTop: 1, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText, minWidth: 44, textAlign: "center" }}>{s.label}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#0f2a1f" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3a46" }}>
             {a.client}<MediaPill m={a.media} />
             {a.kind && <span style={{ fontSize: 11.5, fontWeight: 700, color: s.chipText, marginLeft: 4 }}>{a.kind}</span>}
           </div>
           <div style={{ fontSize: 12, color: "#475569", marginTop: 2 }}>{a.fact}</div>
-          {a.action && <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}><b style={{ color: "#047857" }}>対応 </b>{a.action}</div>}
+          {a.action && <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}><b style={{ color: "#0891b2" }}>対応 </b>{a.action}</div>}
           <div style={{ marginTop: 5 }}><Playbook kind={a.kind} /></div>
-          {op.memo && editKey !== a.key && <div style={{ fontSize: 11.5, color: "#0f2a1f", marginTop: 3, background: "#fff8e1", borderRadius: 6, padding: "3px 7px" }}>📝 {op.memo}</div>}
+          {op.memo && editKey !== a.key && <div style={{ fontSize: 11.5, color: "#0e3a46", marginTop: 3, background: "#fff8e1", borderRadius: 6, padding: "3px 7px" }}>📝 {op.memo}</div>}
           {editKey === a.key ? (
             <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 5 }}>
               <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="メモ（この端末に保存）"
@@ -1253,11 +1261,11 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
             </div>
           ) : (
             <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-              <button style={{ ...btn, background: "linear-gradient(180deg,#0a9268,#047857)", color: "#fff", border: "none", boxShadow: "0 1px 2px rgba(4,120,87,.3)" }} onClick={() => onDecide && onDecide(a, "approved")}><Check size={12} style={{ verticalAlign: "-2px" }} /> 承認</button>
+              <button style={{ ...btn, background: "linear-gradient(180deg,#06b6d4,#0891b2)", color: "#fff", border: "none", boxShadow: "0 1px 2px rgba(8,145,178,.3)" }} onClick={() => onDecide && onDecide(a, "approved")}><Check size={12} style={{ verticalAlign: "-2px" }} /> 承認</button>
               <button style={{ ...btn, color: "#b91c1c", borderColor: "#f0c9c9" }} onClick={() => onDecide && onDecide(a, "rejected")}><X size={12} style={{ verticalAlign: "-2px" }} /> 却下</button>
               <button style={btn} onClick={() => onSnooze(a.key)}>様子見3日</button>
               <button style={btn} onClick={() => { setEditKey(a.key); setDraft(op.memo || ""); }}>メモ</button>
-              {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ ...btn, textDecoration: "none", color: a.media === "google" ? "#1a56db" : "#4338ca", borderColor: "#c7d2fe" }}>↗ {a.media === "google" ? "Google広告" : "Meta"}を開く</a>}
+              {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ ...btn, textDecoration: "none", color: platformColor(a.media), borderColor: "#c7d2fe" }}>↗ {platformLabel(a.media)}を開く</a>}
             </div>
           )}
         </div>
@@ -1268,26 +1276,26 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
 
   if (!items.length && !nh) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #eaeeec", borderTop: "3px solid #047857", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-        <ShieldCheck size={20} color="#047857" />
+      <div style={{ background: "#fff", border: "1px solid #eaeeec", borderTop: "3px solid #0891b2", borderRadius: 12, padding: "16px 18px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+        <ShieldCheck size={20} color="#0891b2" />
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>本日、要対応はありません</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#0e3a46" }}>本日、要対応はありません</div>
           <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>全アカウント基準内・急変なし。{generatedAt ? `（監視 ${generatedAt}）` : ""}</div>
         </div>
       </div>
     );
   }
   return (
-    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderTop: `3px solid ${items.length ? accent : "#047857"}`, borderRadius: 12, padding: "14px 16px 12px", marginBottom: 20 }}>
+    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderTop: `3px solid ${items.length ? accent : "#0891b2"}`, borderRadius: 12, padding: "14px 16px 12px", marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <AlertTriangle size={18} color={items.length ? accent : "#047857"} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f2a1f" }}>今日の要対応 <span style={{ color: items.length ? accent : "#047857" }}>{items.length}件</span></span>
+          <AlertTriangle size={18} color={items.length ? accent : "#0891b2"} />
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#0e3a46" }}>今日の要対応 <span style={{ color: items.length ? accent : "#0891b2" }}>{items.length}件</span></span>
         </div>
         <div style={{ display: "flex", gap: 8, fontSize: 11.5, fontWeight: 700 }}>
           {crit > 0 && <span style={{ color: "#dc2626" }}>● 要対応 {crit}</span>}
           {warn > 0 && <span style={{ color: "#d97706" }}>● 注意 {warn}</span>}
-          {info > 0 && <span style={{ color: "#047857" }}>● 提案 {info}</span>}
+          {info > 0 && <span style={{ color: "#0891b2" }}>● 提案 {info}</span>}
           {generatedAt && <span style={{ color: "#94a3b8", fontWeight: 400 }}>監視 {generatedAt}</span>}
         </div>
       </div>
@@ -1313,7 +1321,7 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
                   <div key={a.key} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", border: "1px solid #f1f5f4", borderRadius: 8, background: "#fafbfa", opacity: 0.85 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>{a.client}<MediaPill m={a.media} />{a.kind && <span style={{ marginLeft: 4, color: "#94a3b8" }}>{a.kind}</span>}</div>
-                      <div style={{ fontSize: 11, color: dec ? (dec.decision === "approved" ? "#047857" : "#b91c1c") : "#94a3b8", marginTop: 1, fontWeight: dec ? 700 : 400 }}>{st}{by ? `・${by}` : ""}{op.memo ? `・📝${op.memo}` : ""}</div>
+                      <div style={{ fontSize: 11, color: dec ? (dec.decision === "approved" ? "#0891b2" : "#b91c1c") : "#94a3b8", marginTop: 1, fontWeight: dec ? 700 : 400 }}>{st}{by ? `・${by}` : ""}{op.memo ? `・📝${op.memo}` : ""}</div>
                     </div>
                     <button style={{ ...btn, flexShrink: 0 }} onClick={() => dec ? (onUndo && onUndo(a)) : onClear(a.key)}>戻す</button>
                   </div>
@@ -1377,14 +1385,14 @@ function ClientBudgetCard({ cl, bud, monthlyMap, asOfDate }) {
   const projSpend = spentMTD != null ? Math.round((spentMTD / elapsed) * daysInMonth) : null;
   const projPct = (projSpend != null && eb.total) ? Math.round((projSpend / eb.total) * 100) : null;
   const projCv = cvMTD != null ? Math.round((cvMTD / elapsed) * daysInMonth) : null;
-  const projC = projPct == null ? "#475569" : Math.abs(projPct - 100) <= 10 ? "#047857" : projPct > 100 ? "#dc2626" : "#d97706";
-  const paceC = pace == null ? "#94a3b8" : pace > 110 ? "#dc2626" : pace >= 45 ? "#047857" : "#d97706";
+  const projC = projPct == null ? "#475569" : Math.abs(projPct - 100) <= 10 ? "#0891b2" : projPct > 100 ? "#dc2626" : "#d97706";
+  const paceC = pace == null ? "#94a3b8" : pace > 110 ? "#dc2626" : pace >= 45 ? "#0891b2" : "#d97706";
   const box = { background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 15, marginBottom: 22 };
   const lbl = { fontSize: 10.5, color: "#94a3b8" };
   return (
     <div style={box}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>今月の予算（契約 ＋ 追加）</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#0e3a46" }}>今月の予算（契約 ＋ 追加）</span>
         <span style={{ fontSize: 12, color: "#64748b" }}>{M}月</span>
         {eb.fromBench && <span style={{ fontSize: 10.5, color: "#b45309", background: "#fdf6e3", borderRadius: 6, padding: "1px 7px" }}>契約未設定（月予算から仮置き・目標設定で登録）</span>}
       </div>
@@ -1398,7 +1406,7 @@ function ClientBudgetCard({ cl, bud, monthlyMap, asOfDate }) {
               <span style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{fmtYen(l.amount)}</span>
             </div>
           ))}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, fontSize: 12, color: "#64748b", borderTop: "1px dashed #eef2f0", marginTop: 3, paddingTop: 3 }}>契約計 <b style={{ color: "#0f2a1f" }}>{fmtYen(eb.contractTotal)}</b></div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, fontSize: 12, color: "#64748b", borderTop: "1px dashed #eef4f7", marginTop: 3, paddingTop: 3 }}>契約計 <b style={{ color: "#0e3a46" }}>{fmtYen(eb.contractTotal)}</b></div>
         </div>
         {/* 追加 */}
         <div>
@@ -1409,12 +1417,12 @@ function ClientBudgetCard({ cl, bud, monthlyMap, asOfDate }) {
               <span style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#1a56db" }}>{fmtYen(a.amount)}</span>
             </div>
           ))}
-          {eb.adds.length > 0 && <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, fontSize: 12, color: "#64748b", borderTop: "1px dashed #eef2f0", marginTop: 3, paddingTop: 3 }}>追加計 <b style={{ color: "#1a56db" }}>{fmtYen(eb.addsTotal)}</b></div>}
+          {eb.adds.length > 0 && <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, fontSize: 12, color: "#64748b", borderTop: "1px dashed #eef4f7", marginTop: 3, paddingTop: 3 }}>追加計 <b style={{ color: "#1a56db" }}>{fmtYen(eb.addsTotal)}</b></div>}
         </div>
         {/* 今月の予算 */}
         <div style={{ background: "#f0f7f4", borderRadius: 10, padding: "10px 12px", textAlign: "center" }}>
           <div style={lbl}>今月の予算</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#0f2a1f", fontVariantNumeric: "tabular-nums" }}>{fmtYen(eb.total)}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#0e3a46", fontVariantNumeric: "tabular-nums" }}>{fmtYen(eb.total)}</div>
           <div style={{ fontSize: 10.5, color: "#64748b" }}>契約 {fmtYen(eb.contractTotal)}{eb.addsTotal ? ` ＋ 追加 ${fmtYen(eb.addsTotal)}` : ""}</div>
         </div>
       </div>
@@ -1433,8 +1441,8 @@ function ClientBudgetCard({ cl, bud, monthlyMap, asOfDate }) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
               <div><div style={lbl}>着地見込（費用）</div><div style={{ fontSize: 14, fontWeight: 700, color: projC }}>{fmtYen(projSpend)}</div><div style={lbl}>今月の予算比 {projPct}%</div></div>
-              <div><div style={lbl}>着地見込（CV）</div><div style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>{projCv}件</div><div style={lbl}>当月 {cvMTD}件</div></div>
-              <div><div style={lbl}>残り予算</div><div style={{ fontSize: 14, fontWeight: 700, color: eb.total - spentMTD < 0 ? "#dc2626" : "#0f2a1f" }}>{fmtYen(eb.total - spentMTD)}</div><div style={lbl}>残 {daysInMonth - elapsed}日</div></div>
+              <div><div style={lbl}>着地見込（CV）</div><div style={{ fontSize: 14, fontWeight: 700, color: "#0e3a46" }}>{projCv}件</div><div style={lbl}>当月 {cvMTD}件</div></div>
+              <div><div style={lbl}>残り予算</div><div style={{ fontSize: 14, fontWeight: 700, color: eb.total - spentMTD < 0 ? "#dc2626" : "#0e3a46" }}>{fmtYen(eb.total - spentMTD)}</div><div style={lbl}>残 {daysInMonth - elapsed}日</div></div>
             </div>
           </>
         )}
@@ -1460,18 +1468,32 @@ function MediaPill({ m }) {
   const s = S[m] || (String(m).indexOf("yahoo") === 0 ? { bg: "#fdeaea", c: "#d1341f", label: "Yahoo!" } : S.meta);
   return <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, margin: "0 2px", background: s.bg, color: s.c }}>{s.label}</span>;
 }
+// 媒体ごとの「◯◯を開く」リンク表記と色（Google/Meta/Yahoo検索/Yahooディスプレイ＋今後追加に対応）
+function platformLabel(m) {
+  if (m === "google") return "Google広告";
+  if (m === "meta") return "Meta";
+  if (m === "yahoo_search") return "Yahoo!検索";
+  if (m === "yahoo_display") return "Yahoo!ディスプレイ";
+  if (String(m).indexOf("yahoo") === 0) return "Yahoo!広告";
+  return "媒体管理画面";
+}
+function platformColor(m) {
+  if (m === "google") return "#1a56db";
+  if (String(m).indexOf("yahoo") === 0) return "#d1341f";
+  return "#4338ca"; // Meta・その他
+}
 function LargePill() {
   return <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 999, marginLeft: 6, background: "#fdf6e3", color: "#b45309" }}><Star size={9} fill="#b45309" color="#b45309" />大型</span>;
 }
 function MiniStat({ label, value, bad }) {
-  return <div><div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0f2a1f" }}>{value}</div></div>;
+  return <div><div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0e3a46" }}>{value}</div></div>;
 }
 // 値＋前月比つきのセル（クライアント別カード用・列が揃うようgridで使う）
 function StatCell({ label, value, d, dir, bad }) {
   return (
     <div>
       <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0f2a1f" }}>{value}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0e3a46" }}>{value}</div>
       <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 1 }}>前月 <DeltaTag v={d} dir={dir} /></div>
     </div>
   );
@@ -1489,7 +1511,7 @@ function BreakdownTable({ title, rows, col }) {
   const hd = { display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "7px 12px", minWidth: 660 };
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", margin: "0 0 6px" }}>{title}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0e3a46", margin: "0 0 6px" }}>{title}</div>
       <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflowX: "auto", overflowY: "hidden" }}>
         <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
           <span>{col}</span>{["表示", "クリック", "CTR", "CPC", "費用", "CV", "CVR", "CPA"].map((h) => <span key={h} style={{ textAlign: "right" }}>{h}</span>)}
@@ -1529,7 +1551,7 @@ function BudgetClientEditor({ eb, onSave }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* 契約 */}
         <div>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>契約（媒体別・この月の契約）</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>契約（媒体別・この月の契約）</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {contract.map((l, i) => (
               <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -1541,13 +1563,13 @@ function BudgetClientEditor({ eb, onSave }) {
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 7 }}>
-            <button onClick={() => { touch(); setContract((p) => [...p, { media: "", amount: "" }]); }} style={{ border: "1px dashed #c7d2cc", background: "#fff", color: "#0f766e", borderRadius: 7, padding: "4px 9px", fontSize: 11.5, cursor: "pointer" }}>＋ 媒体を追加</button>
-            <span style={{ fontSize: 11.5, color: "#64748b" }}>契約計 <b style={{ color: "#0f2a1f" }}>{fmtYen(cTotal)}</b></span>
+            <button onClick={() => { touch(); setContract((p) => [...p, { media: "", amount: "" }]); }} style={{ border: "1px dashed #c7d2cc", background: "#fff", color: "#0e7490", borderRadius: 7, padding: "4px 9px", fontSize: 11.5, cursor: "pointer" }}>＋ 媒体を追加</button>
+            <span style={{ fontSize: 11.5, color: "#64748b" }}>契約計 <b style={{ color: "#0e3a46" }}>{fmtYen(cTotal)}</b></span>
           </div>
         </div>
         {/* 追加 */}
         <div>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>今月の追加（キャンペーン等）</div>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>今月の追加（キャンペーン等）</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {adds.length === 0 && <div style={{ fontSize: 11.5, color: "#94a3b8" }}>追加なし</div>}
             {adds.map((a, i) => (
@@ -1567,9 +1589,9 @@ function BudgetClientEditor({ eb, onSave }) {
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, borderTop: "1px dashed #e6ebe8", paddingTop: 10 }}>
-        <span style={{ fontSize: 12.5 }}>今月の予算 <b style={{ fontSize: 15, color: "#0f2a1f" }}>{fmtYen(cTotal + aTotal)}</b></span>
+        <span style={{ fontSize: 12.5 }}>今月の予算 <b style={{ fontSize: 15, color: "#0e3a46" }}>{fmtYen(cTotal + aTotal)}</b></span>
         <button onClick={save} style={{ ...btnP, marginLeft: "auto" }}><Check size={15} /> この月を保存</button>
-        {saved && <span style={{ fontSize: 12, color: "#047857", fontWeight: 700 }}>保存しました</span>}
+        {saved && <span style={{ fontSize: 12, color: "#0891b2", fontWeight: 700 }}>保存しました</span>}
       </div>
     </div>
   );
@@ -1607,7 +1629,7 @@ function BudgetEditor({ clients, budgets, onSave }) {
                 <span style={{ fontWeight: 700, fontSize: 12.5 }}>{cl.client}{cl.tier === "large" && <LargePill />}</span>
                 <span style={{ fontSize: 12, color: "#475569" }}>契約 {fmtYen(eb.contractTotal)}{eb.fromBench ? <span style={{ color: "#b45309", fontSize: 10.5 }}> (仮)</span> : ""}</span>
                 <span style={{ fontSize: 12, color: eb.addsTotal ? "#1a56db" : "#94a3b8" }}>追加 {eb.addsTotal ? fmtYen(eb.addsTotal) : "—"}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2a1f" }}>今月 {fmtYen(eb.total)}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0e3a46" }}>今月 {fmtYen(eb.total)}</span>
                 <ChevronRight size={15} color="#cbd5e1" style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
               </div>
               {isOpen && <BudgetClientEditor key={cl.client + "|" + month} eb={eb} onSave={(c, a) => applyClient(cl.client, c, a)} />}
@@ -1670,7 +1692,7 @@ function TargetEditor({ clients, targets, onSave }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={save} style={btnP}><Check size={15} /> 保存（この端末）</button>
         <button onClick={exportJson} style={btnS}>{copied ? "コピー済" : "benchmarks.json をコピー"}</button>
-        {saved && <span style={{ fontSize: 12, color: "#047857", fontWeight: 700 }}>保存しました。アラート/基準チェックに反映されます。</span>}
+        {saved && <span style={{ fontSize: 12, color: "#0891b2", fontWeight: 700 }}>保存しました。アラート/基準チェックに反映されます。</span>}
       </div>
       <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
         <div style={head}>
@@ -1720,7 +1742,7 @@ function TargetHistory({ history }) {
     <div style={{ marginTop: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Clock size={16} color="#047857" /><span style={{ fontSize: 15, fontWeight: 700 }}>変更履歴</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Clock size={16} color="#0891b2" /><span style={{ fontSize: 15, fontWeight: 700 }}>変更履歴</span></div>
           <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>{history.length ? "目標の変更を記録（誰が・いつ・変更前→後）。" : "まだ変更履歴はありません。目標を保存すると記録されます。"}</div>
         </div>
         {history.length > 0 && <button onClick={copyCsv} style={btnS}>{copied ? "コピー済" : "履歴をCSVでコピー"}</button>}
@@ -1735,7 +1757,7 @@ function TargetHistory({ history }) {
               <span style={{ color: "#94a3b8" }}>{h.at}</span>
               <span style={{ fontWeight: 600 }}>{h.client}</span>
               <span style={{ color: "#475569" }}>{h.field}</span>
-              <span><span style={{ color: "#94a3b8" }}>{fmt(h.field, h.from)}</span> <span style={{ color: "#cbd5e1" }}>→</span> <span style={{ color: "#0f2a1f", fontWeight: 700 }}>{fmt(h.field, h.to)}</span></span>
+              <span><span style={{ color: "#94a3b8" }}>{fmt(h.field, h.from)}</span> <span style={{ color: "#cbd5e1" }}>→</span> <span style={{ color: "#0e3a46", fontWeight: 700 }}>{fmt(h.field, h.to)}</span></span>
               <span style={{ color: "#475569" }}>{h.by}</span>
             </div>
           ))}
@@ -1749,12 +1771,12 @@ function DeltaTag({ v, dir }) {
   if (v == null) return <span style={{ color: "#94a3b8" }}>—</span>;
   const up = v >= 0;
   const good = dir === 0 ? null : (dir === 1 ? up : !up);
-  const color = good == null ? "#64748b" : good ? "#047857" : "#dc2626";
+  const color = good == null ? "#64748b" : good ? "#0891b2" : "#dc2626";
   return <span style={{ color, fontWeight: 700 }}>{up ? "▲" : "▼"}{Math.abs(v).toFixed(0)}%</span>;
 }
 
 const JUDGE = {
-  good: { label: "良好", c: "#047857", bg: "#ecfdf5" },
+  good: { label: "良好", c: "#0891b2", bg: "#ecfdf5" },
   warn: { label: "注意", c: "#d97706", bg: "#fffbeb" },
   crit: { label: "要対応", c: "#dc2626", bg: "#fef2f2" },
   none: { label: "未設定", c: "#94a3b8", bg: "#f1f5f4" },
@@ -1811,8 +1833,8 @@ function BenchmarkChecks({ c }) {
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4", textAlign: "left" };
   return (
     <div style={{ marginTop: 4, marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>
-        <ShieldCheck size={14} color="#047857" /> 基準チェック（直近7日 / 基準：{b.source || "全社既定"}）
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>
+        <ShieldCheck size={14} color="#0891b2" /> 基準チェック（直近7日 / 基準：{b.source || "全社既定"}）
       </div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 320 }}>
@@ -1826,8 +1848,8 @@ function BenchmarkChecks({ c }) {
               const jj = JUDGE[ch.j];
               return (
                 <tr key={ch.name} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                  <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{ch.name}</td>
-                  <td style={{ ...cell, textAlign: "right", color: "#0f2a1f", fontWeight: 700 }}>{ch.actual}</td>
+                  <td style={{ ...cell, color: "#0e3a46", fontWeight: 600 }}>{ch.name}</td>
+                  <td style={{ ...cell, textAlign: "right", color: "#0e3a46", fontWeight: 700 }}>{ch.actual}</td>
                   <td style={{ ...cell, textAlign: "right", color: "#64748b" }}>{ch.std}</td>
                   <td style={{ ...cell, textAlign: "right", color: jj.c }}>{ch.gap}</td>
                   <td style={{ ...cell, textAlign: "center" }}>
@@ -1869,15 +1891,15 @@ function MonthlyTrend({ series, generated, target, bench }) {
   ];
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 2 }}>
-        <TrendingUp size={14} color="#047857" /> 月次トレンド（前年同月比）
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0e3a46", marginBottom: 2 }}>
+        <TrendingUp size={14} color="#0891b2" /> 月次トレンド（前年同月比）
       </div>
       <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 8 }}>{prev ? `${mJp(latest.month)}（確定月）と ${mJp(prevYM)} を比較。` : `${mJp(latest.month)}（前年同月のデータなし）。`}緑＝改善／赤＝悪化。</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 12 }}>
         {cards.map((c) => (
           <div key={c.k}>
             <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{c.k}（{mJp(latest.month)}）</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: c.col || "#0f2a1f" }}>{c.cur}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: c.col || "#0e3a46" }}>{c.cur}</div>
             <div style={{ fontSize: 10.5, color: "#94a3b8", display: "flex", gap: 5, alignItems: "center" }}>前年 {c.prev} {c.d != null && <DeltaTag v={c.d} dir={c.dir} />}</div>
           </div>
         ))}
@@ -1911,16 +1933,16 @@ function MonthlyTrend({ series, generated, target, bench }) {
 // 監査チェック（ads-google観点の機械監査）：スコア/グレード＋各項目の pass/warn/fail
 function AuditReport({ a }) {
   if (!a || a.error) return null;
-  const gradeColor = (a.grade === "A" || a.grade === "B") ? "#047857" : a.grade === "C" ? "#d97706" : "#dc2626";
-  const SV = { pass: { c: "#047857", bg: "#ecfdf5", mk: "✓" }, warn: { c: "#d97706", bg: "#fffbeb", mk: "△" }, fail: { c: "#dc2626", bg: "#fef2f2", mk: "✗" } };
+  const gradeColor = (a.grade === "A" || a.grade === "B") ? "#0891b2" : a.grade === "C" ? "#d97706" : "#dc2626";
+  const SV = { pass: { c: "#0891b2", bg: "#ecfdf5", mk: "✓" }, warn: { c: "#d97706", bg: "#fffbeb", mk: "△" }, fail: { c: "#dc2626", bg: "#fef2f2", mk: "✗" } };
   const order = { fail: 0, warn: 1, pass: 2 };
   const fs = [...(a.findings || [])].sort((x, y) => (order[x.sev] ?? 3) - (order[y.sev] ?? 3));
   const nFail = fs.filter((f) => f.sev === "fail").length, nWarn = fs.filter((f) => f.sev === "warn").length, nPass = fs.filter((f) => f.sev === "pass").length;
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-        <ShieldCheck size={15} color="#047857" />
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0f2a1f" }}>監査チェック（ads-google 観点）</span>
+        <ShieldCheck size={15} color="#0891b2" />
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0e3a46" }}>監査チェック（ads-google 観点）</span>
         <span style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: gradeColor, borderRadius: 6, padding: "1px 8px" }}>{a.grade} ・ {a.score}/100</span>
         <span style={{ fontSize: 11, color: "#64748b" }}>要対応{nFail}・注意{nWarn}・良好{nPass}</span>
       </div>
@@ -1932,7 +1954,7 @@ function AuditReport({ a }) {
             <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 5, background: s.bg, color: s.c, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mk}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#0f2a1f" }}>{f.title}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#0e3a46" }}>{f.title}</div>
                 <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.6 }}>{f.detail}</div>
               </div>
             </div>
@@ -1960,11 +1982,11 @@ function MonthEndProjection({ days, dailyBudget, target, bench }) {
   const projCpa = projCv ? Math.round(projSpend / projCv) : null;
   const expected = dailyBudget ? dailyBudget * daysInMonth : null;
   const overPct = expected ? Math.round((projSpend / expected - 1) * 100) : null;
-  const overC = overPct == null ? "#475569" : Math.abs(overPct) <= 10 ? "#047857" : overPct > 0 ? "#dc2626" : "#d97706";
+  const overC = overPct == null ? "#475569" : Math.abs(overPct) <= 10 ? "#0891b2" : overPct > 0 ? "#dc2626" : "#d97706";
   const cell = { fontSize: 10.5, color: "#94a3b8" };
   return (
     <div style={{ marginBottom: 12, background: "#f8faf9", border: "1px solid #eef1f4", borderRadius: 8, padding: "9px 12px" }}>
-      <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>月末着地予測（{M}月・{elapsed}/{daysInMonth}日 経過）</div>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>月末着地予測（{M}月・{elapsed}/{daysInMonth}日 経過）</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
         <div>
           <div style={cell}>費用 着地予測</div>
@@ -1973,7 +1995,7 @@ function MonthEndProjection({ days, dailyBudget, target, bench }) {
         </div>
         <div>
           <div style={cell}>CV 着地予測</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#0f2a1f" }}>{Math.round(projCv)}件</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#0e3a46" }}>{Math.round(projCv)}件</div>
           <div style={cell}>当月 {Math.round(cvMTD)}件</div>
         </div>
         <div>
@@ -1997,7 +2019,7 @@ function AccountReport({ c, days, byType }) {
   };
   const cap7 = c.dailyBudget ? c.dailyBudget * 7 : 0;
   const pace = cap7 ? (d7.spend / cap7) * 100 : null;
-  const paceC = pace == null ? "#94a3b8" : pace > 110 ? "#dc2626" : pace >= 90 ? "#d97706" : "#047857";
+  const paceC = pace == null ? "#94a3b8" : pace > 110 ? "#dc2626" : pace >= 90 ? "#d97706" : "#0891b2";
   const rows = [
     { k: "費用", a: yen(d7.spend), b: yen(lm.spend), d: chg(d7.spend, lm.spend, false), dir: 0 },
     { k: "表示回数", a: num(d7.imp), b: num(lm.imp), d: chg(d7.imp, lm.imp, false), dir: 1 },
@@ -2045,8 +2067,8 @@ function AccountReport({ c, days, byType }) {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                    <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{r.k}</td>
-                    <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{r.a}</td>
+                    <td style={{ ...cell, textAlign: "left", color: "#0e3a46", fontWeight: 600 }}>{r.k}</td>
+                    <td style={{ ...cell, color: "#0e3a46", fontWeight: 700 }}>{r.a}</td>
                     <td style={{ ...cell, color: "#64748b" }}>{r.b}</td>
                     <td style={cell}><DeltaTag v={r.d} dir={r.dir} /></td>
                   </tr>
@@ -2089,7 +2111,7 @@ function cpaColor(cpa, target, bench) {
   const over = cpa / target - 1;
   const sev = bench && bench.cpaSeverePct != null ? bench.cpaSeverePct : 0.5;
   const warn = bench && bench.cpaWarnPct != null ? bench.cpaWarnPct : 0.2;
-  return over >= sev ? "#dc2626" : over >= warn ? "#d97706" : "#047857";
+  return over >= sev ? "#dc2626" : over >= warn ? "#d97706" : "#0891b2";
 }
 
 // 週次分解（当月の第1週〜）。社別詳細・月次の両方で使う。
@@ -2106,7 +2128,7 @@ function WeeklyBreakdown({ days, target, bench }) {
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>週次分解（当月 {+curM.slice(5, 7)}月）</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>週次分解（当月 {+curM.slice(5, 7)}月）</div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 300 }}>
           <thead><tr>
@@ -2116,9 +2138,9 @@ function WeeklyBreakdown({ days, target, bench }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.w} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                <td style={{ ...cell, textAlign: "left", fontWeight: 700, color: "#0f2a1f" }}>第{r.w}週</td>
+                <td style={{ ...cell, textAlign: "left", fontWeight: 700, color: "#0e3a46" }}>第{r.w}週</td>
                 <td style={{ ...cell, textAlign: "left", color: "#94a3b8" }}>{r.from}〜{r.to}</td>
-                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{yen(r.cost)}</td>
+                <td style={{ ...cell, color: "#0e3a46", fontWeight: 600 }}>{yen(r.cost)}</td>
                 <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
                 <td style={{ ...cell, color: cpaColor(r.cpa, target, bench), fontWeight: 600 }}>{r.cpa ? yen(r.cpa) : "—"}</td>
                 <td style={{ padding: "6px 8px" }}><div style={{ height: 8, background: "#eef1f4", borderRadius: 999, overflow: "hidden" }}><div style={{ width: (r.cost / maxW) * 100 + "%", height: "100%", background: "#9ec7b4" }} /></div></td>
@@ -2151,7 +2173,7 @@ function MonthlyReport({ c, days, byType }) {
   const cpaJudge = (cpa) => {
     if (!target || cpa == null) return "#475569";
     const over = cpa / target - 1;
-    return over >= (c.bench && c.bench.cpaSeverePct != null ? c.bench.cpaSeverePct : 0.5) ? "#dc2626" : over >= (c.bench && c.bench.cpaWarnPct != null ? c.bench.cpaWarnPct : 0.2) ? "#d97706" : "#047857";
+    return over >= (c.bench && c.bench.cpaSeverePct != null ? c.bench.cpaSeverePct : 0.5) ? "#dc2626" : over >= (c.bench && c.bench.cpaWarnPct != null ? c.bench.cpaWarnPct : 0.2) ? "#d97706" : "#0891b2";
   };
   const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
   const cell = { padding: "6px 10px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
@@ -2173,7 +2195,7 @@ function MonthlyReport({ c, days, byType }) {
         ].map((k) => (
           <div key={k.label}>
             <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{k.label}</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: k.color || "#0f2a1f" }}>{k.v}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: k.color || "#0e3a46" }}>{k.v}</div>
             <div style={{ fontSize: 10.5, color: "#94a3b8", display: "flex", gap: 5, alignItems: "center" }}>{k.sub}{k.d != null && <DeltaTag v={k.d} dir={k.dir} />}</div>
           </div>
         ))}
@@ -2187,7 +2209,7 @@ function MonthlyReport({ c, days, byType }) {
         if (!mrows.length) return null;
         return (
           <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>当月の手法別</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>当月の手法別</div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 340 }}>
                 <thead><tr>
@@ -2196,8 +2218,8 @@ function MonthlyReport({ c, days, byType }) {
                 <tbody>
                   {mrows.map((r) => (
                     <tr key={r.label} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                      <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 700 }}>{r.label}</td>
-                      <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{yen(r.cost)}</td>
+                      <td style={{ ...cell, textAlign: "left", color: "#0e3a46", fontWeight: 700 }}>{r.label}</td>
+                      <td style={{ ...cell, color: "#0e3a46", fontWeight: 600 }}>{yen(r.cost)}</td>
                       <td style={{ ...cell, color: "#94a3b8" }}>{cur.cost ? Math.round((r.cost / cur.cost) * 100) : 0}%</td>
                       <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
                       <td style={{ ...cell, color: cpaJudge(r.cpa), fontWeight: 600 }}>{r.cpa ? yen(r.cpa) : "—"}</td>
@@ -2211,7 +2233,7 @@ function MonthlyReport({ c, days, byType }) {
       })()}
 
       {/* 週次分解 */}
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>週次分解（合計）</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>週次分解（合計）</div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420 }}>
           <thead><tr>
@@ -2222,9 +2244,9 @@ function MonthlyReport({ c, days, byType }) {
           <tbody>
             {weekRows.map((r) => (
               <tr key={r.w} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                <td style={{ ...cell, textAlign: "left", fontWeight: 700, color: "#0f2a1f" }}>第{r.w}週</td>
+                <td style={{ ...cell, textAlign: "left", fontWeight: 700, color: "#0e3a46" }}>第{r.w}週</td>
                 <td style={{ ...cell, textAlign: "left", color: "#94a3b8" }}>{r.from}〜{r.to}</td>
-                <td style={{ ...cell, color: "#0f2a1f", fontWeight: 600 }}>{yen(r.cost)}</td>
+                <td style={{ ...cell, color: "#0e3a46", fontWeight: 600 }}>{yen(r.cost)}</td>
                 <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
                 <td style={{ ...cell, color: cpaJudge(r.cpa), fontWeight: 600 }}>{r.cpa ? yen(r.cpa) : "—"}</td>
                 <td style={{ padding: "6px 10px" }}>
@@ -2267,7 +2289,7 @@ function MethodBreakdown({ days, byType }) {
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>手法別（直近7日／前7日比）</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>手法別（直近7日／前7日比）</div>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 380 }}>
           <thead><tr>
@@ -2277,11 +2299,11 @@ function MethodBreakdown({ days, byType }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.label} style={{ borderBottom: "1px solid #f6f8f7", background: r.total ? "#f8faf9" : "transparent" }}>
-                <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 700 }}>{r.label}</td>
-                <td style={{ ...cell, color: "#0f2a1f", fontWeight: r.total ? 700 : 600 }}>{yen(r.cost)}</td>
+                <td style={{ ...cell, textAlign: "left", color: "#0e3a46", fontWeight: 700 }}>{r.label}</td>
+                <td style={{ ...cell, color: "#0e3a46", fontWeight: r.total ? 700 : 600 }}>{yen(r.cost)}</td>
                 <td style={cell}><DeltaTag v={r.costD} dir={0} /></td>
                 <td style={{ ...cell, color: "#475569" }}>{Math.round(r.cv)}件</td>
-                <td style={{ ...cell, color: "#0f2a1f" }}>{r.cpa ? yen(r.cpa) : "—"}</td>
+                <td style={{ ...cell, color: "#0e3a46" }}>{r.cpa ? yen(r.cpa) : "—"}</td>
                 <td style={cell}><DeltaTag v={r.cpaD} dir={-1} /></td>
                 <td style={{ ...cell, color: "#475569" }}>{yen(r.cpc)}</td>
               </tr>
@@ -2317,13 +2339,13 @@ function TrendReport({ days, byType, bench }) {
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0f2a1f", marginBottom: 2 }}>
-        <TrendingUp size={14} color="#047857" /> 期間比較・推移（日次データより）
+      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0e3a46", marginBottom: 2 }}>
+        <TrendingUp size={14} color="#0891b2" /> 期間比較・推移（日次データより）
       </div>
       <div style={{ fontSize: 10.5, color: "#94a3b8", marginBottom: 8 }}>各期間は<b>同じ長さの直前期間</b>と比較（7日比=前7日／14日比=前14日／28日比=前28日）。緑＝改善／赤＝悪化。データ不足の期間は「—」。</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>全体（期間比較）</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>全体（期間比較）</div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
               <thead><tr>
@@ -2335,8 +2357,8 @@ function TrendReport({ days, byType, bench }) {
               <tbody>
                 {metrics.map((m) => (
                   <tr key={m.k} style={{ borderBottom: "1px solid #f6f8f7" }}>
-                    <td style={{ ...cell, textAlign: "left", color: "#0f2a1f", fontWeight: 600 }}>{m.k}</td>
-                    <td style={{ ...cell, color: "#0f2a1f", fontWeight: 700 }}>{m.fmt(m.get(d7))}</td>
+                    <td style={{ ...cell, textAlign: "left", color: "#0e3a46", fontWeight: 600 }}>{m.k}</td>
+                    <td style={{ ...cell, color: "#0e3a46", fontWeight: 700 }}>{m.fmt(m.get(d7))}</td>
                     <td style={{ ...cell, color: "#64748b" }}>{m.fmt(m.get(p7))}</td>
                     <td style={cell}><DeltaTag v={pct(m.get(d7), m.get(p7))} dir={m.dir} /></td>
                     <td style={{ ...cell, color: "#64748b" }}>{m.fmt(m.get(d14))}</td>
@@ -2352,7 +2374,7 @@ function TrendReport({ days, byType, bench }) {
         <MethodBreakdown days={days} byType={byType} />
         <WeeklyBreakdown days={days} target={bench && bench.targetCpa} bench={bench} />
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#0f2a1f", marginBottom: 6 }}>日次推移（直近30日）</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>日次推移（直近30日）</div>
           <DailyChart days={days.slice(-30)} target={bench && bench.targetCpa} />
         </div>
       </div>
