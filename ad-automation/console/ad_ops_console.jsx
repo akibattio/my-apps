@@ -1149,21 +1149,19 @@ function ProposalCard({ p, decide, onClient, hideClient, url }) {
   const s = SEV[p.severity];
   // 左＝クライアント名/媒体/種別・信頼度など「何の・どの提案か」、右＝内容と操作。左右2カラム（狭幅では自動で縦積み）
   return (
-    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderLeft: `3px solid ${s.dot}`, borderRadius: 10, padding: 14, display: "grid", gridTemplateColumns: "minmax(150px,190px) 1fr", gap: 16, alignItems: "start" }}>
-      {/* 左カラム：クライアント名・媒体・種別・バッジ */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 7, borderRight: "1px solid #f1f5f4", paddingRight: 12, minWidth: 0 }}>
+    <div style={{ background: "#fff", border: "1px solid #e9eef1", borderRadius: 12, padding: 4, display: "grid", gridTemplateColumns: "minmax(150px,190px) 1fr", gap: 0, alignItems: "stretch", boxShadow: "0 1px 3px rgba(16,42,31,.05), 0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
+      {/* 左カラム：クライアント名・媒体・種別・バッジ（薄い面で右と視覚的に分割） */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, background: "#f7fafb", borderRadius: 9, padding: "12px 13px", minWidth: 0 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: s.chipText }}><Circle size={8} fill={s.dot} color={s.dot} />{s.label}</div>
         {!hideClient && <button onClick={() => onClient && onClient(p.client)} style={{ fontWeight: 700, fontSize: 14.5, lineHeight: 1.35, textAlign: "left", background: "none", border: "none", padding: 0, cursor: onClient ? "pointer" : "default", color: "#0e3a46" }}>{p.client}</button>}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}><MediaPill m={p.media} /><span style={{ fontSize: 11.5, fontWeight: 700, color: "#475569" }}>{p.kind}</span></div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {p.confidence && <span title="データ量から見た確からしさ" style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: p.confidence === "高" ? "#e7f5ef" : p.confidence === "中" ? "#fdf1e3" : "#eef1f4", color: p.confidence === "高" ? "#0891b2" : p.confidence === "中" ? "#b45309" : "#64748b" }}>信頼度 {p.confidence}</span>}
-          {p.twoStep && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: "#eef2ff", color: "#4338ca" }}>二段階承認</span>}
+          {p.confidence && <span title="データ量から見た確からしさ" style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 6, background: "#fff", border: "1px solid #e3e9ec", color: p.confidence === "高" ? "#0891b2" : p.confidence === "中" ? "#b45309" : "#64748b" }}>信頼度 {p.confidence}</span>}
+          {p.twoStep && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 6, background: "#fff", border: "1px solid #d7dcf5", color: "#4338ca" }}>二段階承認</span>}
         </div>
       </div>
       {/* 右カラム：内容と操作 */}
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText }}>{s.label}</span>
-        </div>
+      <div style={{ minWidth: 0, padding: "12px 14px" }}>
         <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <span style={{ color: "#64748b" }}>{p.cur}</span><ChevronRight size={14} color="#94a3b8" /><span style={{ fontWeight: 700, color: "#0e3a46" }}>{p.next}</span>
         </div>
@@ -1241,8 +1239,8 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
     const s = SEV[a.severity] || SEV.warning;
     const op = (ops && ops[a.key]) || {};
     return (
-      <div key={a.key} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", border: "1px solid #eef1f0", borderLeft: `3px solid ${s.dot}`, borderRadius: 8, background: "#fcfdfc", cursor: onClient ? "pointer" : "default" }}>
-        <span style={{ flexShrink: 0, marginTop: 1, fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.chip, color: s.chipText, minWidth: 44, textAlign: "center" }}>{s.label}</span>
+      <div key={a.key} onClick={() => onClient && onClient(a.client)} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "12px 14px", border: "1px solid #e9eef1", borderRadius: 12, background: "#fff", boxShadow: "0 1px 2px rgba(16,42,31,.04)", cursor: onClient ? "pointer" : "default" }}>
+        <span style={{ flexShrink: 0, marginTop: 3, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: s.chipText, minWidth: 52 }}><Circle size={8} fill={s.dot} color={s.dot} />{s.label}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "#0e3a46" }}>
             {a.client}<MediaPill m={a.media} />
@@ -1286,7 +1284,7 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
     );
   }
   return (
-    <div style={{ background: "#fff", border: "1px solid #eaeeec", borderTop: `3px solid ${items.length ? accent : "#0891b2"}`, borderRadius: 12, padding: "14px 16px 12px", marginBottom: 20 }}>
+    <div style={{ background: "#fff", border: "1px solid #e7ecef", borderRadius: 14, padding: "16px 18px 14px", marginBottom: 20, boxShadow: "0 1px 3px rgba(16,42,31,.05), 0 1px 2px rgba(16,42,31,.03)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <AlertTriangle size={18} color={items.length ? accent : "#0891b2"} />
@@ -1300,7 +1298,7 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
         </div>
       </div>
       {items.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>{items.map(renderRow)}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(360px,1fr))", gap: 10 }}>{items.map(renderRow)}</div>
       ) : (
         <div style={{ fontSize: 12.5, color: "#64748b", padding: "4px 2px" }}>未対応はありません（対応済み・様子見 {nh}件）。</div>
       )}
@@ -1310,7 +1308,7 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
             対応済み・様子見 {nh}件 {showHandled ? "▲" : "▼"}
           </button>
           {showHandled && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8, marginTop: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 8, marginTop: 8 }}>
               {handled.map((a) => {
                 const op = (ops && ops[a.key]) || {};
                 const dec = approvals && approvals["alert:" + a.key];
@@ -1459,14 +1457,15 @@ function TableHead({ cols, which }) {
   return (<div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.3 }}>{cols.map((c) => <span key={c}>{c}</span>)}</div>);
 }
 function MediaPill({ m }) {
+  // ゴースト（白地＋細い同色枠）でスタイリッシュに。ベタ塗りの色ブロックを避け情報密度を上げる
   const S = {
-    google: { bg: "#e8f0fe", c: "#1a56db", label: "Google" },
-    meta: { bg: "#eef0ff", c: "#4338ca", label: "Meta" },
-    yahoo_search: { bg: "#fdeaea", c: "#d1341f", label: "Yahoo!検索" },
-    yahoo_display: { bg: "#fdeaea", c: "#b91c1c", label: "Yahoo!ディスプレイ" },
+    google: { c: "#1a56db", label: "Google" },
+    meta: { c: "#4338ca", label: "Meta" },
+    yahoo_search: { c: "#d1341f", label: "Yahoo!検索" },
+    yahoo_display: { c: "#d1341f", label: "Yahoo!ディスプレイ" },
   };
-  const s = S[m] || (String(m).indexOf("yahoo") === 0 ? { bg: "#fdeaea", c: "#d1341f", label: "Yahoo!" } : S.meta);
-  return <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, margin: "0 2px", background: s.bg, color: s.c }}>{s.label}</span>;
+  const s = S[m] || (String(m).indexOf("yahoo") === 0 ? { c: "#d1341f", label: "Yahoo!" } : S.meta);
+  return <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 6, margin: "0 3px", background: "#fff", border: `1px solid ${s.c}40`, color: s.c, whiteSpace: "nowrap" }}>{s.label}</span>;
 }
 // 媒体ごとの「◯◯を開く」リンク表記と色（Google/Meta/Yahoo検索/Yahooディスプレイ＋今後追加に対応）
 function platformLabel(m) {
