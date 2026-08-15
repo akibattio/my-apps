@@ -213,14 +213,16 @@ MEDIA_JP = {"google": "Google", "meta": "Meta",
             "yahoo_search": "Yahoo!検索", "yahoo_display": "Yahoo!ディスプレイ"}
 
 
-def build_message(alerts: list[dict], period: str, generated: str) -> str:
+def build_message(alerts: list[dict], period: str, generated: str, n_proposals: int = 0) -> str:
     # 注意(warn)は出さない（要対応=critical・提案=info のみ。コンソール表示と統一）
     alerts = [x for x in alerts if x["severity"] != "warn"]
     crit = [x for x in alerts if x["severity"] == "critical"]
     info = [x for x in alerts if x["severity"] == "info"]
+    # 承認待ちの提案リマインド（滞留の抜け漏れ防止＝運用の制度化）
+    prop_line = f"\n📋 承認待ちの提案 {n_proposals}件 — コンソールで承認/却下を" if n_proposals else ""
     head = f"🔔 広告運用アラート  {generated}\n対象:{period}"
     if not alerts:
-        return head + "\n\n✅ 要対応なし（全アカウント基準内）"
+        return head + "\n\n✅ 要対応なし（全アカウント基準内）" + prop_line
 
     # クライアントごとにまとめる。クライアントは「最悪重要度→件数」で並べる
     by_client = {}
@@ -243,7 +245,7 @@ def build_message(alerts: list[dict], period: str, generated: str) -> str:
                 lines.append(f"　　→ 対応: {x['approve']}")
         blocks.append("\n".join(lines))
 
-    return (f"{head}\n要対応 {len(crit)} ・ 提案 {len(info)}\n\n"
+    return (f"{head}\n要対応 {len(crit)} ・ 提案 {len(info)}{prop_line}\n\n"
             + "\n\n".join(blocks)
             + "\n\n※すべて下書き（未適用）。適用は承認後のみ。")
 
@@ -327,7 +329,7 @@ def main():
             print("search_diag.json 判定失敗:", str(e)[:80])
 
     generated = datetime.now(JST).strftime("%Y-%m-%d %H:%M JST")
-    msg = build_message(alerts, data.get("period", "直近30日"), generated)
+    msg = build_message(alerts, data.get("period", "直近30日"), generated, n_proposals=len(data.get("proposals") or []))
 
     # 1) ログ
     (PROJ / "logs").mkdir(exist_ok=True)

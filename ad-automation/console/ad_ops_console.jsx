@@ -479,6 +479,11 @@ export default function AdOpsConsole() {
               const cr = rows.filter((c) => acctHk(c) === "critical").length;
               const nt = rows.filter((c) => acctHk(c) === "unset").length;
               const crit = alertActive.filter((a) => a.severity === "critical").length;
+              const approvedN = approvalLog.filter((l) => l.decision === "approved").length;
+              const rejectedN = approvalLog.filter((l) => l.decision === "rejected").length;
+              const doneN = approvedN + rejectedN;
+              const operators = [...new Set(approvalLog.map((l) => l.by).filter(Boolean))];
+              const pendingTotal = pending.length + crit;  // 承認待ち提案 ＋ 未対応の要対応アラート
               return (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 20 }}>
                   <button onClick={() => setView("summary")} style={{ textAlign: "left", cursor: "pointer", background: "#0f2a1f", color: "#fff", border: "none", borderRadius: 12, padding: "14px 16px" }}>
@@ -498,6 +503,13 @@ export default function AdOpsConsole() {
                       <span style={{ color: "#d97706" }}>● 注意 {w}</span>
                       <span style={{ color: "#dc2626" }}>● 要対応 {cr}</span>
                       {nt > 0 && <button onClick={() => setView("targets")} style={{ border: "none", background: "none", padding: 0, cursor: "pointer", color: "#64748b", fontWeight: 700, fontSize: 12 }}>● 目標未設定 {nt}</button>}
+                    </div>
+                  </Card>
+                  <Card>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>対応状況</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: pendingTotal ? "#dc2626" : "#047857" }}>未対応 {pendingTotal}件</div>
+                    <div style={{ fontSize: 11, marginTop: 4, color: "#94a3b8", lineHeight: 1.5 }}>
+                      承認待ち提案 {pending.length}・要対応 {crit}<br />対応済 {doneN}（承認{approvedN}・却下{rejectedN}）{operators.length ? ` ・ 対応者${operators.length}名` : ""}
                     </div>
                   </Card>
                 </div>
