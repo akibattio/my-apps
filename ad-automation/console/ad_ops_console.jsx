@@ -520,7 +520,7 @@ export default function AdOpsConsole() {
             <div style={{ marginTop: 22 }}>
               <SectionTitle icon={<Zap size={16} color="#0891b2" />} title="承認キュー" note="AIの提案を確認して適用。適用されるのは承認した分だけ（書き込みは承認後のみ）。" />
               {pending.length === 0 && <Empty text="承認待ちはありません。" />}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(480px,1fr))", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {pending.map((p) => <ProposalCard key={p.id} p={p} decide={decide} onClient={goClient} url={propUrl(p)} />)}
               </div>
               {approvalLog.length > 0 && (
