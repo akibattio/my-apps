@@ -411,12 +411,14 @@ export default function AdOpsConsole() {
 
   const NavBtn = ({ id, icon, label, badge }) => (
     <button onClick={() => { setView(id); if (id !== "client") setOpenClient(null); }} style={{
-      display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 8, border: "none",
-      cursor: "pointer", fontSize: 13, fontWeight: 600,
-      background: view === id ? "#0e3a46" : "transparent", color: view === id ? "#fff" : "#a9d4de" }}>
-      {icon}{label}
+      display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 9, border: "none",
+      cursor: "pointer", fontSize: 13, fontWeight: 600, textAlign: "left",
+      background: view === id ? "rgba(255,255,255,.15)" : "transparent", color: view === id ? "#fff" : "#bfe3ea",
+      boxShadow: view === id ? "inset 3px 0 0 #f59e0b" : "none" }}>
+      <span style={{ display: "inline-flex", width: 18, justifyContent: "center", flexShrink: 0 }}>{icon}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>{label}</span>
       {badge > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
-        background: view === id ? "#f59e0b" : "#d97706", color: "#0e3a46" }}>{badge}</span>}
+        background: "#f59e0b", color: "#0e3a46", flexShrink: 0 }}>{badge}</span>}
     </button>
   );
   const MediaTab = ({ id, label }) => (
@@ -427,32 +429,43 @@ export default function AdOpsConsole() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#eef4f7", color: "#0f172a",
+    <div style={{ minHeight: "100vh", background: "#eef4f7", color: "#0f172a", display: "flex", alignItems: "flex-start",
       fontFamily: "-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" }}>
-      <div className="no-print" style={{ background: "linear-gradient(118deg,#0b3a46 0%,#0e5566 52%,#0e7a90 100%)", color: "#fff", padding: "16px 24px", boxShadow: "0 2px 16px rgba(11,58,70,.28)", position: "sticky", top: 0, zIndex: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 700 }}>広告運用コンソール</div>
-            <div style={{ fontSize: 11.5, color: "#a9d4de" }}>ソフコミ ・ {dataInfo ? `実データ（${dataInfo.period || ""}・${dataInfo.generatedAt || ""}）` : "サンプルデータ"} ・ {clients.length}社 / {A.length}連携</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 12.5 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#f59e0b" }}><Bell size={15} /><b>{pending.length}</b><span style={{ color: "#a9d4de" }}>承認待ち</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: connIssues ? "#f4a3a3" : "#a9d4de" }}><Cable size={15} /><b>{connIssues}</b><span style={{ color: "#a9d4de" }}>接続要確認</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#a9d4de" }}><ShieldCheck size={14} /> 承認ゲート ON</span>
-            {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, color: "#0e3a46", background: "#f59e0b", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "5px 11px" }}>📄 顧客レポート ↗</a>}
-          </div>
+      {/* ===== 左サイドバー（ナビ）===== */}
+      <aside className="no-print" style={{ width: 226, flexShrink: 0, position: "sticky", top: 0, height: "100vh", boxSizing: "border-box",
+        background: "linear-gradient(160deg,#0b3a46 0%,#0e5566 55%,#0e7a90 100%)", color: "#fff",
+        display: "flex", flexDirection: "column", padding: "18px 14px", boxShadow: "2px 0 18px rgba(11,58,70,.20)", overflowY: "auto" }}>
+        <div style={{ padding: "2px 8px 16px" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>広告運用コンソール</div>
+          <div style={{ fontSize: 10.5, color: "#a9d4de", marginTop: 3 }}>ソフコミ広告運用</div>
         </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 12, flexWrap: "wrap" }}>
-          <NavBtn id="dash" icon={<LayoutDashboard size={15} />} label="ダッシュボード" badge={alertActive.length} />
-          <NavBtn id="list" icon={<Table2 size={15} />} label="費用・成果一覧（媒体別）" />
-          <NavBtn id="contracts" icon={<span style={{ fontSize: 14 }}>💰</span>} label="契約一覧" />
-          <NavBtn id="report" icon={<span style={{ fontSize: 14 }}>📄</span>} label="社内レポート" />
-          <NavBtn id="conn" icon={<Cable size={15} />} label="接続ステータス" badge={connIssues} />
-          <NavBtn id="targets" icon={<Target size={15} />} label="目標設定" badge={noTargetCount} />
+        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <NavBtn id="dash" icon={<LayoutDashboard size={16} />} label="ダッシュボード" badge={alertActive.length} />
+          <NavBtn id="list" icon={<Table2 size={16} />} label="費用・成果一覧" />
+          <NavBtn id="contracts" icon={<span style={{ fontSize: 15 }}>💰</span>} label="契約一覧" />
+          <NavBtn id="report" icon={<span style={{ fontSize: 15 }}>📄</span>} label="社内レポート" />
+          <NavBtn id="conn" icon={<Cable size={16} />} label="接続ステータス" badge={connIssues} />
+          <NavBtn id="targets" icon={<Target size={16} />} label="目標設定" badge={noTargetCount} />
+        </nav>
+        <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.14)", fontSize: 11, color: "#a9d4de", display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><ShieldCheck size={13} /> 承認ゲート ON</span>
+          <span>{clients.length}社 / {A.length}連携</span>
+          {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 5, color: "#0e3a46", background: "#f59e0b", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "6px 10px", justifyContent: "center" }}>📄 顧客レポート ↗</a>}
         </div>
-      </div>
+      </aside>
 
-      <div style={{ padding: 24, maxWidth: 1240, margin: "0 auto" }}>
+      {/* ===== 右メイン ===== */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignSelf: "stretch" }}>
+        {/* トップバー（ステータス）*/}
+        <div className="no-print" style={{ background: "#fff", borderBottom: "1px solid #e3eaed", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", position: "sticky", top: 0, zIndex: 20, boxShadow: "0 1px 3px rgba(16,42,31,.04)" }}>
+          <div style={{ fontSize: 12.5, color: "#64748b" }}>{dataInfo ? `実データ（${dataInfo.period || ""} ・ ${dataInfo.generatedAt || ""}）` : "サンプルデータ"}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 18, fontSize: 12.5 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, color: pending.length ? "#b45309" : "#64748b" }}><Bell size={15} color={pending.length ? "#d97706" : "#94a3b8"} /><b style={{ fontSize: 14 }}>{pending.length}</b><span style={{ color: "#64748b" }}>承認待ち</span></span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5, color: connIssues ? "#b91c1c" : "#64748b" }}><Cable size={15} color={connIssues ? "#dc2626" : "#94a3b8"} /><b style={{ fontSize: 14 }}>{connIssues}</b><span style={{ color: "#64748b" }}>接続要確認</span></span>
+          </div>
+        </div>
+
+        <div style={{ padding: 24 }}>
         {view === "summary" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
             <MediaTab id="all" label="すべて" /><MediaTab id="google" label="Google" /><MediaTab id="meta" label="Meta" />{hasYahoo && <MediaTab id="yahoo" label="Yahoo!" />}
@@ -1044,6 +1057,7 @@ export default function AdOpsConsole() {
           {dataInfo
             ? "実データ（Google Ads / Meta）。毎日 8:30・12:00・16:00 に取得→監視。判断基準はCLAUDE.mdルールブック＋各社の目標設定に集約。書き込み（予算/入札/ON-OFF）は承認後にのみ実行。"
             : "サンプルデータのプロトタイプ。実運用では Google Ads / Meta を接続し、毎朝取得・分析・提案生成。書き込みは承認後にのみ実行。"}
+        </div>
         </div>
       </div>
     </div>
