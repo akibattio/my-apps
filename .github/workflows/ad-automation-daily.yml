@@ -44,8 +44,9 @@ jobs:
       YAHOO_ADS_BASE_ACCOUNT_ID: ${{ secrets.YAHOO_ADS_BASE_ACCOUNT_ID }}
       YAHOO_ADS_API_VERSION: ${{ secrets.YAHOO_ADS_API_VERSION }}
       GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
-      # 通知は「Webhookが登録済み かつ 朝8:30の実行(または手動)」のときだけ Google Chat へ。昼/夕は通知しない（ノイズ回避）。
-      NOTIFY_CHANNEL: ${{ (secrets.GOOGLE_CHAT_WEBHOOK_URL != '' && (github.event_name != 'schedule' || github.event.schedule == '30 23 * * *')) && 'googlechat' || 'none' }}
+      # 通知は「Webhookが登録済み かつ (朝8:30の定期 または 手動実行)」のときだけ Google Chat へ。
+      # push(コード修正の反映)や昼12:00/夕16:00の再取得では送らない（通知は1日1回・ノイズ回避）。
+      NOTIFY_CHANNEL: ${{ (secrets.GOOGLE_CHAT_WEBHOOK_URL != '' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '30 23 * * *'))) && 'googlechat' || 'none' }}
     steps:
       - uses: actions/checkout@v4
 
