@@ -122,6 +122,7 @@ export default function AdOpsConsole() {
   const [clientFilter, setClientFilter] = useState("all");
   const [proposals, setProposals] = useState(SAMPLE_PROPOSALS);
   const [openClient, setOpenClient] = useState(null);
+  const [clientTab, setClientTab] = useState("seika"); // クライアントページ内タブ：成果/目標/アカウント/契約
   const [DATA, setDATA] = useState(SAMPLE_DATA);
   const [dataInfo, setDataInfo] = useState(null);
   const [targets, setTargets] = useState({});
@@ -334,7 +335,7 @@ export default function AdOpsConsole() {
     return Object.values(m);
   }, [A]);
 
-  const goClient = (name) => { setOpenClient(name); setView("client"); };
+  const goClient = (name, tab) => { setOpenClient(name); setView("client"); setClientTab(tab || "seika"); };
 
   const alerts = rows.map((c) => {
     if (c.cv === 0 && c.spend > 0) return { c, sev: "critical", msg: `CV 0件のまま ${yen(c.spend)} を消化` };
@@ -441,11 +442,30 @@ export default function AdOpsConsole() {
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <NavBtn id="dash" icon={<LayoutDashboard size={16} />} label="ダッシュボード" badge={alertActive.length} />
-          <NavBtn id="list" icon={<Table2 size={16} />} label="費用・成果一覧" />
-          <NavBtn id="contracts" icon={<span style={{ fontSize: 15 }}>💰</span>} label="契約一覧" />
           <NavBtn id="report" icon={<span style={{ fontSize: 15 }}>📄</span>} label="社内レポート" />
           <NavBtn id="conn" icon={<Cable size={16} />} label="接続ステータス" badge={connIssues} />
-          <NavBtn id="targets" icon={<Target size={16} />} label="目標設定" badge={noTargetCount} />
+        </nav>
+        {/* クライアント一覧（左メニューにずらっと。クリックで各社ページへ＝成果/目標/アカウント/契約を中で完結）*/}
+        <div style={{ marginTop: 16, marginBottom: 6, padding: "0 8px", fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", color: "#7fbccb", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span>クライアント</span><span style={{ fontWeight: 600 }}>{clients.length}</span>
+        </div>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
+          {[...clients].sort((x, y) => worstHealth(y.accts) - worstHealth(x.accts)).map((cl) => {
+            const on = view === "client" && openClient === cl.client;
+            const hk = rankToHk(worstHealth(cl.accts));
+            const nProp = proposals.filter((p) => p.client === cl.client && !approvals[pKey(p)]).length;
+            return (
+              <button key={cl.client} onClick={() => goClient(cl.client)} title={cl.client} style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 12px", borderRadius: 8, border: "none",
+                cursor: "pointer", fontSize: 12.5, fontWeight: on ? 700 : 500, textAlign: "left",
+                background: on ? "rgba(255,255,255,.15)" : "transparent", color: on ? "#fff" : "#cfe7ed",
+                boxShadow: on ? "inset 3px 0 0 #f59e0b" : "none" }}>
+                <Circle size={7} fill={HC[hk]} color={HC[hk]} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cl.client}</span>
+                {nProp > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", borderRadius: 999, background: "#f59e0b", color: "#0e3a46", flexShrink: 0 }}>{nProp}</span>}
+              </button>
+            );
+          })}
         </nav>
         <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.14)", fontSize: 11, color: "#a9d4de", display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}><ShieldCheck size={13} /> 承認ゲート ON</span>
@@ -621,11 +641,19 @@ export default function AdOpsConsole() {
             if (c.is != null && c.is < 50) return { c, sev: "warning", msg: `IS ${c.is}%（機会損失大）` };
             return null;
           }).filter(Boolean);
+          const CTab = ({ id, label, badge }) => (
+            <button onClick={() => setClientTab(id)} style={{
+              padding: "8px 16px", border: "none", borderBottom: clientTab === id ? "2px solid #0891b2" : "2px solid transparent",
+              background: "none", cursor: "pointer", fontSize: 13.5, fontWeight: clientTab === id ? 700 : 600,
+              color: clientTab === id ? "#0891b2" : "#64748b", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {label}{badge > 0 && <span style={{ fontSize: 10.5, fontWeight: 700, padding: "0 7px", borderRadius: 999, background: "#f59e0b", color: "#0e3a46" }}>{badge}</span>}
+            </button>
+          );
           return (
             <>
               <div className="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <button onClick={() => { setView("list"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#0891b2", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-                  <ArrowLeft size={15} /> 一覧に戻る
+                <button onClick={() => { setView("dash"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#0891b2", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
+                  <ArrowLeft size={15} /> ダッシュボードへ
                 </button>
                 <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, border: "1px solid #0891b2", background: "#fff", color: "#0891b2", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
                   🖨 レポート印刷／PDF
@@ -645,9 +673,16 @@ export default function AdOpsConsole() {
                 <Card><MiniStat label="接続" value={cl.accts.every((x) => x.status === "ok") ? "正常" : "要確認"} bad={!cl.accts.every((x) => x.status === "ok")} /></Card>
               </div>
 
-              <ClientBudgetCard cl={cl} bud={budgets[cl.client]} monthlyMap={monthlyMap} />
+              {/* クライアント内タブ：成果／目標／アカウント管理／契約（この社の設定・確認をページ内で完結）*/}
+              <div className="no-print" style={{ display: "flex", gap: 2, borderBottom: "1px solid #e3eaed", marginBottom: 20, flexWrap: "wrap" }}>
+                <CTab id="seika" label="成果" />
+                <CTab id="mokuhyo" label="目標" />
+                <CTab id="account" label="アカウント管理" />
+                <CTab id="keiyaku" label="契約" />
+              </div>
 
-              <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="媒体別" note="この社の各アカウントの接続と成果。手法別（検索/PMax等）・週次も表示。" />
+              {clientTab === "seika" && (<>
+              <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="媒体別の成果" note="この社の各アカウントの成果。手法別（検索/PMax等）・月次推移も表示。接続/トークンは『アカウント管理』タブへ。" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
                 {cl.accts.map((c) => {
                   const s = CONN[c.status]; const h = healthOf(c);
@@ -700,6 +735,50 @@ export default function AdOpsConsole() {
                       </div>
                     ))}
                   </div>
+                </>
+              )}
+              </>)}
+
+              {/* 目標 */}
+              {clientTab === "mokuhyo" && (
+                <>
+                  <SectionTitle icon={<Target size={16} color="#0891b2" />} title="目標設定" note="この社の目標CPA・CPC上限・月予算・監視頻度。保存でアラート/基準チェックに即反映（この端末に保存→全スタッフ共有）。" />
+                  <TargetEditor key={cl.client} clients={[cl]} targets={targets} onSave={saveTargets} />
+                </>
+              )}
+
+              {/* アカウント管理 */}
+              {clientTab === "account" && (
+                <>
+                  <SectionTitle icon={<Cable size={16} color="#0891b2" />} title="アカウント管理" note="この社の媒体アカウント・接続/トークン・同期状況。書き込みは承認後のみ（CLAUDE.md §0）。" />
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 12 }}>
+                    {cl.accts.map((c) => {
+                      const s = CONN[c.status];
+                      const tok = c.tokenDays >= 999 ? "無期限" : c.tokenDays === 0 ? "失効" : `残 ${c.tokenDays}日`;
+                      const tokC = c.tokenDays >= 999 ? "#0891b2" : c.tokenDays === 0 ? "#dc2626" : c.tokenDays <= 7 ? "#d97706" : "#475569";
+                      return (
+                        <div key={c.id} style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 15 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <span style={{ display: "flex", alignItems: "center", gap: 8 }}><MediaPill m={c.media} /><DeliveryBadge c={c} /></span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: s.c }}><Circle size={8} fill={s.c} color={s.c} />{s.label}</span>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: "#64748b", fontFamily: "monospace", marginBottom: 6 }}>{c.acct}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: tokC, fontWeight: 600, marginBottom: 5 }}>
+                            <KeyRound size={12} />トークン {tok} ・ 稼働 {c.cp}本{c.dailyBudget ? ` ・ 日予算 ${yen(c.dailyBudget)}` : ""}</div>
+                          <div style={{ fontSize: 11, color: "#94a3b8" }}>最終同期 {c.sync}</div>
+                          {platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc) && <a className="no-print" href={platformUrl(c.media, c.acct, dataInfo && dataInfo.googleMcc)} target="_blank" rel="noopener noreferrer" style={{ marginTop: 9, display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10.5, fontWeight: 700, color: platformColor(c.media), textDecoration: "none", border: "1px solid #c7d2fe", borderRadius: 6, padding: "3px 9px" }}>↗ {platformLabel(c.media)}を開く</a>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* 契約 */}
+              {clientTab === "keiyaku" && (
+                <>
+                  <ClientBudgetCard cl={cl} bud={budgets[cl.client]} monthlyMap={monthlyMap} />
+                  <BudgetEditor key={cl.client} clients={[cl]} budgets={budgets} onSave={saveBudgets} />
                 </>
               )}
             </>
