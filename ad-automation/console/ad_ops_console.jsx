@@ -464,8 +464,8 @@ export default function AdOpsConsole() {
                 boxShadow: on ? "inset 3px 0 0 #0891b2" : "none" }}>
                 <Circle size={8} fill={HC[hk]} color={HC[hk]} style={{ flexShrink: 0 }} />
                 <span style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
-                  <span style={{ display: "block", fontSize: 15, fontWeight: 700, color: on ? "#0e7490" : "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
-                  {sub && <span style={{ display: "block", fontSize: 12, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
+                  <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: on ? "#0e7490" : "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
+                  {sub && <span style={{ display: "block", fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
                 </span>
                 {nProp > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: "#f59e0b", color: "#0e3a46", flexShrink: 0 }}>{nProp}</span>}
               </button>
@@ -1583,14 +1583,14 @@ function LargePill() {
   return <span style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 9.5, fontWeight: 700, padding: "1px 6px", borderRadius: 999, marginLeft: 6, background: "#fdf6e3", color: "#b45309" }}><Star size={9} fill="#b45309" color="#b45309" />大型</span>;
 }
 function MiniStat({ label, value, bad }) {
-  return <div><div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div><div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0e3a46" }}>{value}</div></div>;
+  return <div><div style={{ fontSize: 11, color: "#94a3b8" }}>{label}</div><div style={{ fontSize: 16.5, fontWeight: 700, color: bad ? "#dc2626" : "#0e3a46" }}>{value}</div></div>;
 }
 // 値＋前月比つきのセル（クライアント別カード用・列が揃うようgridで使う）
 function StatCell({ label, value, d, dir, bad }) {
   return (
     <div>
-      <div style={{ fontSize: 10.5, color: "#94a3b8" }}>{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: bad ? "#dc2626" : "#0e3a46" }}>{value}</div>
+      <div style={{ fontSize: 11, color: "#94a3b8" }}>{label}</div>
+      <div style={{ fontSize: 16.5, fontWeight: 700, color: bad ? "#dc2626" : "#0e3a46" }}>{value}</div>
       <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 1 }}>前月 <DeltaTag v={d} dir={dir} /></div>
     </div>
   );
@@ -2126,7 +2126,7 @@ function AccountReport({ c, days, byType }) {
     { k: "CV", a: d7.cv + "件", b: lm.cv + "件", d: chg(d7.cv, lm.cv, false), dir: 1 },
     { k: "CPA", a: d7.cpa ? yen(d7.cpa) : "—", b: lm.cpa ? yen(lm.cpa) : "—", d: chg(d7.cpa, lm.cpa, true), dir: -1 },
   ];
-  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div>
@@ -2221,7 +2221,7 @@ function WeeklyBreakdown({ days, target, bench }) {
   const rows = Object.keys(weeks).map((w) => { const ds = weeks[w]; return { w: +w, from: ds[0].date.slice(5), to: ds[ds.length - 1].date.slice(5), ...aggList(ds) }; }).sort((a, b) => a.w - b.w);
   if (!rows.length) return null;
   const maxW = Math.max(1, ...rows.map((r) => r.cost));
-  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div>
@@ -2382,7 +2382,7 @@ function MethodBreakdown({ days, byType }) {
   }).sort((a, b) => b.cost - a.cost);
   const tot = sumSet(days, dset7), totp = sumSet(days, dsetp7);
   rows.push({ label: "合計", cost: tot.cost, cv: tot.cv, cpa: tot.cpa, cpc: tot.cpc, costD: pct(tot.cost, totp.cost), cpaD: pct(tot.cpa, totp.cpa), total: true });
-  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 12 }}>
@@ -2432,7 +2432,7 @@ function TrendReport({ days, byType, bench }) {
     { k: "CV", get: (o) => o.cv, fmt: cvfmt, dir: 1 },
     { k: "CPA", get: (o) => o.cpa, fmt: cpafmt, dir: -1 },
   ];
-  const cell = { padding: "6px 8px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
