@@ -449,7 +449,7 @@ export default function AdOpsConsole() {
         <div style={{ marginTop: 16, marginBottom: 6, padding: "0 8px", fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", color: "#94a3b8", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>クライアント</span><span style={{ fontWeight: 600 }}>{clients.length}</span>
         </div>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 3, overflowY: "auto" }}>
+        <nav style={{ display: "flex", flexDirection: "column", gap: 1, overflowY: "auto" }}>
           {[...clients].sort((x, y) => worstHealth(y.accts) - worstHealth(x.accts)).map((cl) => {
             const on = view === "client" && openClient === cl.client;
             const hk = rankToHk(worstHealth(cl.accts));
@@ -458,14 +458,14 @@ export default function AdOpsConsole() {
             const sub = short === cl.client ? "" : cl.client;                                // 略称＝全名なら副題なし
             return (
               <button key={cl.client} onClick={() => goClient(cl.client)} title={cl.client} style={{
-                display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none",
+                display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "5px 10px", borderRadius: 8, border: "none",
                 cursor: "pointer", textAlign: "left",
                 background: on ? "#e6f4f7" : "transparent",
                 boxShadow: on ? "inset 3px 0 0 #0891b2" : "none" }}>
-                <Circle size={8} fill={HC[hk]} color={HC[hk]} style={{ flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: on ? "#0e7490" : "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
-                  {sub && <span style={{ display: "block", fontSize: 11, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>{sub}</span>}
+                <Circle size={7} fill={HC[hk]} color={HC[hk]} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
+                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: on ? "#0e7490" : "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
+                  {sub && <span style={{ display: "block", fontSize: 10.5, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
                 </span>
                 {nProp > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: "#f59e0b", color: "#0e3a46", flexShrink: 0 }}>{nProp}</span>}
               </button>
