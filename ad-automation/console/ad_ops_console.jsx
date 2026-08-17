@@ -413,7 +413,7 @@ export default function AdOpsConsole() {
   const NavBtn = ({ id, icon, label, badge }) => (
     <button onClick={() => { setView(id); if (id !== "client") setOpenClient(null); }} style={{
       display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 9, border: "none",
-      cursor: "pointer", fontSize: 13, fontWeight: 600, textAlign: "left",
+      cursor: "pointer", fontSize: 14, fontWeight: 600, textAlign: "left",
       background: view === id ? "#e6f4f7" : "transparent", color: view === id ? "#0e7490" : "#475569",
       boxShadow: view === id ? "inset 3px 0 0 #0891b2" : "none" }}>
       <span style={{ display: "inline-flex", width: 18, justifyContent: "center", flexShrink: 0 }}>{icon}</span>
@@ -458,14 +458,14 @@ export default function AdOpsConsole() {
             const sub = short === cl.client ? "" : cl.client;                                // 略称＝全名なら副題なし
             return (
               <button key={cl.client} onClick={() => goClient(cl.client)} title={cl.client} style={{
-                display: "flex", alignItems: "center", gap: 9, width: "100%", padding: "5px 10px", borderRadius: 8, border: "none",
+                display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "6px 11px", borderRadius: 8, border: "none",
                 cursor: "pointer", textAlign: "left",
                 background: on ? "#e6f4f7" : "transparent",
                 boxShadow: on ? "inset 3px 0 0 #0891b2" : "none" }}>
-                <Circle size={7} fill={HC[hk]} color={HC[hk]} style={{ flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
-                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: on ? "#0e7490" : "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
-                  {sub && <span style={{ display: "block", fontSize: 10.5, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
+                <Circle size={8} fill={HC[hk]} color={HC[hk]} style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 700, color: on ? "#0e7490" : "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{short}</span>
+                  {sub && <span style={{ display: "block", fontSize: 12, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
                 </span>
                 {nProp > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: "#f59e0b", color: "#0e3a46", flexShrink: 0 }}>{nProp}</span>}
               </button>
