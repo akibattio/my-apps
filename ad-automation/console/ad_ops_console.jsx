@@ -414,8 +414,8 @@ export default function AdOpsConsole() {
     <button onClick={() => { setView(id); if (id !== "client") setOpenClient(null); }} style={{
       display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 9, border: "none",
       cursor: "pointer", fontSize: 13, fontWeight: 600, textAlign: "left",
-      background: view === id ? "rgba(255,255,255,.15)" : "transparent", color: view === id ? "#fff" : "#bfe3ea",
-      boxShadow: view === id ? "inset 3px 0 0 #f59e0b" : "none" }}>
+      background: view === id ? "#e6f4f7" : "transparent", color: view === id ? "#0e7490" : "#475569",
+      boxShadow: view === id ? "inset 3px 0 0 #0891b2" : "none" }}>
       <span style={{ display: "inline-flex", width: 18, justifyContent: "center", flexShrink: 0 }}>{icon}</span>
       <span style={{ flex: 1, minWidth: 0 }}>{label}</span>
       {badge > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
@@ -434,11 +434,11 @@ export default function AdOpsConsole() {
       fontFamily: "-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" }}>
       {/* ===== 左サイドバー（ナビ）===== */}
       <aside className="no-print" style={{ width: 226, flexShrink: 0, position: "sticky", top: 0, height: "100vh", boxSizing: "border-box",
-        background: "linear-gradient(160deg,#0b3a46 0%,#0e5566 55%,#0e7a90 100%)", color: "#fff",
-        display: "flex", flexDirection: "column", padding: "18px 14px", boxShadow: "2px 0 18px rgba(11,58,70,.20)", overflowY: "auto" }}>
+        background: "#fff", color: "#0f172a", borderRight: "1px solid #e3eaed",
+        display: "flex", flexDirection: "column", padding: "18px 14px", boxShadow: "1px 0 3px rgba(16,42,31,.04)", overflowY: "auto" }}>
         <div style={{ padding: "2px 8px 16px" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3 }}>広告運用コンソール</div>
-          <div style={{ fontSize: 10.5, color: "#a9d4de", marginTop: 3 }}>ソフコミ広告運用</div>
+          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3, color: "#0e3a46" }}>広告運用コンソール</div>
+          <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 3 }}>ソフコミ広告運用</div>
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <NavBtn id="dash" icon={<LayoutDashboard size={16} />} label="ダッシュボード" badge={alertActive.length} />
@@ -446,7 +446,7 @@ export default function AdOpsConsole() {
           <NavBtn id="conn" icon={<Cable size={16} />} label="接続ステータス" badge={connIssues} />
         </nav>
         {/* クライアント一覧（左メニューにずらっと。クリックで各社ページへ＝成果/目標/アカウント/契約を中で完結）*/}
-        <div style={{ marginTop: 16, marginBottom: 6, padding: "0 8px", fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", color: "#7fbccb", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ marginTop: 16, marginBottom: 6, padding: "0 8px", fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", color: "#94a3b8", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>クライアント</span><span style={{ fontWeight: 600 }}>{clients.length}</span>
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
@@ -458,8 +458,8 @@ export default function AdOpsConsole() {
               <button key={cl.client} onClick={() => goClient(cl.client)} title={cl.client} style={{
                 display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 12px", borderRadius: 8, border: "none",
                 cursor: "pointer", fontSize: 12.5, fontWeight: on ? 700 : 500, textAlign: "left",
-                background: on ? "rgba(255,255,255,.15)" : "transparent", color: on ? "#fff" : "#cfe7ed",
-                boxShadow: on ? "inset 3px 0 0 #f59e0b" : "none" }}>
+                background: on ? "#e6f4f7" : "transparent", color: on ? "#0e7490" : "#475569",
+                boxShadow: on ? "inset 3px 0 0 #0891b2" : "none" }}>
                 <Circle size={7} fill={HC[hk]} color={HC[hk]} style={{ flexShrink: 0 }} />
                 <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cl.client}</span>
                 {nProp > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "0 6px", borderRadius: 999, background: "#f59e0b", color: "#0e3a46", flexShrink: 0 }}>{nProp}</span>}
@@ -467,8 +467,8 @@ export default function AdOpsConsole() {
             );
           })}
         </nav>
-        <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.14)", fontSize: 11, color: "#a9d4de", display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}><ShieldCheck size={13} /> 承認ゲート ON</span>
+        <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid #eef1f0", fontSize: 11, color: "#64748b", display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#0891b2", fontWeight: 600 }}><ShieldCheck size={13} /> 承認ゲート ON</span>
           <span>{clients.length}社 / {A.length}連携</span>
           {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 5, color: "#0e3a46", background: "#f59e0b", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "6px 10px", justifyContent: "center" }}>📄 顧客レポート ↗</a>}
         </div>
