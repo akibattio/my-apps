@@ -10,7 +10,7 @@
 使い方:
   python3 scripts/generate_proposals.py \
       --input data/samples/metrics_sample.csv \
-      --client ハルナ美容外科 \
+      --client サンプル社 \
       [--config clients/haruna_thresholds.json] \
       [--out out/proposals_YYYY-MM-DD.md]
 

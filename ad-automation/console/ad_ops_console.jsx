@@ -9,8 +9,6 @@ import {
 const SAMPLE_DATA = [
   { id: 1, client: "エムライフ物販", tier: "large", monthly: 1800000, media: "google", acct: "742-118-9930", status: "ok", tokenDays: 55, cp: 8, sync: "今朝 09:00", spend: 341000, cpa: 3100, target: 3200, roas: 4.6, cv: 110, ctr: 4.1, is: 74 },
   { id: 2, client: "エムライフ物販", tier: "large", monthly: 1800000, media: "meta", acct: "act_60417", status: "ok", tokenDays: 999, cp: 6, sync: "今朝 09:00", spend: 288000, cpa: 2900, target: 3200, roas: 5.0, cv: 99, ctr: 1.8, is: null },
-  { id: 3, client: "ハルナ美容外科", tier: "large", monthly: 2800000, media: "google", acct: "553-207-4412", status: "ok", tokenDays: 41, cp: 12, sync: "今朝 09:00", spend: 366000, cpa: 5900, target: 5500, roas: 3.4, cv: 62, ctr: 3.0, is: 63 },
-  { id: 4, client: "ハルナ美容外科", tier: "large", monthly: 2800000, media: "meta", acct: "act_88120", status: "warn", tokenDays: 5, cp: 9, sync: "今朝 09:00", spend: 402000, cpa: 5200, target: 5500, roas: 3.9, cv: 77, ctr: 2.1, is: null },
   { id: 5, client: "ミナト水産EC", tier: "large", monthly: 1200000, media: "google", acct: "901-334-7781", status: "ok", tokenDays: 60, cp: 7, sync: "今朝 09:00", spend: 189000, cpa: 2800, target: 3000, roas: 5.1, cv: 67, ctr: 4.4, is: 79 },
   { id: 6, client: "ミナト水産EC", tier: "large", monthly: 1200000, media: "meta", acct: "act_33019", status: "ok", tokenDays: 999, cp: 5, sync: "今朝 09:00", spend: 156000, cpa: 2600, target: 3000, roas: 5.4, cv: 60, ctr: 2.3, is: null },
   { id: 7, client: "ヤマト保険相談", tier: "large", monthly: 1500000, media: "google", acct: "220-556-1043", status: "ok", tokenDays: 33, cp: 10, sync: "今朝 09:00", spend: 267000, cpa: 9800, target: 8000, roas: null, cv: 27, ctr: 1.7, is: 47 },
@@ -31,7 +29,6 @@ const SAMPLE_DATA = [
 
 const SAMPLE_PROPOSALS = [
   { id: "p1", client: "トキワ学習塾", media: "meta", kind: "配信停止", cur: "CV 0件（7日）で ¥39,000 消化", next: "キャンペーンを一時停止", reason: "7日間CV0、CTRも0.6%と低くクリエイティブ疲弊。停止して原因を精査すべき。", severity: "critical", twoStep: false },
-  { id: "p2", client: "ハルナ美容外科", media: "google", kind: "予算増額", cur: "日予算 ¥12,000 / IS損失(予算) 22%", next: "日予算を ¥14,500 に増額", reason: "ROAS3.4を維持しつつ予算による機会損失22%。大型のため二段階承認が必要。", severity: "info", twoStep: true },
   { id: "p3", client: "みどり工務店", media: "google", kind: "除外KW追加", cur: "「無料 diy」等 3語がCV0で費用消化", next: "除外KWに3語を追加", reason: "情報収集目的の語が費用の28%を占有。除外でCPAを目標¥10,000に近づく見込み。", severity: "warning", twoStep: false },
   { id: "p4", client: "ヤマト保険相談", media: "google", kind: "入札調整", cur: "CPA ¥9,800（目標比 +22%）", next: "上限CPAを ¥8,500 に引き下げ", reason: "CPAが目標を22%超過。大型のため二段階承認が必要。", severity: "warning", twoStep: true },
   { id: "p5", client: "アオヤマ歯科クリニック", media: "meta", kind: "クリエイティブ差し替え", cur: "訴求A：CTR 1.1%（低下傾向）", next: "新コピー2案を下書き作成（PAUSED）", reason: "主力のCTRが2週間で1.6%→1.1%へ低下。トーン&マナーに沿った新案を提案。", severity: "info", twoStep: false },

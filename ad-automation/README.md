@@ -12,7 +12,7 @@ ad-automation/
 ├── HANDOFF_広告運用自動化.md   引き継ぎ書（設計の出発点）
 ├── CLAUDE.md                    ★ 全社共通ルールブック（判断基準・禁止事項・承認・様式）
 ├── clients/
-│   ├── ハルナ美容外科.md        個社の接続台帳＋ルール（実値は書かない）
+│   ├── ＜社名＞.md        個社の接続台帳＋ルール（実値は書かない）
 │   └── haruna_thresholds.example.json  個社しきい値の見本
 ├── skills/
 │   ├── weekly-audit/            週次監査（しきい値照合→下書き）
@@ -46,11 +46,11 @@ python3 scripts/fetch_meta_insights.py \
 ```bash
 # 全社既定値で（目標未設定なら「要確認」付きで出力）
 python3 scripts/generate_proposals.py \
-  --input data/samples/metrics_sample.csv --client ハルナ美容外科
+  --input data/samples/metrics_sample.csv --client サンプル社
 
 # 個社の目標CPA/ROASを入れて評価
 python3 scripts/generate_proposals.py \
-  --input data/samples/metrics_sample.csv --client ハルナ美容外科 \
+  --input data/samples/metrics_sample.csv --client サンプル社 \
   --config clients/haruna_thresholds.example.json \
   --out out/proposals_2026-07-02.md
 ```

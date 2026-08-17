@@ -23,7 +23,7 @@
       --out data/haruna_$(date +%F).csv
 
   # トークン未取得の間の疎通確認は generate_proposals.py にサンプルCSVを渡す:
-  #   python3 scripts/generate_proposals.py --input data/samples/metrics_sample.csv --client ハルナ美容外科
+  #   python3 scripts/generate_proposals.py --input data/samples/metrics_sample.csv --client サンプル社
 
 Python 3.12+ 推奨（標準ライブラリのみで動作）。
 """
