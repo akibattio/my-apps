@@ -62,9 +62,11 @@ const RANK = { good: 0, unset: 1, warning: 2, critical: 3 };
 const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "unset" : "good");
 // 配信ステータス：直近7日にインプレッション（or 消化）があれば配信中、無ければ停止中
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
-// 顧客レポート（ad-report / Netlify）へのリンク。URLを入れるとヘッダーに「顧客レポート↗」が出る。空なら非表示。
-// クライアント提出レポートは ad-report(Report GLASS) に一本化。コンソールの「簡易分析」タブは社内確認用（混同回避のため"レポート"表記を避ける）。
-const AD_REPORT_URL = "";
+// 顧客レポート（Report GLASS / Netlify）へのリンク。クライアント提出レポートはReport GLASSに一本化。
+// コンソールの「簡易分析」タブは社内確認用（混同回避のため"レポート"表記を避ける）。
+// ※per-client のディープリンク書式が判明したら reportGlassUrl(client) を差し替え。
+const AD_REPORT_URL = "https://report-glass.netlify.app/";
+const reportGlassUrl = (client) => AD_REPORT_URL; // TODO: 社別URL書式が分かればクエリ等を付与
 
 // 媒体（Google広告/Meta広告マネージャ）の該当ページURL。alertの種類(kind)から「修正する画面」を選ぶ。
 const onlyDigits = (s) => (s || "").replace(/\D/g, "");
@@ -425,25 +427,48 @@ export default function AdOpsConsole() {
       border: "1px solid " + (media === id ? "#0891b2" : "#e2e8f0"),
       background: media === id ? "#0891b2" : "#fff", color: media === id ? "#fff" : "#475569" }}>{label}</button>
   );
+  // ヘッダー内タブ（濃色ヘッダー上）。アクティブ=白面＋ティール文字。
+  const HeaderTab = ({ id, label, badge }) => (
+    <button onClick={() => { setView(id); setOpenClient(null); }} style={{
+      display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+      fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0,
+      background: view === id ? "#fff" : "rgba(255,255,255,.08)", color: view === id ? "#0e5566" : "#dbeef2" }}>
+      {label}
+      {badge > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 7px", borderRadius: 999, background: "#f59e0b", color: "#0e3a46" }}>{badge}</span>}
+    </button>
+  );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#eef4f7", color: "#0f172a", display: "flex", alignItems: "flex-start",
+    <div style={{ minHeight: "100vh", background: "#eef4f7", color: "#0f172a",
       fontFamily: "-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif" }}>
-      {/* ===== 左サイドバー（ナビ）===== */}
-      <aside className="no-print" style={{ width: 244, flexShrink: 0, position: "sticky", top: 0, height: "100vh", boxSizing: "border-box",
-        background: "#fff", color: "#0f172a", borderRight: "1px solid #e3eaed",
-        display: "flex", flexDirection: "column", padding: "18px 14px", boxShadow: "1px 0 3px rgba(16,42,31,.04)", overflowY: "auto" }}>
-        <div style={{ padding: "2px 8px 16px" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3, color: "#0e3a46" }}>広告運用コンソール</div>
-          <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 3 }}>ソフコミ広告運用</div>
+      {/* ===== 全幅ヘッダー：ブランド＋タブ（ダッシュボード/簡易分析/接続ステータス）＋ステータス ===== */}
+      <header className="no-print" style={{ background: "linear-gradient(100deg,#0b3a46 0%,#0e5566 60%,#0e7a90 100%)", color: "#fff",
+        position: "sticky", top: 0, zIndex: 30, height: 56, boxSizing: "border-box",
+        display: "flex", alignItems: "center", gap: 16, padding: "0 20px", boxShadow: "0 2px 12px rgba(11,58,70,.22)" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 16, fontWeight: 800, letterSpacing: ".01em" }}>広告運用コンソール</span>
+          <span style={{ fontSize: 11, color: "#a9d4de" }}>運用型広告 管理画面</span>
         </div>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <NavBtn id="dash" icon={<LayoutDashboard size={16} />} label="ダッシュボード" badge={alertActive.length} />
-          <NavBtn id="report" icon={<span style={{ fontSize: 15 }}>📊</span>} label="簡易分析" />
-          <NavBtn id="conn" icon={<Cable size={16} />} label="接続ステータス" badge={connIssues} />
+        <nav style={{ display: "flex", gap: 4, marginLeft: 6 }}>
+          <HeaderTab id="dash" label="ダッシュボード" badge={alertActive.length} />
+          <HeaderTab id="report" label="簡易分析" />
+          <HeaderTab id="conn" label="接続ステータス" badge={connIssues} />
         </nav>
-        {/* クライアント一覧（左メニューにずらっと。クリックで各社ページへ＝成果/目標/アカウント/契約を中で完結）*/}
-        <div style={{ marginTop: 16, marginBottom: 6, padding: "0 8px", fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", color: "#94a3b8", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 15, fontSize: 12.5, flexShrink: 0 }}>
+          <span style={{ color: "#a9d4de" }}>{dataInfo ? `${dataInfo.period || ""}` : "サンプルデータ"}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#f59e0b" }}><Bell size={15} /><b style={{ fontSize: 14 }}>{pending.length}</b><span style={{ color: "#a9d4de" }}>承認待ち</span></span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, color: connIssues ? "#f4a3a3" : "#a9d4de" }}><Cable size={15} /><b style={{ fontSize: 14 }}>{connIssues}</b><span style={{ color: "#a9d4de" }}>接続要確認</span></span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, color: "#a9d4de" }}><ShieldCheck size={14} /> 承認ゲート ON</span>
+        </div>
+      </header>
+
+      {/* ===== 本体：左＝クライアントのみ ＋ 右＝コンテンツ ===== */}
+      <div style={{ display: "flex", alignItems: "flex-start" }}>
+      <aside className="no-print" style={{ width: 244, flexShrink: 0, position: "sticky", top: 56, height: "calc(100vh - 56px)", boxSizing: "border-box",
+        background: "#fff", color: "#0f172a", borderRight: "1px solid #e3eaed",
+        display: "flex", flexDirection: "column", padding: "14px 12px", boxShadow: "1px 0 3px rgba(16,42,31,.04)", overflowY: "auto" }}>
+        {/* クライアント一覧のみ（全体メニューはヘッダーのタブへ移動）*/}
+        <div style={{ marginTop: 2, marginBottom: 6, padding: "0 8px", fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", color: "#94a3b8", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <span>クライアント</span><span style={{ fontWeight: 600 }}>{clients.length}</span>
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 1, overflowY: "auto" }}>
@@ -470,23 +495,13 @@ export default function AdOpsConsole() {
           })}
         </nav>
         <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid #eef1f0", fontSize: 11, color: "#64748b", display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6, color: "#0891b2", fontWeight: 600 }}><ShieldCheck size={13} /> 承認ゲート ON</span>
           <span>{clients.length}社 / {A.length}連携</span>
-          {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 5, color: "#0e3a46", background: "#f59e0b", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "6px 10px", justifyContent: "center" }}>📄 顧客レポート ↗</a>}
+          {AD_REPORT_URL && <a href={AD_REPORT_URL} target="_blank" rel="noopener noreferrer" style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 5, color: "#0e3a46", background: "#f59e0b", fontWeight: 700, textDecoration: "none", borderRadius: 8, padding: "6px 10px", justifyContent: "center" }}>Report GLASS（顧客レポート）↗</a>}
         </div>
       </aside>
 
-      {/* ===== 右メイン ===== */}
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignSelf: "stretch" }}>
-        {/* トップバー（ステータス）*/}
-        <div className="no-print" style={{ background: "#fff", borderBottom: "1px solid #e3eaed", padding: "12px 24px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", position: "sticky", top: 0, zIndex: 20, boxShadow: "0 1px 3px rgba(16,42,31,.04)" }}>
-          <div style={{ fontSize: 12.5, color: "#64748b" }}>{dataInfo ? `実データ（${dataInfo.period || ""} ・ ${dataInfo.generatedAt || ""}）` : "サンプルデータ"}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 18, fontSize: 12.5 }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: pending.length ? "#b45309" : "#64748b" }}><Bell size={15} color={pending.length ? "#d97706" : "#94a3b8"} /><b style={{ fontSize: 14 }}>{pending.length}</b><span style={{ color: "#64748b" }}>承認待ち</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: 5, color: connIssues ? "#b91c1c" : "#64748b" }}><Cable size={15} color={connIssues ? "#dc2626" : "#94a3b8"} /><b style={{ fontSize: 14 }}>{connIssues}</b><span style={{ color: "#64748b" }}>接続要確認</span></span>
-          </div>
-        </div>
-
+      {/* ===== 右メイン（コンテンツ）===== */}
+      <div style={{ flex: 1, minWidth: 0, alignSelf: "stretch" }}>
         <div style={{ padding: 24 }}>
         {view === "summary" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
@@ -657,9 +672,9 @@ export default function AdOpsConsole() {
                 <button onClick={() => { setView("dash"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#0891b2", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
                   <ArrowLeft size={15} /> ダッシュボードへ
                 </button>
-                <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, border: "1px solid #0891b2", background: "#fff", color: "#0891b2", fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}>
-                  🖨 レポート印刷／PDF
-                </button>
+                <a href={reportGlassUrl(cl.client)} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#0e3a46", fontSize: 12.5, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}>
+                  Report GLASS（顧客レポート）で開く ↗
+                </a>
               </div>
               <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>ソフトコミュニケーションズ 広告運用レポート{dataInfo ? `（${dataInfo.generatedAt || ""}時点）` : ""}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
@@ -908,7 +923,7 @@ export default function AdOpsConsole() {
                   {[...allMonths].reverse().map((m) => <option key={m} value={m}>{m.replace("-", "年") + "月"}</option>)}
                   {allMonths.length === 0 && <option value="">データなし</option>}
                 </select>
-                <button onClick={() => window.print()} style={{ ...btnP, marginLeft: "auto" }}>📄 PDFで書き出し</button>
+                <a href={reportGlassUrl(rc)} target="_blank" rel="noopener noreferrer" style={{ ...btnP, marginLeft: "auto", textDecoration: "none" }}>Report GLASS（顧客レポート）で開く ↗</a>
               </div>
 
               {/* レポート本体（印刷対象） */}
@@ -1140,6 +1155,7 @@ export default function AdOpsConsole() {
             : "サンプルデータのプロトタイプ。実運用では Google Ads / Meta を接続し、毎朝取得・分析・提案生成。書き込みは承認後にのみ実行。"}
         </div>
         </div>
+      </div>
       </div>
     </div>
   );
