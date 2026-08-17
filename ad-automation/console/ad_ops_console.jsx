@@ -63,7 +63,7 @@ const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "
 // 配信ステータス：直近7日にインプレッション（or 消化）があれば配信中、無ければ停止中
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
 // 顧客レポート（ad-report / Netlify）へのリンク。URLを入れるとヘッダーに「顧客レポート↗」が出る。空なら非表示。
-// クライアント提出レポートは ad-report に一本化。コンソールの「社内レポート」タブは社内確認用。
+// クライアント提出レポートは ad-report(Report GLASS) に一本化。コンソールの「簡易分析」タブは社内確認用（混同回避のため"レポート"表記を避ける）。
 const AD_REPORT_URL = "";
 
 // 媒体（Google広告/Meta広告マネージャ）の該当ページURL。alertの種類(kind)から「修正する画面」を選ぶ。
@@ -439,7 +439,7 @@ export default function AdOpsConsole() {
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <NavBtn id="dash" icon={<LayoutDashboard size={16} />} label="ダッシュボード" badge={alertActive.length} />
-          <NavBtn id="report" icon={<span style={{ fontSize: 15 }}>📄</span>} label="社内レポート" />
+          <NavBtn id="report" icon={<span style={{ fontSize: 15 }}>📊</span>} label="簡易分析" />
           <NavBtn id="conn" icon={<Cable size={16} />} label="接続ステータス" badge={connIssues} />
         </nav>
         {/* クライアント一覧（左メニューにずらっと。クリックで各社ページへ＝成果/目標/アカウント/契約を中で完結）*/}
