@@ -54,11 +54,22 @@ COL_ALIASES = {
     "month": {"MONTH", "Month", "月"},
     "name": {"CAMPAIGN_NAME", "CAMPAIGN", "Campaign", "キャンペーン名", "キャンペーン",
              "DEVICE", "デバイス", "KEYWORD", "キーワード",
-             "SEARCH_QUERY", "検索クエリー", "検索クエリ", "SEARCH_TERM"},
+             "SEARCH_QUERY", "検索クエリー", "検索クエリ", "SEARCH_TERM",
+             # 広告グループ別／広告別（クリエイティブ）
+             "AD_GROUP_NAME", "広告グループ名", "広告グループ", "AD_NAME", "広告名", "AD_ID",
+             # 追加ディメンション（年齢/性別/地域/時間帯）。CSVヘッダは英名 or 日本語のどちらか
+             "GENDER", "性別", "AGE", "年齢", "PREFECTURE", "都道府県", "地域",
+             "HOUR", "HOUR_OF_DAY", "時間帯", "時", "DAY_OF_WEEK", "曜日"},
     "cost": {"COST", "Cost", "コスト", "費用"},
     "imp": {"IMPS", "IMPRESSIONS", "Impressions", "インプレッション数", "インプレッション"},
     "clk": {"CLICKS", "Clicks", "クリック数", "クリック"},
     "cv": {"CONVERSIONS", "CONV", "Conversions", "コンバージョン数", "コンバージョン"},
+    # キーワード拡充（品質インデックス／平均掲載順位／平均CPC）と広告文
+    "quality": {"QUALITY_INDEX", "品質インデックス"},
+    "rank": {"AVG_DELIVER_RANK", "平均掲載順位", "掲載順位"},
+    "avgcpc": {"AVG_CPC", "平均CPC"},
+    "title": {"TITLE", "タイトル", "HEADLINE", "見出し", "TITLE1"},
+    "desc": {"DESCRIPTION1", "DESCRIPTION", "説明文1", "説明文"},
 }
 POLL_INTERVAL_SEC = 3
 POLL_MAX_TRIES = 40
@@ -180,11 +191,21 @@ def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: 
     if report_type:  # 検索のみ reportType を指定（ディスプレイは付けない）
         op["reportType"] = report_type
     add_body = {"accountId": int(str(account_id).replace("-", "")), "operand": [op]}
-    add = _rval(_post(f"{base}/ReportDefinitionService/add", account_id, add_body))
-    try:
-        job_id = add["values"][0]["reportDefinition"]["reportJobId"]
-    except Exception:
-        raise RuntimeError(f"reportJobId 取得失敗: {json.dumps(add, ensure_ascii=False)[:300]}")
+    # RL001（レート制限：レポート同時発行の上限）はバックオフして再試行
+    job_id = None
+    for attempt in range(6):
+        add = _rval(_post(f"{base}/ReportDefinitionService/add", account_id, add_body))
+        try:
+            job_id = add["values"][0]["reportDefinition"]["reportJobId"]
+            break
+        except Exception:
+            errs = json.dumps(add, ensure_ascii=False)
+            if "RL001" in errs and attempt < 5:
+                time.sleep(8 * (attempt + 1))
+                continue
+            raise RuntimeError(f"reportJobId 取得失敗: {errs[:300]}")
+    if job_id is None:
+        raise RuntimeError("reportJobId 取得失敗: RL001 リトライ上限")
 
     # ポーリング（COMPLETED まで）。v20の get 応答に downloadUrl は無く、reportJobStatus のみ。
     acct_int = int(str(account_id).replace("-", ""))
@@ -246,6 +267,18 @@ def _parse_csv(text: str) -> list[dict]:
         if "month" in idx and idx["month"] < len(r):
             m = (r[idx["month"]] or "").strip().replace("/", "-")
             rec["month"] = m if "-" in m else (f"{m[:4]}-{m[4:6]}" if len(m) >= 6 else m)
+        # 追加の数値フィールド（品質インデックス／平均掲載順位／平均CPC）
+        for ek in ("quality", "rank", "avgcpc"):
+            if ek in idx and idx[ek] < len(r):
+                v = (r[idx[ek]] or "").replace(",", "").replace("¥", "").strip()
+                try:
+                    rec[ek] = float(v)
+                except ValueError:
+                    pass
+        # 追加のテキストフィールド（広告のタイトル／説明文）
+        for tk in ("title", "desc"):
+            if tk in idx and idx[tk] < len(r):
+                rec[tk] = (r[idx[tk]] or "").strip().strip('"')
         out.append(rec)
     return out
 
@@ -326,6 +359,101 @@ def yahoo_search_queries(account_id: str, start: str, end: str, top: int = 30) -
         e["cost"] += x["cost"]; e["clk"] += x["clk"]
     out = [{"q": n, "clicks": v["clk"], "cost": round(v["cost"])} for n, v in agg.items()]
     return sorted(out, key=lambda r: r["cost"], reverse=True)[:top]
+
+
+def yahoo_search_adgroups(account_id: str, start: str, end: str, top: int = 30) -> list[dict]:
+    """検索広告の広告グループ別（上位・費用順）。検索アカウントのみ。"""
+    rows = _parse_csv(_report_csv(account_id, "search", ["ADGROUP_NAME", "COST", "IMPS", "CLICKS", "CONVERSIONS"], start, end, report_type="ADGROUP"))
+    agg = {}
+    for x in rows:
+        n = x.get("name")
+        if not n:
+            continue
+        e = agg.setdefault(n, {"cost": 0, "imp": 0, "clk": 0, "cv": 0.0})
+        e["cost"] += x["cost"]; e["imp"] += x["imp"]; e["clk"] += x["clk"]; e["cv"] += x["cv"]
+    out = [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])} for n, v in agg.items()]
+    return sorted(out, key=lambda r: r["cost"], reverse=True)[:top]
+
+
+def yahoo_search_ads(account_id: str, start: str, end: str, top: int = 20) -> list[dict]:
+    """検索広告の広告別（クリエイティブ・上位・費用順）。テキスト広告の見出し/説明文つき。検索アカウントのみ。"""
+    rows = _parse_csv(_report_csv(account_id, "search", ["AD_ID", "AD_NAME", "COST", "IMPS", "CLICKS", "CONVERSIONS"], start, end, report_type="AD"))
+    agg = {}
+    for x in rows:
+        n = x.get("name") or x.get("title")
+        if not n:
+            continue
+        e = agg.setdefault(n, {"title": x.get("title", ""), "desc": x.get("desc", ""), "cost": 0, "imp": 0, "clk": 0, "cv": 0.0})
+        e["cost"] += x["cost"]; e["imp"] += x["imp"]; e["clk"] += x["clk"]; e["cv"] += x["cv"]
+        if not e["title"] and x.get("title"): e["title"] = x["title"]
+        if not e["desc"] and x.get("desc"): e["desc"] = x["desc"]
+    out = [{"name": n, "title": v["title"], "desc": v["desc"], "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])} for n, v in agg.items()]
+    return sorted(out, key=lambda r: r["cost"], reverse=True)[:top]
+
+
+def yahoo_search_keyword_stats(account_id: str, start: str, end: str) -> dict:
+    """キーワード別の品質インデックス／平均掲載順位／平均CPC（keyword名→{quality,rank,avgcpc}）。検索のみ。
+    別レポートにして、失敗しても基本のキーワード表は壊さない。"""
+    rows = _parse_csv(_report_csv(account_id, "search", ["KEYWORD", "QUALITY_INDEX", "AVG_DELIVER_RANK", "AVG_CPC", "CLICKS"], start, end, report_type="KEYWORDS"))
+    m = {}
+    for x in rows:
+        n = x.get("name")
+        if not n:
+            continue
+        rec = {}
+        if "quality" in x: rec["quality"] = x["quality"]
+        if "rank" in x: rec["rank"] = x["rank"]
+        if "avgcpc" in x: rec["avgcpc"] = x["avgcpc"]
+        if rec:
+            m[n] = rec
+    return m
+
+
+# ---- 追加ディメンション（年齢/性別/地域/時間帯）。
+#      ★実APIで確認(2026-08-16): GENDER/AGE/HOUR/PREFECTURE は Yahooディスプレイ広告(YDA)のみ有効。
+#        検索(YSS)は非対応(V0001)。よって display アカウントのみ取得する（search は空を返す）。
+def _yahoo_dim(account_id: str, kind: str, field: str, start: str, end: str) -> list[dict]:
+    if kind != "display":
+        return []  # 検索(YSS)はこれらのディメンション非対応
+    rows = _parse_csv(_report_csv(account_id, kind, [field, "COST", "IMPS", "CLICKS", "CONVERSIONS"], start, end, report_type=None))
+    agg = {}
+    for x in rows:
+        n = x.get("name")
+        if n is None or n == "":
+            continue
+        e = agg.setdefault(n, {"cost": 0, "imp": 0, "clk": 0, "cv": 0.0})
+        e["cost"] += x["cost"]; e["imp"] += x["imp"]; e["clk"] += x["clk"]; e["cv"] += x["cv"]
+    return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
+            for n, v in agg.items()]
+
+
+def yahoo_gender(account_id: str, kind: str, start: str, end: str) -> list[dict]:
+    """性別別 費用。"""
+    return _yahoo_dim(account_id, kind, "GENDER", start, end)
+
+
+def yahoo_age(account_id: str, kind: str, start: str, end: str) -> list[dict]:
+    """年齢層別 費用。"""
+    return _yahoo_dim(account_id, kind, "AGE", start, end)
+
+
+def yahoo_prefecture(account_id: str, kind: str, start: str, end: str) -> list[dict]:
+    """都道府県別 費用（地域）。"""
+    return _yahoo_dim(account_id, kind, "PREFECTURE", start, end)
+
+
+def yahoo_hourly(account_id: str, kind: str, start: str, end: str) -> list[dict]:
+    """時間帯別（0〜23時）費用・クリック。"""
+    rows = _yahoo_dim(account_id, kind, "HOUR", start, end)
+    # name（時間帯）を数値hに正規化
+    out = []
+    for r in rows:
+        try:
+            h = int(str(r["name"]).strip().replace("時", ""))
+        except ValueError:
+            continue
+        out.append({"h": h, "cost": r["cost"], "imp": r["impressions"], "clicks": r["clicks"], "cv": r["conversions"]})
+    return sorted(out, key=lambda x: x["h"])
 
 
 def yahoo_summary(account_id: str, kind: str, start: str, end: str) -> dict:
