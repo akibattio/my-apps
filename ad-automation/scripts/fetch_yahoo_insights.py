@@ -51,7 +51,7 @@ REPORT_FIELDS_CAMPAIGN = ["CAMPAIGN_NAME", "COST", "IMPS", "CLICKS", "CONVERSION
 # CSVヘッダ→内部キーの対応（NAME/FIELD_NAME どちらのヘッダでも拾えるよう別名を許容）
 COL_ALIASES = {
     "date": {"DAY", "Day", "日", "日付"},
-    "month": {"MONTH", "Month", "月"},
+    "month": {"MONTH", "Month", "月", "毎月"},
     "name": {"CAMPAIGN_NAME", "CAMPAIGN", "Campaign", "キャンペーン名", "キャンペーン",
              "DEVICE", "デバイス", "KEYWORD", "キーワード",
              "SEARCH_QUERY", "検索クエリー", "検索クエリ", "SEARCH_TERM",
@@ -68,7 +68,7 @@ COL_ALIASES = {
     "quality": {"QUALITY_INDEX", "品質インデックス"},
     "rank": {"AVG_DELIVER_RANK", "平均掲載順位", "掲載順位"},
     "avgcpc": {"AVG_CPC", "平均CPC"},
-    "title": {"TITLE", "タイトル", "HEADLINE", "見出し", "TITLE1"},
+    "title": {"TITLE", "TITLE1", "タイトル", "タイトル1", "HEADLINE", "見出し"},
     "desc": {"DESCRIPTION1", "DESCRIPTION", "説明文1", "説明文"},
 }
 POLL_INTERVAL_SEC = 3
@@ -224,7 +224,13 @@ def _report_csv(account_id: str, kind: str, fields: list[str], start: str, end: 
     if not completed:
         raise RuntimeError(f"レポート未完了（タイムアウト） job={job_id}")
     # v20: 専用 download エンドポイントに reportJobId(単数) をPOST → CSVバイトを直接取得
-    return _download_report(base, account_id, job_id)
+    csv_text = _download_report(base, account_id, job_id)
+    # レポート定義を削除（溜め過ぎによる RL001 を防ぐ）。失敗しても無視
+    try:
+        _post(f"{base}/ReportDefinitionService/remove", account_id, {"accountId": acct_int, "operand": [{"reportJobId": job_id}]})
+    except Exception:
+        pass
+    return csv_text
 
 
 def _parse_csv(text: str) -> list[dict]:
@@ -377,7 +383,7 @@ def yahoo_search_adgroups(account_id: str, start: str, end: str, top: int = 30) 
 
 def yahoo_search_ads(account_id: str, start: str, end: str, top: int = 20) -> list[dict]:
     """検索広告の広告別（クリエイティブ・上位・費用順）。テキスト広告の見出し/説明文つき。検索アカウントのみ。"""
-    rows = _parse_csv(_report_csv(account_id, "search", ["AD_ID", "AD_NAME", "COST", "IMPS", "CLICKS", "CONVERSIONS"], start, end, report_type="AD"))
+    rows = _parse_csv(_report_csv(account_id, "search", ["AD_ID", "AD_NAME", "TITLE1", "COST", "IMPS", "CLICKS", "CONVERSIONS"], start, end, report_type="AD"))
     agg = {}
     for x in rows:
         n = x.get("name") or x.get("title")
@@ -394,7 +400,7 @@ def yahoo_search_ads(account_id: str, start: str, end: str, top: int = 20) -> li
 def yahoo_search_keyword_stats(account_id: str, start: str, end: str) -> dict:
     """キーワード別の品質インデックス／平均掲載順位／平均CPC（keyword名→{quality,rank,avgcpc}）。検索のみ。
     別レポートにして、失敗しても基本のキーワード表は壊さない。"""
-    rows = _parse_csv(_report_csv(account_id, "search", ["KEYWORD", "QUALITY_INDEX", "AVG_DELIVER_RANK", "AVG_CPC", "CLICKS"], start, end, report_type="KEYWORDS"))
+    rows = _parse_csv(_report_csv(account_id, "search", ["KEYWORD", "QUALITY_INDEX", "AVG_CPC", "CLICKS"], start, end, report_type="KEYWORDS"))
     m = {}
     for x in rows:
         n = x.get("name")
