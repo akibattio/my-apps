@@ -18,13 +18,54 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+// スマホの写真は数MBと大きいので、送信前にブラウザ側で縮小＆JPEG化する。
+// これでアップロードが軽くなり（HEICもJPEGに変換され）、登録の失敗を防ぐ。
+async function resizeImage(file: File, maxDim = 1600, quality = 0.82): Promise<File> {
+  try {
+    const dataUrl = await new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(file);
+    });
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error("image load failed"));
+      im.src = dataUrl;
+    });
+    let { width, height } = img;
+    if (Math.max(width, height) > maxDim) {
+      const s = maxDim / Math.max(width, height);
+      width = Math.round(width * s);
+      height = Math.round(height * s);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((res) =>
+      canvas.toBlob(res, "image/jpeg", quality)
+    );
+    if (!blob) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+    return new File([blob], name, { type: "image/jpeg" });
+  } catch {
+    return file; // 変換できなければ元のファイルで続行
+  }
+}
+
 export default function RegisterForm() {
   const [state, formAction, isPending] = useActionState<RegisterState, FormData>(
     registerVehicle,
     {}
   );
+  const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [tooMany, setTooMany] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // 手入力フィールド（AIが下書き→人が確認・修正できるよう controlled にする）
@@ -37,10 +78,11 @@ export default function RegisterForm() {
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length > MAX_PHOTOS) {
+  async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    if (selected.length > MAX_PHOTOS) {
       setTooMany(true);
+      setFiles([]);
       setPreviews([]);
       if (inputRef.current) inputRef.current.value = "";
       return;
@@ -48,12 +90,17 @@ export default function RegisterForm() {
     setTooMany(false);
     setAiNote(null);
     setAiError(null);
+    setPreparing(true);
     previews.forEach((url) => URL.revokeObjectURL(url));
-    setPreviews(files.map((f) => URL.createObjectURL(f)));
+
+    const resized = await Promise.all(selected.map((f) => resizeImage(f)));
+    setFiles(resized);
+    setPreviews(resized.map((f) => URL.createObjectURL(f)));
+    setPreparing(false);
   }
 
   async function onAiDraft() {
-    const file = inputRef.current?.files?.[0];
+    const file = files[0];
     if (!file) return;
     setAiBusy(true);
     setAiError(null);
@@ -77,8 +124,21 @@ export default function RegisterForm() {
     }
   }
 
+  // 送信: 縮小済みファイル＋手入力を FormData に詰めてサーバーアクションへ。
+  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData();
+    fd.set("manufacturer", manufacturer);
+    fd.set("model", model);
+    fd.set("year", year);
+    for (const f of files) fd.append("photos", f);
+    formAction(fd);
+  }
+
+  const busy = isPending || preparing;
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={onSubmit} className="space-y-6">
       {/* 写真アップロード（最大10枚）*/}
       <div>
         <label
@@ -91,7 +151,6 @@ export default function RegisterForm() {
         <input
           ref={inputRef}
           id="photos"
-          name="photos"
           type="file"
           accept="image/*"
           multiple
@@ -102,6 +161,9 @@ export default function RegisterForm() {
           <p className="mt-2 text-sm text-red-400">
             写真は最大{MAX_PHOTOS}枚までです。選び直してください。
           </p>
+        )}
+        {preparing && (
+          <p className="mt-2 text-sm text-muted">写真を準備中…</p>
         )}
         {previews.length > 0 && (
           <div className="mt-3 grid grid-cols-5 gap-2">
@@ -123,7 +185,7 @@ export default function RegisterForm() {
             <button
               type="button"
               onClick={onAiDraft}
-              disabled={aiBusy}
+              disabled={aiBusy || preparing}
               className="w-full rounded-lg border border-accent px-4 py-3 text-sm font-medium text-accent disabled:opacity-60"
             >
               {aiBusy ? "AIが写真を確認中…" : "✨ AIで下書きする（1枚目の写真から）"}
@@ -137,7 +199,6 @@ export default function RegisterForm() {
       {/* 最小限の手入力（AIが下書き→人が確認）*/}
       <div className="space-y-3">
         <input
-          name="manufacturer"
           type="text"
           value={manufacturer}
           onChange={(e) => setManufacturer(e.target.value)}
@@ -145,7 +206,6 @@ export default function RegisterForm() {
           className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
         />
         <input
-          name="model"
           type="text"
           value={model}
           onChange={(e) => setModel(e.target.value)}
@@ -153,7 +213,6 @@ export default function RegisterForm() {
           className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
         />
         <input
-          name="year"
           type="number"
           inputMode="numeric"
           value={year}
@@ -167,10 +226,10 @@ export default function RegisterForm() {
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={busy}
         className="w-full rounded-full bg-primary px-6 py-4 font-medium text-black disabled:opacity-60"
       >
-        {isPending ? "登録中…" : "この車を登録する"}
+        {isPending ? "登録中…" : preparing ? "写真を準備中…" : "この車を登録する"}
       </button>
 
       <p className="text-center text-xs text-muted">

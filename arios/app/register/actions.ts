@@ -33,76 +33,92 @@ export async function registerVehicle(
   const yearNum = yearRaw ? Number(yearRaw) : null;
   const year = yearNum && Number.isFinite(yearNum) ? Math.trunc(yearNum) : null;
 
-  const supabase = createAdminClient();
+  let vehicleId: string;
 
-  // ログイン中なら所有者として紐付ける（未ログインなら owner なしで登録）
-  const owner = await ensureOwner();
+  try {
+    const supabase = createAdminClient();
 
-  // 1. Vehicle（永久・削除不可）
-  const { data: vehicle, error: vErr } = await supabase
-    .from("vehicles")
-    .insert({
-      manufacturer: manufacturer || null,
-      model: model || null,
-      year,
-      status: "REGISTERED",
-      current_owner_id: owner?.ownerId ?? null,
-    })
-    .select("id")
-    .single();
+    // ログイン中なら所有者として紐付ける（未ログインなら owner なしで登録）
+    const owner = await ensureOwner();
 
-  if (vErr || !vehicle) {
-    return { error: "車両の作成に失敗しました。時間をおいて試してください。" };
+    // 1. Vehicle（永久・削除不可）
+    const { data: vehicle, error: vErr } = await supabase
+      .from("vehicles")
+      .insert({
+        manufacturer: manufacturer || null,
+        model: model || null,
+        year,
+        status: "REGISTERED",
+        current_owner_id: owner?.ownerId ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (vErr || !vehicle) {
+      console.error("[register] vehicle insert failed:", vErr);
+      return { error: "車両の作成に失敗しました。時間をおいて試してください。" };
+    }
+    vehicleId = vehicle.id as string;
+
+    // 2. Ownership（所有履歴。ログイン時のみ）
+    const today0 = new Date().toISOString().slice(0, 10);
+    if (owner) {
+      const { error: oErr } = await supabase.from("ownerships").insert({
+        vehicle_id: vehicleId,
+        owner_id: owner.ownerId,
+        is_current: true,
+        start_date: today0,
+        source: "REGISTRATION",
+      });
+      if (oErr) console.error("[register] ownership insert failed:", oErr);
+    }
+
+    // 3. 最初の History（この車の Timeline の起点）
+    const { data: history, error: hErr } = await supabase
+      .from("histories")
+      .insert({
+        vehicle_id: vehicleId,
+        owner_id: owner?.ownerId ?? null,
+        history_type: "OTHER",
+        title: "ARIOSに登録",
+        description: "この車の記録がARIOSで始まりました。",
+        event_date: today0,
+        source: "PUBLIC_REGISTRATION",
+        visibility: "PUBLIC",
+      })
+      .select("id")
+      .single();
+    if (hErr) console.error("[register] history insert failed:", hErr);
+
+    // 4. 写真を Storage にアップロードして images に記録（1枚失敗しても他は続行）
+    for (let i = 0; i < photos.length; i++) {
+      const file = photos[i];
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `vehicles/${vehicleId}/${String(i).padStart(2, "0")}-${Date.now()}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, file, { contentType: file.type || undefined, upsert: false });
+      if (upErr) {
+        console.error("[register] image upload failed:", upErr);
+        continue;
+      }
+
+      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      await supabase.from("images").insert({
+        vehicle_id: vehicleId,
+        history_id: history?.id ?? null,
+        image_url: pub.publicUrl,
+        image_type: i === 0 ? "EXTERIOR" : null,
+      });
+    }
+  } catch (e) {
+    console.error("[register] unexpected error:", e);
+    return {
+      error: "登録に失敗しました。通信環境を確認して、もう一度お試しください。",
+    };
   }
-  const vehicleId = vehicle.id as string;
 
-  // 2. Ownership（所有履歴。ログイン時のみ）
-  const today0 = new Date().toISOString().slice(0, 10);
-  if (owner) {
-    await supabase.from("ownerships").insert({
-      vehicle_id: vehicleId,
-      owner_id: owner.ownerId,
-      is_current: true,
-      start_date: today0,
-      source: "REGISTRATION",
-    });
-  }
-
-  // 3. 最初の History（この車の Timeline の起点）
-  const { data: history } = await supabase
-    .from("histories")
-    .insert({
-      vehicle_id: vehicleId,
-      owner_id: owner?.ownerId ?? null,
-      history_type: "OTHER",
-      title: "ARIOSに登録",
-      description: "この車の記録がARIOSで始まりました。",
-      event_date: today0,
-      source: "PUBLIC_REGISTRATION",
-      visibility: "PUBLIC",
-    })
-    .select("id")
-    .single();
-
-  // 4. 写真を Storage にアップロードして images に記録（1枚失敗しても他は続行）
-  for (let i = 0; i < photos.length; i++) {
-    const file = photos[i];
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `vehicles/${vehicleId}/${String(i).padStart(2, "0")}-${Date.now()}.${ext}`;
-
-    const { error: upErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, file, { contentType: file.type || undefined, upsert: false });
-    if (upErr) continue;
-
-    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    await supabase.from("images").insert({
-      vehicle_id: vehicleId,
-      history_id: history?.id ?? null,
-      image_url: pub.publicUrl,
-      image_type: i === 0 ? "EXTERIOR" : null,
-    });
-  }
-
+  // 成功時のみ完了ページへ（redirect は例外を投げるので try の外で呼ぶ）
   redirect(`/thank-you?v=${vehicleId}`);
 }
