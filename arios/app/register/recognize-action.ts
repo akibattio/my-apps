@@ -1,7 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { recognizeVehicle, type Recognition } from "@/lib/ai/recognize";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rateLimit } from "@/lib/ratelimit";
 
 export type RecognizeResult =
   | ({ ok: true } & Recognition)
@@ -16,6 +18,19 @@ export async function recognizePhoto(
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "AIキーが未設定です（.env の ANTHROPIC_API_KEY）。" };
   }
+
+  // AI費用の乱打対策: IP単位でレート制限（1分に10回 / 1日に40回）。
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  const perMin = rateLimit(`ai:min:${ip}`, 10, 60_000);
+  const perDay = rateLimit(`ai:day:${ip}`, 40, 24 * 60 * 60_000);
+  if (!perMin.ok || !perDay.ok) {
+    return {
+      ok: false,
+      error: "AI下書きの利用が集中しています。少し時間をおいてお試しください。",
+    };
+  }
+
   try {
     const { parsed, modelName } = await recognizeVehicle(base64, mediaType);
 

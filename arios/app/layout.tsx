@@ -8,6 +8,8 @@ export const metadata: Metadata = {
     "写真を撮るだけで、その車の消えない履歴書ができる。一台の車の人生を一本の時間軸で記録する Vehicle Timeline。History is never deleted.",
   manifest: "/manifest.webmanifest",
   applicationName: "ARIOS GARAGE",
+  // 開発中の限定公開のため、検索エンジン・クローラには載せない
+  robots: { index: false, follow: false },
   appleWebApp: {
     capable: true,
     title: "ARIOS GARAGE",
