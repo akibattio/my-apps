@@ -10,7 +10,10 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
   const type = (searchParams.get("type") ?? "email") as EmailOtpType;
-  const next = searchParams.get("next") ?? "/garage";
+  // オープンリダイレクト対策: 自サイト内の単一スラッシュ始まりパスのみ許可
+  const rawNext = searchParams.get("next") ?? "/garage";
+  const next =
+    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/garage";
 
   const supabase = await createClient();
 

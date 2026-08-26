@@ -80,9 +80,12 @@ export async function addDocument(
     const { error: upErr } = await admin.storage
       .from(BUCKET)
       .upload(path, file, { contentType: file.type || undefined });
-    if (upErr) continue;
+    if (upErr) {
+      console.error("[add-document] upload failed:", upErr);
+      continue;
+    }
 
-    await admin.from("documents").insert({
+    const { error: insErr } = await admin.from("documents").insert({
       vehicle_id: vehicleId,
       owner_id: owner.ownerId,
       history_id: history?.id ?? null,
@@ -90,6 +93,12 @@ export async function addDocument(
       file_url: path, // 非公開: パスのみ保存（公開URLにしない）
       verified_status: "SELF_REPORTED",
     });
+    if (insErr) {
+      // DB登録に失敗したらアップ済みの孤立ファイルを消す（非公開バケット）
+      console.error("[add-document] document insert failed:", insErr);
+      await admin.storage.from(BUCKET).remove([path]);
+      continue;
+    }
     uploaded++;
   }
 

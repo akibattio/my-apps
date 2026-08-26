@@ -57,7 +57,7 @@ export async function addHistory(
     return { error: "この車を編集する権限がありません。" };
   }
 
-  const { data: history } = await admin
+  const { data: history, error: hErr } = await admin
     .from("histories")
     .insert({
       vehicle_id: vehicleId,
@@ -71,6 +71,11 @@ export async function addHistory(
     })
     .select("id")
     .single();
+
+  if (hErr || !history) {
+    console.error("[add-history] history insert failed:", hErr);
+    return { error: "記録の作成に失敗しました。時間をおいて試してください。" };
+  }
 
   for (let i = 0; i < photos.length; i++) {
     const file = photos[i];
