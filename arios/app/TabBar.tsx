@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 // アプリらしい下タブバー。ログイン後の主要画面で表示する。
 // 公開共有ページ(パスポート)やログイン・完了画面など「アプリの外」では隠す。
@@ -86,15 +86,21 @@ const TABS: Tab[] = [
 
 export default function TabBar() {
   const pathname = usePathname() || "/";
+  const [mounted, setMounted] = useState(false);
   const hidden = HIDE_PREFIXES.some((p) => pathname.startsWith(p));
+
+  // クライアントでマウント後にのみ描画し、SSRとのハイドレーション不整合を避ける。
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // タブバー表示中は本文の下部に余白を作り、固定バーで隠れないようにする。
   useEffect(() => {
-    document.body.classList.toggle("with-tabbar", !hidden);
+    document.body.classList.toggle("with-tabbar", mounted && !hidden);
     return () => document.body.classList.remove("with-tabbar");
-  }, [hidden]);
+  }, [mounted, hidden]);
 
-  if (hidden) return null;
+  if (!mounted || hidden) return null;
 
   return (
     <nav className="tabbar" aria-label="メインメニュー">
