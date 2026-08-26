@@ -25,11 +25,9 @@ export default function Error({
       >
         再読み込み
       </button>
-      {/* 一時的な診断表示（原因特定後に削除） */}
-      <p className="mt-2 max-w-xs break-words text-[11px] text-neutral-500">
-        [診断] {error?.message || "(no message)"}
-        {error?.digest ? ` / id:${error.digest}` : ""}
-      </p>
+      {error?.digest && (
+        <p className="text-[10px] text-neutral-600">エラーID: {error.digest}</p>
+      )}
     </main>
   );
 }

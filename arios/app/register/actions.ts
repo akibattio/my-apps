@@ -56,12 +56,7 @@ export async function registerVehicle(
 
     if (vErr || !vehicle) {
       console.error("[register] vehicle insert failed:", vErr);
-      // 一時的な診断: 実際のDBエラーを画面に表示する（原因特定後に戻す）
-      return {
-        error: `車両の作成に失敗しました。[診断 ${vErr?.code ?? "?"}] ${
-          vErr?.message ?? "不明"
-        }`,
-      };
+      return { error: "車両の作成に失敗しました。時間をおいて試してください。" };
     }
     vehicleId = vehicle.id as string;
 

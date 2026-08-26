@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useRef, useState, startTransition } from "react";
 import { registerVehicle, type RegisterState } from "./actions";
 import { recognizePhoto } from "./recognize-action";
 
@@ -132,7 +132,10 @@ export default function RegisterForm() {
     fd.set("model", model);
     fd.set("year", year);
     for (const f of files) fd.append("photos", f);
-    formAction(fd);
+    // useActionState の dispatch は transition 内で呼ぶ（React の作法）。
+    startTransition(() => {
+      formAction(fd);
+    });
   }
 
   const busy = isPending || preparing;

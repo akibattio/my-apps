@@ -50,19 +50,11 @@ export default function GlobalError({
         >
           再読み込み
         </button>
-        {/* 一時的な診断表示（原因特定後に削除） */}
-        <p
-          style={{
-            maxWidth: "300px",
-            fontSize: "11px",
-            color: "#6b6b70",
-            wordBreak: "break-word",
-            margin: 0,
-          }}
-        >
-          [診断] {error?.message || "(no message)"}
-          {error?.digest ? ` / id:${error.digest}` : ""}
-        </p>
+        {error?.digest && (
+          <p style={{ fontSize: "10px", color: "#6b6b70", margin: 0 }}>
+            エラーID: {error.digest}
+          </p>
+        )}
       </body>
     </html>
   );
