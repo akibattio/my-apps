@@ -8,6 +8,7 @@ function gateAllowed(pathname: string) {
   return (
     pathname.startsWith("/gate") ||
     pathname.startsWith("/api/gate") ||
+    pathname === "/status" || // 依頼者に共有する公開進捗ページ
     pathname === "/manifest.webmanifest"
   );
 }
