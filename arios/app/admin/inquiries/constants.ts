@@ -1,0 +1,18 @@
+// 依頼のステータス定義（サーバーアクション/ページ双方から参照する共有定数）。
+export const STATUS_LABEL: Record<string, string> = {
+  NEW: "新着",
+  IN_PROGRESS: "対応中",
+  DONE: "完了",
+  ARCHIVED: "保管",
+};
+
+export const STATUS_FLOW = ["NEW", "IN_PROGRESS", "DONE", "ARCHIVED"] as const;
+
+export const SOURCE_LABEL: Record<string, string> = {
+  MANUAL: "その他/来店",
+  LINE: "LINE",
+  PHONE: "電話",
+  EMAIL: "メール",
+  WEB_FORM: "Webフォーム",
+  WHATSAPP: "WhatsApp",
+};

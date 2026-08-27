@@ -22,6 +22,9 @@ export default async function AdminLayout({
           <Link href="/admin" className="hover:text-foreground">
             サマリー
           </Link>
+          <Link href="/admin/inquiries" className="hover:text-foreground">
+            依頼
+          </Link>
           <Link href="/admin/vehicles" className="hover:text-foreground">
             車両
           </Link>

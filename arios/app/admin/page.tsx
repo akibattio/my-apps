@@ -11,9 +11,25 @@ async function count(
   return count ?? 0;
 }
 
+// inquiries テーブルが未作成でも落ちないよう安全に未対応件数を取る。
+async function openInquiryCount(
+  admin: ReturnType<typeof createAdminClient>
+): Promise<number | null> {
+  try {
+    const { count, error } = await admin
+      .from("inquiries")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["NEW", "IN_PROGRESS"]);
+    if (error) return null;
+    return count ?? 0;
+  } catch {
+    return null;
+  }
+}
+
 export default async function AdminDashboard() {
   const admin = createAdminClient();
-  const [vehicles, owners, histories, documents, images, analyses] =
+  const [vehicles, owners, histories, documents, images, analyses, openInquiries] =
     await Promise.all([
       count(admin, "vehicles"),
       count(admin, "owners"),
@@ -21,6 +37,7 @@ export default async function AdminDashboard() {
       count(admin, "documents"),
       count(admin, "images"),
       count(admin, "ai_analyses"),
+      openInquiryCount(admin),
     ]);
 
   const stats = [
@@ -34,6 +51,21 @@ export default async function AdminDashboard() {
 
   return (
     <div>
+      <Link
+        href="/admin/inquiries"
+        className="mb-6 flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/10 p-5 hover:border-accent"
+      >
+        <div>
+          <p className="text-sm text-accent">📮 依頼インボックス</p>
+          <p className="mt-1 text-sm text-muted">
+            {openInquiries === null
+              ? "テーブル未作成です（0004のSQLを実行してください）"
+              : `未対応 ${openInquiries} 件 — 電話・LINE・来店の相談を記録`}
+          </p>
+        </div>
+        <span className="text-accent">›</span>
+      </Link>
+
       <h1 className="mb-6 text-xl font-semibold">サマリー</h1>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {stats.map((s) => {
