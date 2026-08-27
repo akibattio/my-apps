@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { updateInquiryStatus } from "../actions";
+import { updateInquiryStatus, linkInquiryToVehicle } from "../actions";
 import { STATUS_LABEL, SOURCE_LABEL } from "../constants";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +21,29 @@ export default async function InquiryDetailPage({
   const { data: inq } = await supabase
     .from("inquiries")
     .select(
-      "id, name, contact, contact_method, vehicle_text, message, photo_urls, status, source, created_at, updated_at"
+      "id, name, contact, contact_method, vehicle_text, message, photo_urls, status, source, vehicle_id, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
 
   if (!inq) notFound();
+
+  // 紐付け済み車両の名前を取得
+  let linkedVehicle: { id: string; name: string } | null = null;
+  if (inq.vehicle_id) {
+    const { data: v } = await supabase
+      .from("vehicles")
+      .select("id, manufacturer, model")
+      .eq("id", inq.vehicle_id)
+      .maybeSingle();
+    if (v) {
+      linkedVehicle = {
+        id: v.id,
+        name:
+          [v.manufacturer, v.model].filter(Boolean).join(" ") || "名称未設定の車両",
+      };
+    }
+  }
 
   // 非公開バケットの写真は署名付きURLで一時表示
   let signed: string[] = [];
@@ -117,6 +134,32 @@ export default async function InquiryDetailPage({
             </form>
           ))}
         </div>
+      </section>
+
+      <section className="mb-6 rounded-2xl border border-border bg-card p-5">
+        <p className="mb-3 text-sm text-muted">車両との連携</p>
+        {linkedVehicle ? (
+          <Link
+            href={`/garage/${linkedVehicle.id}`}
+            className="flex items-center justify-between rounded-xl border border-border p-3"
+          >
+            <span className="text-sm">🚗 {linkedVehicle.name} の記録を見る</span>
+            <span className="text-muted">›</span>
+          </Link>
+        ) : (
+          <form action={linkInquiryToVehicle}>
+            <input type="hidden" name="id" value={inq.id} />
+            <button
+              type="submit"
+              className="w-full rounded-full bg-primary px-6 py-3 font-semibold text-black"
+            >
+              この依頼を車両として登録する
+            </button>
+            <p className="mt-2 text-xs text-muted">
+              依頼の写真・内容を引き継いで車両の記録を作成します（あとから編集・整備履歴の追加ができます）。
+            </p>
+          </form>
+        )}
       </section>
 
       <p className="text-center text-xs text-muted">
