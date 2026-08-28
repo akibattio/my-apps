@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
     // 写真アップロード（Server Action）の本文サイズ上限を引き上げる。
     // クライアント側で縮小もするが、余裕を持たせる。
     serverActions: {
-      bodySizeLimit: "8mb",
+      bodySizeLimit: "16mb",
     },
   },
 };

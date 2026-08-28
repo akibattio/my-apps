@@ -6,7 +6,8 @@ import { getCurrentAdmin, ensureOwner } from "@/lib/auth";
 import { STATUS_LABEL } from "./constants";
 
 const BUCKET = "inquiry-photos"; // 非公開バケット
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = 30;
+const PARTY_TYPES = ["OWNER", "BROKER", "DEALER"];
 
 export type InquiryState = { error?: string };
 
@@ -18,6 +19,9 @@ export async function createInquiry(
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/");
 
+  const vin = String(formData.get("vin") ?? "").trim();
+  const partyRaw = String(formData.get("partyType") ?? "").trim().toUpperCase();
+  const partyType = PARTY_TYPES.includes(partyRaw) ? partyRaw : "OWNER";
   const name = String(formData.get("name") ?? "").trim();
   const contact = String(formData.get("contact") ?? "").trim();
   const contactMethod = String(formData.get("contactMethod") ?? "").trim();
@@ -29,8 +33,9 @@ export async function createInquiry(
     .getAll("photos")
     .filter((f): f is File => f instanceof File && f.size > 0);
 
-  if (!name && !contact && !message && photos.length === 0) {
-    return { error: "顧客名・連絡先・内容・写真のいずれかは入力してください。" };
+  // 必須: 車体番号
+  if (!vin) {
+    return { error: "車体番号（必須）を入力してください。" };
   }
   if (photos.length > MAX_PHOTOS) {
     return { error: `写真は最大${MAX_PHOTOS}枚までです。` };
@@ -43,6 +48,8 @@ export async function createInquiry(
     const { data, error } = await supabase
       .from("inquiries")
       .insert({
+        vin,
+        party_type: partyType,
         name: name || null,
         contact: contact || null,
         contact_method: contactMethod || null,
@@ -117,7 +124,7 @@ export async function linkInquiryToVehicle(formData: FormData): Promise<void> {
   const supabase = createAdminClient();
   const { data: inq } = await supabase
     .from("inquiries")
-    .select("id, message, vehicle_text, photo_urls, vehicle_id")
+    .select("id, message, vehicle_text, photo_urls, vehicle_id, vin")
     .eq("id", inquiryId)
     .maybeSingle();
   if (!inq) redirect("/admin/inquiries");
@@ -133,6 +140,7 @@ export async function linkInquiryToVehicle(formData: FormData): Promise<void> {
     .insert({
       manufacturer: null,
       model: inq.vehicle_text || null, // 暫定: 車について をモデル欄に。後で編集可
+      vin: inq.vin || null, // 車体番号を引き継ぐ
       status: "REGISTERED",
       current_owner_id: owner.ownerId,
     })

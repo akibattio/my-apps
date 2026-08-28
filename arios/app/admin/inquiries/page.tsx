@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { STATUS_LABEL } from "./constants";
+import { STATUS_LABEL, PARTY_LABEL } from "./constants";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function InquiriesPage() {
   const supabase = createAdminClient();
   const { data: inquiries } = await supabase
     .from("inquiries")
-    .select("id, name, contact, vehicle_text, message, status, created_at")
+    .select("id, vin, party_type, name, contact, vehicle_text, message, status, created_at")
     .order("created_at", { ascending: false });
 
   const list = inquiries ?? [];
@@ -45,8 +45,10 @@ export default async function InquiriesPage() {
       ) : (
         <ul className="space-y-3">
           {list.map((i) => {
+            const party = i.party_type ? PARTY_LABEL[i.party_type] ?? i.party_type : null;
             const snippet =
-              [i.vehicle_text, i.message].filter(Boolean).join(" / ") || "（内容未記入）";
+              [party, i.vehicle_text, i.message].filter(Boolean).join(" / ") ||
+              "（内容未記入）";
             return (
               <li key={i.id}>
                 <Link
@@ -62,7 +64,7 @@ export default async function InquiriesPage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium">
-                      {i.name || "名称未設定"}
+                      {i.name || (i.vin ? `車体番号 ${i.vin}` : "名称未設定")}
                       {i.contact ? (
                         <span className="ml-2 text-xs font-normal text-muted">{i.contact}</span>
                       ) : null}
