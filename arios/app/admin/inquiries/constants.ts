@@ -8,6 +8,11 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export const STATUS_FLOW = ["NEW", "IN_PROGRESS", "DONE", "ARCHIVED"] as const;
 
+export const KIND_LABEL: Record<string, string> = {
+  SELL: "売りたい",
+  BUY: "買いたい",
+};
+
 export const PARTY_LABEL: Record<string, string> = {
   OWNER: "オーナー",
   BROKER: "ブローカー",

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { updateInquiryStatus, linkInquiryToVehicle } from "../actions";
-import { STATUS_LABEL, PARTY_LABEL } from "../constants";
+import { STATUS_LABEL, PARTY_LABEL, KIND_LABEL } from "../constants";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "依頼の詳細 — ARIOS GARAGE" };
@@ -21,7 +21,7 @@ export default async function InquiryDetailPage({
   const { data: inq } = await supabase
     .from("inquiries")
     .select(
-      "id, vin, party_type, name, contact, contact_method, vehicle_text, message, photo_urls, status, source, vehicle_id, created_at, updated_at"
+      "id, kind, manufacturer, model, price, vin, party_type, name, contact, contact_method, vehicle_text, message, photo_urls, status, source, vehicle_id, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -61,11 +61,17 @@ export default async function InquiryDetailPage({
         : "連絡先";
 
   const rows: [string, string | null][] = [
-    ["車体番号", inq.vin],
+    ["種別", inq.kind ? KIND_LABEL[inq.kind] ?? inq.kind : null],
+    ["メーカー", inq.manufacturer],
+    ["車種", inq.model],
+    [
+      inq.kind === "BUY" ? "希望価格" : "販売価格",
+      inq.price != null ? "¥" + Number(inq.price).toLocaleString("ja-JP") : null,
+    ],
     ["区分", inq.party_type ? PARTY_LABEL[inq.party_type] ?? inq.party_type : null],
     [contactMethodLabel, inq.contact],
     ["お名前・会社名", inq.name],
-    ["車種など", inq.vehicle_text],
+    ["車体番号", inq.vin],
   ];
 
   return (

@@ -52,15 +52,15 @@ export default async function AdminDashboard() {
   return (
     <div>
       <Link
-        href="/admin/inquiries"
+        href="/admin/matching"
         className="mb-6 flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/10 p-5 hover:border-accent"
       >
         <div>
-          <p className="text-sm text-accent">📮 依頼インボックス</p>
+          <p className="text-sm text-accent">🔗 マッチング</p>
           <p className="mt-1 text-sm text-muted">
             {openInquiries === null
-              ? "テーブル未作成です（0004のSQLを実行してください）"
-              : `未対応 ${openInquiries} 件 — 電話・LINE・来店の相談を記録`}
+              ? "テーブル未作成です（マイグレーションを実行してください）"
+              : `売り手・買い手をメーカー×車種でマッチ（未対応 ${openInquiries} 件）`}
           </p>
         </div>
         <span className="text-accent">›</span>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { STATUS_LABEL, PARTY_LABEL } from "./constants";
+import { STATUS_LABEL, KIND_LABEL } from "./constants";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function InquiriesPage() {
   const supabase = createAdminClient();
   const { data: inquiries } = await supabase
     .from("inquiries")
-    .select("id, vin, party_type, name, contact, vehicle_text, message, status, created_at")
+    .select("id, kind, manufacturer, model, price, name, contact, message, status, created_at")
     .order("created_at", { ascending: false });
 
   const list = inquiries ?? [];
@@ -23,32 +23,35 @@ export default async function InquiriesPage() {
 
   return (
     <div>
-      <header className="mb-6 flex items-end justify-between">
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">依頼インボックス</h1>
+          <h1 className="text-xl font-semibold">登録一覧</h1>
           <p className="mt-1 text-sm text-muted">未対応 {openCount} 件 / 全 {list.length} 件</p>
         </div>
-        <Link
-          href="/admin/inquiries/new"
-          className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-black"
-        >
-          ＋ 依頼を登録
-        </Link>
+        <div className="flex gap-2 text-sm">
+          <Link href="/buy" className="rounded-full border border-border px-4 py-2 text-muted">
+            ＋買いたい
+          </Link>
+          <Link href="/sell" className="rounded-full bg-primary px-4 py-2 font-semibold text-black">
+            ＋売りたい
+          </Link>
+        </div>
       </header>
 
       {list.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-border bg-card px-6 py-12 text-center text-sm text-muted">
-          まだ依頼がありません。
+          まだ登録がありません。
           <br />
-          「＋ 依頼を登録」から、電話・LINE・来店で受けた相談を記録しましょう。
+          「＋売りたい」「＋買いたい」から登録、または公開フォームのURLを共有してください。
         </div>
       ) : (
         <ul className="space-y-3">
           {list.map((i) => {
-            const party = i.party_type ? PARTY_LABEL[i.party_type] ?? i.party_type : null;
+            const kind = KIND_LABEL[i.kind] ?? i.kind;
+            const carName = [i.manufacturer, i.model].filter(Boolean).join(" ");
+            const priceLabel = i.price != null ? "¥" + Number(i.price).toLocaleString("ja-JP") : null;
             const snippet =
-              [party, i.vehicle_text, i.message].filter(Boolean).join(" / ") ||
-              "（内容未記入）";
+              [priceLabel, i.name, i.message].filter(Boolean).join(" / ") || "（内容未記入）";
             return (
               <li key={i.id}>
                 <Link
@@ -64,10 +67,16 @@ export default async function InquiriesPage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium">
-                      {i.name || (i.vin ? `車体番号 ${i.vin}` : "名称未設定")}
-                      {i.contact ? (
-                        <span className="ml-2 text-xs font-normal text-muted">{i.contact}</span>
-                      ) : null}
+                      <span
+                        className={`mr-2 rounded px-1.5 py-0.5 text-[10px] ${
+                          i.kind === "BUY"
+                            ? "bg-sky-400/15 text-sky-300"
+                            : "bg-accent/15 text-accent"
+                        }`}
+                      >
+                        {kind}
+                      </span>
+                      {carName || "車種未設定"}
                     </span>
                     <span className="mt-0.5 block truncate text-sm text-muted">{snippet}</span>
                   </span>

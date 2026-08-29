@@ -6,7 +6,17 @@ import { useEffect, useState } from "react";
 
 // アプリらしい下タブバー。ログイン後の主要画面で表示する。
 // 公開共有ページ(パスポート)やログイン・完了画面など「アプリの外」では隠す。
-const HIDE_PREFIXES = ["/login", "/thank-you", "/passport", "/auth", "/gate", "/status"];
+const HIDE_PREFIXES = [
+  "/login",
+  "/thank-you",
+  "/passport",
+  "/auth",
+  "/gate",
+  "/status",
+  "/sell",
+  "/buy",
+  "/submitted",
+];
 
 type Tab = {
   href: string;
