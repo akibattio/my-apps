@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/auth";
+import AdminNav from "./AdminNav";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "管理者 — ARIOS GARAGE" };
+export const metadata = { title: "管理 — ARIOS GARAGE" };
 
 // 管理者エリアのゲート。管理者(メール許可リスト)以外はトップへ。
 export default async function AdminLayout({
@@ -15,27 +15,9 @@ export default async function AdminLayout({
   if (!admin) redirect("/");
 
   return (
-    <div className="mx-auto min-h-dvh max-w-3xl px-6 py-8">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-3 border-b border-neutral-800 pb-4">
-        <p className="text-sm tracking-[0.3em] text-accent">ARIOS ADMIN</p>
-        <nav className="flex gap-4 text-sm text-muted">
-          <Link href="/admin" className="hover:text-foreground">
-            サマリー
-          </Link>
-          <Link href="/admin/buyers" className="hover:text-foreground">
-            買いたい
-          </Link>
-          <Link href="/admin/sellers" className="hover:text-foreground">
-            売りたい
-          </Link>
-          <Link href="/admin/matching" className="hover:text-foreground">
-            マッチング
-          </Link>
-          <Link href="/account" className="hover:text-foreground">
-            マイページ
-          </Link>
-        </nav>
-      </header>
+    <div className="mx-auto min-h-dvh max-w-2xl px-5 pb-16 pt-6">
+      <p className="text-xs tracking-[0.35em] text-accent">ARIOS ADMIN</p>
+      <AdminNav />
       {children}
     </div>
   );

@@ -16,6 +16,7 @@ const HIDE_PREFIXES = [
   "/sell",
   "/buy",
   "/submitted",
+  "/admin",
 ];
 
 type Tab = {
