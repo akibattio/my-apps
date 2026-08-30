@@ -112,6 +112,47 @@ export async function updateInquiryStatus(formData: FormData): Promise<void> {
   redirect(`/admin/inquiries/${id}`);
 }
 
+// 次アクション日・フォローアップメモを保存（管理者のみ）。
+export async function saveFollowup(formData: FormData): Promise<void> {
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect("/");
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/admin/inquiries");
+
+  const nextRaw = String(formData.get("nextActionDate") ?? "").trim();
+  const next_action_date = /^\d{4}-\d{2}-\d{2}$/.test(nextRaw) ? nextRaw : null;
+  const note = String(formData.get("note") ?? "").trim() || null;
+
+  const supabase = createAdminClient();
+  await supabase
+    .from("inquiries")
+    .update({ next_action_date, note, updated_at: new Date().toISOString() })
+    .eq("id", id);
+
+  redirect(`/admin/inquiries/${id}`);
+}
+
+// 「今、連絡した」を記録（最終接触を更新し、新規なら連絡済へ）。
+export async function markContacted(formData: FormData): Promise<void> {
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect("/");
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/admin/inquiries");
+
+  const supabase = createAdminClient();
+  const now = new Date().toISOString();
+  const { data: cur } = await supabase
+    .from("inquiries")
+    .select("status")
+    .eq("id", id)
+    .maybeSingle();
+  const patch: Record<string, unknown> = { last_contact_at: now, updated_at: now };
+  if (cur?.status === "NEW") patch.status = "CONTACTED";
+  await supabase.from("inquiries").update(patch).eq("id", id);
+
+  redirect(`/admin/inquiries/${id}`);
+}
+
 // 依頼を「車両」として登録し、依頼と紐付ける。
 // 依頼の写真(非公開)を車両画像(公開)へコピーし、最初の履歴に依頼内容を残す。
 export async function linkInquiryToVehicle(formData: FormData): Promise<void> {

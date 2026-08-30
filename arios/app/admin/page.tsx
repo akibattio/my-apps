@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { STATUS_ACTIVE } from "./inquiries/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ async function kindCount(
       .from("inquiries")
       .select("*", { count: "exact", head: true })
       .eq("kind", kind)
-      .neq("status", "ARCHIVED");
+      .in("status", STATUS_ACTIVE);
     if (error) return null;
     return count ?? 0;
   } catch {

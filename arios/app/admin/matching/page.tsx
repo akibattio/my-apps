@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { reorderSeller } from "@/app/listings/actions";
 import { sellerOrder } from "@/app/listings/order";
-import { PARTY_LABEL } from "../inquiries/constants";
+import { PARTY_LABEL, STATUS_ACTIVE } from "../inquiries/constants";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング — ARIOS GARAGE" };
@@ -34,7 +34,7 @@ export default async function MatchingPage() {
     .select(
       "id, kind, manufacturer, model, price, priority, party_type, name, contact, contact_method, message, vin"
     )
-    .neq("status", "ARCHIVED")
+    .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
   const rows = (data ?? []) as Row[];
 

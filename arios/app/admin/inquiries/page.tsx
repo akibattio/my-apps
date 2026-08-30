@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { STATUS_LABEL, KIND_LABEL } from "./constants";
+import { STATUS_LABEL, KIND_LABEL, STATUS_ACTIVE } from "./constants";
 
 export const dynamic = "force-dynamic";
 
 const STATUS_STYLE: Record<string, string> = {
   NEW: "text-accent border-accent/40 bg-accent/10",
-  IN_PROGRESS: "text-primary border-primary/40 bg-primary/10",
-  DONE: "text-muted border-border bg-white/5",
-  ARCHIVED: "text-muted border-border bg-white/5",
+  CONTACTED: "text-sky-300 border-sky-400/40 bg-sky-400/10",
+  NEGOTIATING: "text-primary border-primary/40 bg-primary/10",
+  CLOSED: "text-emerald-300 border-emerald-400/30 bg-emerald-400/10",
+  DROPPED: "text-muted border-border bg-white/5",
 };
 
 export default async function InquiriesPage() {
@@ -19,7 +20,7 @@ export default async function InquiriesPage() {
     .order("created_at", { ascending: false });
 
   const list = inquiries ?? [];
-  const openCount = list.filter((i) => i.status === "NEW" || i.status === "IN_PROGRESS").length;
+  const openCount = list.filter((i) => STATUS_ACTIVE.includes(i.status)).length;
 
   return (
     <div>
@@ -60,7 +61,7 @@ export default async function InquiriesPage() {
                 >
                   <span
                     className={`flex-none rounded-full border px-2.5 py-1 text-[11px] ${
-                      STATUS_STYLE[i.status] ?? STATUS_STYLE.DONE
+                      STATUS_STYLE[i.status] ?? STATUS_STYLE.DROPPED
                     }`}
                   >
                     {STATUS_LABEL[i.status] ?? i.status}

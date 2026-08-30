@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { updateInquiryStatus, linkInquiryToVehicle } from "../actions";
-import { STATUS_LABEL, PARTY_LABEL, KIND_LABEL } from "../constants";
+import {
+  updateInquiryStatus,
+  linkInquiryToVehicle,
+  saveFollowup,
+  markContacted,
+} from "../actions";
+import { STATUS_LABEL, PARTY_LABEL, KIND_LABEL, STATUS_FLOW } from "../constants";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "依頼の詳細 — ARIOS GARAGE" };
 
 const BUCKET = "inquiry-photos";
-const FLOW = ["NEW", "IN_PROGRESS", "DONE", "ARCHIVED"] as const;
 
 export default async function InquiryDetailPage({
   params,
@@ -21,7 +25,7 @@ export default async function InquiryDetailPage({
   const { data: inq } = await supabase
     .from("inquiries")
     .select(
-      "id, kind, manufacturer, model, price, vin, party_type, name, contact, contact_method, vehicle_text, message, photo_urls, status, source, vehicle_id, created_at, updated_at"
+      "id, kind, manufacturer, model, price, vin, party_type, name, contact, contact_method, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -123,9 +127,11 @@ export default async function InquiryDetailPage({
       )}
 
       <section className="mb-6 rounded-2xl border border-border bg-card p-5">
-        <p className="mb-3 text-sm text-muted">ステータスを変更</p>
-        <div className="flex flex-wrap gap-2">
-          {FLOW.map((s) => (
+        <p className="mb-3 text-sm text-muted">フォロー（取りこぼさない）</p>
+
+        {/* ステータス */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {STATUS_FLOW.map((s) => (
             <form key={s} action={updateInquiryStatus}>
               <input type="hidden" name="id" value={inq.id} />
               <input type="hidden" name="status" value={s} />
@@ -143,6 +149,54 @@ export default async function InquiryDetailPage({
             </form>
           ))}
         </div>
+
+        {/* 最終接触 + 連絡した */}
+        <div className="mb-4 flex items-center justify-between border-t border-border pt-4">
+          <span className="text-sm text-muted">
+            最終接触:{" "}
+            {inq.last_contact_at
+              ? new Date(inq.last_contact_at).toLocaleString("ja-JP")
+              : "未"}
+          </span>
+          <form action={markContacted}>
+            <input type="hidden" name="id" value={inq.id} />
+            <button
+              type="submit"
+              className="rounded-full border border-accent px-4 py-2 text-sm text-accent"
+            >
+              連絡した（今）
+            </button>
+          </form>
+        </div>
+
+        {/* 次アクション日 + メモ */}
+        <form action={saveFollowup} className="space-y-3 border-t border-border pt-4">
+          <input type="hidden" name="id" value={inq.id} />
+          <div>
+            <label className="mb-1 block text-sm text-muted">次にやること・いつ追う</label>
+            <input
+              type="date"
+              name="nextActionDate"
+              defaultValue={inq.next_action_date ?? ""}
+              className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-muted">フォローメモ</label>
+            <textarea
+              name="note"
+              defaultValue={inq.note ?? ""}
+              placeholder="例: 来週価格交渉。相手はオーナー本人確認済み。"
+              className="min-h-20 w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
+            />
+          </div>
+          <button
+            type="submit"
+            className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-black"
+          >
+            フォローを保存
+          </button>
+        </form>
       </section>
 
       <section className="mb-6 rounded-2xl border border-border bg-card p-5">

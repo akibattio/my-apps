@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CHANNEL_LABEL, STATUS_LABEL } from "../inquiries/constants";
+import { CHANNEL_LABEL, STATUS_LABEL, STATUS_ACTIVE } from "../inquiries/constants";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "買いたい人 — ARIOS GARAGE" };
@@ -16,6 +16,7 @@ type Row = {
   channel: string | null;
   message: string | null;
   status: string;
+  next_action_date: string | null;
   created_at: string;
 };
 
@@ -28,10 +29,10 @@ export default async function BuyersPage() {
   const { data } = await supabase
     .from("inquiries")
     .select(
-      "id, manufacturer, model, price, name, contact, contact_method, channel, message, status, created_at"
+      "id, manufacturer, model, price, name, contact, contact_method, channel, message, status, next_action_date, created_at"
     )
     .eq("kind", "BUY")
-    .neq("status", "ARCHIVED")
+    .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
   const list = (data ?? []) as Row[];
 
@@ -89,6 +90,11 @@ export default async function BuyersPage() {
                   </div>
                   {b.message && (
                     <p className="mt-1 text-xs leading-relaxed text-muted">{b.message}</p>
+                  )}
+                  {b.next_action_date && (
+                    <p className="mt-1 inline-block rounded bg-primary/15 px-2 py-0.5 text-xs text-primary">
+                      次アクション {b.next_action_date.replaceAll("-", "/")}
+                    </p>
                   )}
                 </Link>
               </li>

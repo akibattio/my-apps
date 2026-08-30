@@ -1,12 +1,22 @@
 // 依頼のステータス定義（サーバーアクション/ページ双方から参照する共有定数）。
 export const STATUS_LABEL: Record<string, string> = {
-  NEW: "新着",
-  IN_PROGRESS: "対応中",
-  DONE: "完了",
-  ARCHIVED: "保管",
+  NEW: "新規",
+  CONTACTED: "連絡済",
+  NEGOTIATING: "商談中",
+  CLOSED: "成約",
+  DROPPED: "見送り",
 };
 
-export const STATUS_FLOW = ["NEW", "IN_PROGRESS", "DONE", "ARCHIVED"] as const;
+export const STATUS_FLOW = [
+  "NEW",
+  "CONTACTED",
+  "NEGOTIATING",
+  "CLOSED",
+  "DROPPED",
+] as const;
+
+// 対応中（アクティブ）とみなすステータス。買い/売り/マッチングの一覧はこれで絞る。
+export const STATUS_ACTIVE = ["NEW", "CONTACTED", "NEGOTIATING"];
 
 export const KIND_LABEL: Record<string, string> = {
   SELL: "売りたい",
