@@ -46,6 +46,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
   const name = String(formData.get("name") ?? "").trim();
   const contact = String(formData.get("contact") ?? "").trim();
   const contactMethod = String(formData.get("contactMethod") ?? "").trim();
+  const channel = String(formData.get("channel") ?? "").trim() || null;
   const message = String(formData.get("message") ?? "").trim();
 
   const photos =
@@ -73,6 +74,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         name: name || null,
         contact: contact || null,
         contact_method: contactMethod || null,
+        channel,
         message: message || null,
         source: "WEB_FORM",
         status: "NEW",

@@ -22,17 +22,14 @@ export default async function AdminLayout({
           <Link href="/admin" className="hover:text-foreground">
             サマリー
           </Link>
+          <Link href="/admin/buyers" className="hover:text-foreground">
+            買いたい
+          </Link>
+          <Link href="/admin/sellers" className="hover:text-foreground">
+            売りたい
+          </Link>
           <Link href="/admin/matching" className="hover:text-foreground">
             マッチング
-          </Link>
-          <Link href="/admin/inquiries" className="hover:text-foreground">
-            一覧
-          </Link>
-          <Link href="/admin/vehicles" className="hover:text-foreground">
-            車両
-          </Link>
-          <Link href="/admin/owners" className="hover:text-foreground">
-            オーナー
           </Link>
           <Link href="/account" className="hover:text-foreground">
             マイページ

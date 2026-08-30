@@ -13,6 +13,14 @@ export const KIND_LABEL: Record<string, string> = {
   BUY: "買いたい",
 };
 
+export const CHANNEL_LABEL: Record<string, string> = {
+  LINE: "LINE",
+  WHATSAPP: "WhatsApp",
+  PHONE: "電話",
+  REFERRAL: "紹介",
+  OTHER: "その他",
+};
+
 export const PARTY_LABEL: Record<string, string> = {
   OWNER: "オーナー",
   BROKER: "ブローカー",

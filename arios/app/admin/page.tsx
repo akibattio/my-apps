@@ -11,15 +11,17 @@ async function count(
   return count ?? 0;
 }
 
-// inquiries テーブルが未作成でも落ちないよう安全に未対応件数を取る。
-async function openInquiryCount(
-  admin: ReturnType<typeof createAdminClient>
+// inquiries テーブルが未作成でも落ちないよう安全に件数を取る。
+async function kindCount(
+  admin: ReturnType<typeof createAdminClient>,
+  kind: string
 ): Promise<number | null> {
   try {
     const { count, error } = await admin
       .from("inquiries")
       .select("*", { count: "exact", head: true })
-      .in("status", ["NEW", "IN_PROGRESS"]);
+      .eq("kind", kind)
+      .neq("status", "ARCHIVED");
     if (error) return null;
     return count ?? 0;
   } catch {
@@ -29,7 +31,7 @@ async function openInquiryCount(
 
 export default async function AdminDashboard() {
   const admin = createAdminClient();
-  const [vehicles, owners, histories, documents, images, analyses, openInquiries] =
+  const [vehicles, owners, histories, documents, images, analyses, buyCount, sellCount] =
     await Promise.all([
       count(admin, "vehicles"),
       count(admin, "owners"),
@@ -37,7 +39,8 @@ export default async function AdminDashboard() {
       count(admin, "documents"),
       count(admin, "images"),
       count(admin, "ai_analyses"),
-      openInquiryCount(admin),
+      kindCount(admin, "BUY"),
+      kindCount(admin, "SELL"),
     ]);
 
   const stats = [
@@ -51,18 +54,29 @@ export default async function AdminDashboard() {
 
   return (
     <div>
+      <div className="mb-3 grid grid-cols-2 gap-3">
+        <Link
+          href="/admin/buyers"
+          className="rounded-2xl border border-sky-400/40 bg-sky-400/10 p-5 hover:border-sky-400"
+        >
+          <p className="text-sm text-sky-300">🔵 買いたい人</p>
+          <p className="mt-1 text-3xl font-semibold tabular-nums">{buyCount ?? "—"}</p>
+          <p className="mt-1 text-xs text-muted">いつ・誰から・どんな車</p>
+        </Link>
+        <Link
+          href="/admin/sellers"
+          className="rounded-2xl border border-accent/40 bg-accent/10 p-5 hover:border-accent"
+        >
+          <p className="text-sm text-accent">🟡 売りたい人</p>
+          <p className="mt-1 text-3xl font-semibold tabular-nums">{sellCount ?? "—"}</p>
+          <p className="mt-1 text-xs text-muted">車ごと・区分・人数</p>
+        </Link>
+      </div>
       <Link
         href="/admin/matching"
-        className="mb-6 flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/10 p-5 hover:border-accent"
+        className="mb-6 flex items-center justify-between rounded-2xl border border-border bg-card p-4 hover:border-accent"
       >
-        <div>
-          <p className="text-sm text-accent">🔗 マッチング</p>
-          <p className="mt-1 text-sm text-muted">
-            {openInquiries === null
-              ? "テーブル未作成です（マイグレーションを実行してください）"
-              : `売り手・買い手をメーカー×車種でマッチ（未対応 ${openInquiries} 件）`}
-          </p>
-        </div>
+        <p className="text-sm">🔗 マッチング（メーカー×車種で突き合わせ）</p>
         <span className="text-accent">›</span>
       </Link>
 

@@ -12,6 +12,13 @@ const MODIFIED = [
   { v: "なし", label: "改造なし" },
   { v: "あり", label: "改造あり" },
 ];
+const CHANNELS = [
+  { v: "LINE", label: "LINE" },
+  { v: "WHATSAPP", label: "WhatsApp" },
+  { v: "PHONE", label: "電話" },
+  { v: "REFERRAL", label: "紹介" },
+  { v: "OTHER", label: "その他" },
+];
 
 export default function BuyForm() {
   const [state, formAction, isPending] = useActionState<ListingState, FormData>(
@@ -20,6 +27,7 @@ export default function BuyForm() {
   );
   const [localError, setLocalError] = useState<string | null>(null);
 
+  const [channel, setChannel] = useState("LINE");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
   const [price, setPrice] = useState("");
@@ -56,6 +64,7 @@ export default function BuyForm() {
 
     const fd = new FormData();
     fd.set("company", ""); // honeypot
+    fd.set("channel", channel);
     fd.set("manufacturer", manufacturer);
     fd.set("model", model);
     fd.set("price", price);
@@ -73,6 +82,23 @@ export default function BuyForm() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
+      <div>
+        <label className={label}>受付経路</label>
+        <div className="flex flex-wrap gap-2">
+          {CHANNELS.map((c) => (
+            <button
+              type="button"
+              key={c.v}
+              onClick={() => setChannel(c.v)}
+              className={`rounded-full border px-4 py-2 text-sm ${
+                channel === c.v ? "border-accent bg-accent/10 text-accent" : "border-neutral-700 text-muted"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div>
         <label className={label}>メーカー{req}</label>
         <input className={field} value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="例: フェラーリ" />
