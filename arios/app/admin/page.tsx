@@ -55,6 +55,19 @@ export default async function AdminDashboard() {
 
   return (
     <div>
+      <Link
+        href="/admin/new"
+        className="mb-3 flex items-center justify-between rounded-2xl border border-primary/50 bg-primary/10 p-5 hover:border-primary"
+      >
+        <div>
+          <p className="text-sm font-semibold text-primary">✨ AIで登録</p>
+          <p className="mt-1 text-xs text-muted">
+            写真・スクショ・貼り付けから買いたい/売りたいを素早く登録
+          </p>
+        </div>
+        <span className="text-primary">›</span>
+      </Link>
+
       <div className="mb-3 grid grid-cols-2 gap-3">
         <Link
           href="/admin/buyers"

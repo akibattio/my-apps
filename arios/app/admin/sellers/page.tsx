@@ -58,7 +58,7 @@ export default async function SellersPage() {
             車ごとにまとめて表示（同じ車に複数の売り手＝ブローカー等）。{list.length} 車種 / 全 {rows.length} 件
           </p>
         </div>
-        <Link href="/sell" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-black">
+        <Link href="/admin/new" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-black">
           ＋売りたいを登録
         </Link>
       </header>

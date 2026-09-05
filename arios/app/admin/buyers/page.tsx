@@ -45,7 +45,7 @@ export default async function BuyersPage() {
             「こういう車が欲しい」という依頼。全 {list.length} 件
           </p>
         </div>
-        <Link href="/buy" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-black">
+        <Link href="/admin/new" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-black">
           ＋買いたいを登録
         </Link>
       </header>
