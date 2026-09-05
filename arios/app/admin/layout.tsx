@@ -15,7 +15,7 @@ export default async function AdminLayout({
   if (!admin) redirect("/");
 
   return (
-    <div className="mx-auto min-h-dvh max-w-2xl px-5 pb-16 pt-6">
+    <div className="mx-auto min-h-dvh max-w-5xl px-5 pb-16 pt-6">
       <p className="text-xs tracking-[0.35em] text-accent">ARIOS ADMIN</p>
       <AdminNav />
       {children}
