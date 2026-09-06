@@ -12,7 +12,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const admin = await getCurrentAdmin();
-  if (!admin) redirect("/");
+  if (!admin) redirect("/admin-login");
 
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-5 pb-16 pt-6">

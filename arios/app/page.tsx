@@ -82,6 +82,14 @@ export default async function Home() {
       <p className="mt-12 text-center text-xs text-muted">
         ARIOS — 一台ごとの人生を、つなぐ。
       </p>
+      <p className="mt-3 text-center">
+        <Link
+          href="/admin-login"
+          className="text-[11px] text-muted/70 underline-offset-4 hover:underline"
+        >
+          管理者ログイン
+        </Link>
+      </p>
     </main>
   );
 }
