@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { signUpCustomer } from "./actions";
 
 // メール＋パスワードで新規登録。
-// Supabase の「メール確認(Confirm email)」がオフなら即ログイン→マイページへ。
-// オンの場合はセッションが張られないので「確認メールを見てください」を表示する。
+// サーバー側で「確認済みユーザー」を作成 → クライアントでログイン → マイページへ。
+// （確認メールを送らないので、メール配信が未整備でも登録できる）
 export default function SignupForm() {
   const supabase = createClient();
   const router = useRouter();
@@ -18,7 +19,6 @@ export default function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [needConfirm, setNeedConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -29,45 +29,31 @@ export default function SignupForm() {
       return;
     }
     setBusy(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) {
+    // 1) サーバーで確認済みユーザーを作成
+    const res = await signUpCustomer(email, password);
+    if (res.error === "exists") {
       setBusy(false);
-      setError(
-        error.message.includes("already")
-          ? "このメールアドレスは既に登録されています。ログインしてください。"
-          : "登録に失敗しました。入力内容を確認してください。"
-      );
+      setError("このメールアドレスは既に登録されています。ログインしてください。");
       return;
     }
-    // セッションがあればそのままログイン、無ければメール確認待ち
-    if (data.session) {
-      router.push(next);
-      router.refresh();
-    } else {
+    if (res.error) {
       setBusy(false);
-      setNeedConfirm(true);
+      setError("登録に失敗しました。入力内容を確認してください。");
+      return;
     }
+    // 2) 作成できたらそのままログイン
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setBusy(false);
+      setError("登録は完了しました。お手数ですがログインしてください。");
+      return;
+    }
+    router.push(next);
+    router.refresh();
   }
 
   const field =
     "w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500";
-
-  if (needConfirm) {
-    return (
-      <div className="space-y-3">
-        <p className="text-sm leading-relaxed">
-          {email} に<span className="text-accent">確認メール</span>を送りました。
-        </p>
-        <p className="text-sm leading-relaxed text-muted">
-          メール内のリンクを開くと登録が完了します。完了後に
-          <Link href="/login" className="text-accent">
-            ログイン
-          </Link>
-          してください。
-        </p>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
