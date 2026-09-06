@@ -9,7 +9,7 @@ import { sellerOrder } from "./order";
 import { matchKey } from "@/app/admin/matching/key";
 
 const BUCKET = "inquiry-photos";
-const MAX_PHOTOS = 30;
+const MAX_PHOTOS = 20;
 const PARTY_TYPES = ["OWNER", "BROKER", "DEALER"];
 
 export type ListingState = { error?: string };

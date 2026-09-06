@@ -4,7 +4,7 @@ import { useActionState, useRef, useState, startTransition } from "react";
 import { submitSell, type ListingState } from "./actions";
 import { resizeImage } from "./resize";
 
-const MAX_PHOTOS = 30;
+const MAX_PHOTOS = 20;
 
 const PARTIES = [
   { v: "OWNER", label: "オーナー" },
@@ -192,8 +192,11 @@ export default function SellForm({
       <div>
         <label htmlFor="sell-photos" className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-neutral-600 text-muted">
           <span className="text-2xl text-accent">＋</span>
-          <span className="mt-1 text-sm">写真を追加（最大{MAX_PHOTOS}枚）</span>
+          <span className="mt-1 text-sm">写真を追加（最大{MAX_PHOTOS}枚・任意）</span>
         </label>
+        <p className="mt-1.5 text-xs text-muted">
+          写真は<span className="text-accent">あとからマイページで追加</span>できます。初回はスキップや数枚だけでもOKです。
+        </p>
         <input ref={inputRef} id="sell-photos" type="file" accept="image/*" multiple onChange={onFilesChange} className="hidden" />
         {preparing && <p className="mt-2 text-sm text-muted">写真を準備中…</p>}
         {previews.length > 0 && (

@@ -4,6 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { updateMyListing } from "../../actions";
 import { KIND_LABEL } from "@/app/admin/inquiries/constants";
+import ListingPhotos from "./ListingPhotos";
+
+const BUCKET = "inquiry-photos";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "情報を編集 — LIFE LINE GARAGE" };
@@ -18,6 +21,7 @@ type Row = {
   contact: string | null;
   name: string | null;
   email: string | null;
+  photo_urls: string[] | null;
 };
 
 export default async function EditMyListing({
@@ -33,13 +37,21 @@ export default async function EditMyListing({
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("inquiries")
-    .select("id, kind, manufacturer, model, price, message, contact, name, email")
+    .select("id, kind, manufacturer, model, price, message, contact, name, email, photo_urls")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
   const r = data as Row;
   // 本人以外は自分のマイページへ戻す。
   if ((r.email ?? "").toLowerCase() !== email) redirect("/mypage");
+
+  // 既存写真は非公開バケットなので署名付きURLで表示。
+  const paths: string[] = r.photo_urls ?? [];
+  let photos: { path: string; url: string }[] = [];
+  if (paths.length > 0) {
+    const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 3600);
+    photos = paths.map((p, i) => ({ path: p, url: signed?.[i]?.signedUrl ?? "" })).filter((x) => x.url);
+  }
 
   const field =
     "w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500";
@@ -101,6 +113,13 @@ export default async function EditMyListing({
           保存する
         </button>
       </form>
+
+      {r.kind === "SELL" && (
+        <section className="mt-8">
+          <h2 className="mb-2 text-sm font-medium">写真</h2>
+          <ListingPhotos id={r.id} photos={photos} />
+        </section>
+      )}
     </main>
   );
 }
