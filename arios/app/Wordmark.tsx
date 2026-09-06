@@ -14,7 +14,7 @@ export default function Wordmark({
         className="font-semibold italic leading-[1.02] tracking-tight"
         style={{ fontFamily: "var(--font-brand), system-ui, sans-serif" }}
       >
-        <span className="block text-[30px] sm:text-[34px]">
+        <span className="block text-[27px] sm:text-[30.6px]">
           LIFE LINE <span className="text-primary">GARAGE</span>
         </span>
       </div>
