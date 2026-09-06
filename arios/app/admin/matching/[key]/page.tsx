@@ -6,6 +6,7 @@ import { createDeal } from "@/app/admin/deals/actions";
 import { sellerOrder } from "@/app/listings/order";
 import { PARTY_LABEL, STATUS_ACTIVE } from "../../inquiries/constants";
 import { parseMatchKey } from "../key";
+import { gradePair, GRADE_LABEL, GRADE_STYLE, GRADE_RANK } from "../score";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング詳細 — ARIOS GARAGE" };
@@ -57,6 +58,21 @@ export default async function MatchingDetailPage({
   const buyers = rows.filter((r) => r.kind === "BUY");
   const sellers = rows.filter((r) => r.kind !== "BUY").sort(sellerOrder);
   const isMatch = buyers.length > 0 && sellers.length > 0;
+
+  // 賢いマッチング: 全ての買い×売りペアを成立可能性で判定し、有力な順に並べる。
+  const pairs = buyers
+    .flatMap((b) =>
+      sellers.map((s) => {
+        const { grade, reason } = gradePair(b.price, s.price);
+        return { b, s, grade, reason };
+      })
+    )
+    .sort((a, z) => {
+      if (GRADE_RANK[a.grade] !== GRADE_RANK[z.grade])
+        return GRADE_RANK[a.grade] - GRADE_RANK[z.grade];
+      return (a.s.price ?? Infinity) - (z.s.price ?? Infinity);
+    })
+    .slice(0, 12);
 
   return (
     <div>
@@ -125,6 +141,52 @@ export default async function MatchingDetailPage({
               取引にする
             </button>
           </form>
+        </section>
+      )}
+
+      {/* 賢いマッチング: おすすめの組み合わせ（成立可能性つき） */}
+      {isMatch && (
+        <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="border-b border-border px-4 py-3 text-xs tracking-wide text-emerald-300">
+            おすすめの組み合わせ（成立可能性で判定）
+          </div>
+          <ul className="divide-y divide-white/[0.04]">
+            {pairs.map(({ b, s, grade, reason }) => (
+              <li key={b.id + "|" + s.id} className="px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${GRADE_STYLE[grade]}`}
+                  >
+                    {GRADE_LABEL[grade]}
+                  </span>
+                  <span className="text-sm">
+                    <span className="text-sky-300">買 希望 {yen(b.price)}</span>
+                    <span className="mx-1.5 text-muted">⇄</span>
+                    <span className="text-accent">売 {yen(s.price)}</span>
+                  </span>
+                  <form action={createDeal} className="ml-auto">
+                    <input type="hidden" name="manufacturer" value={maker} />
+                    <input type="hidden" name="model" value={model} />
+                    <input type="hidden" name="buyerId" value={b.id} />
+                    <input type="hidden" name="sellerId" value={s.id} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-accent px-2.5 py-1 text-xs text-accent"
+                    >
+                      取引にする
+                    </button>
+                  </form>
+                </div>
+                <p className="mt-1 text-xs text-muted">
+                  {reason}
+                  <span className="ml-1 opacity-70">／ 色・状態などの条件は要確認</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+          <p className="px-4 py-3 text-[11px] text-muted">
+            ※ 価格（予算と売値）をもとに成立可能性を自動判定しています。最終判断はARIOSが行ってください。
+          </p>
         </section>
       )}
 

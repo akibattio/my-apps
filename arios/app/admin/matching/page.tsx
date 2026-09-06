@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE } from "../inquiries/constants";
 import RowLink from "../RowLink";
 import { matchKey } from "./key";
+import { bestGrade, GRADE_LABEL, GRADE_STYLE } from "./score";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング — ARIOS GARAGE" };
@@ -45,6 +46,13 @@ export default async function MatchingPage() {
     .map((g) => ({
       ...g,
       isMatch: g.buyers.length > 0 && g.sellers.length > 0,
+      grade:
+        g.buyers.length > 0 && g.sellers.length > 0
+          ? bestGrade(
+              g.buyers.map((b) => b.price),
+              g.sellers.map((s) => s.price)
+            )
+          : null,
       minSell: g.sellers.reduce<number | null>(
         (m, s) => (s.price == null ? m : m == null ? s.price : Math.min(m, s.price)),
         null
@@ -106,9 +114,12 @@ export default async function MatchingPage() {
                   }`}
                 >
                   <td className={td}>
-                    {g.isMatch ? (
-                      <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">
-                        マッチ
+                    {g.isMatch && g.grade ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${GRADE_STYLE[g.grade]}`}
+                        title="価格による成立可能性"
+                      >
+                        {GRADE_LABEL[g.grade]}
                       </span>
                     ) : (
                       <span className="text-xs text-muted">—</span>
