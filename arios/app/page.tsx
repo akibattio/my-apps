@@ -1,8 +1,8 @@
 import Link from "next/link";
 import Wordmark from "./Wordmark";
+import { getCurrentUser } from "@/lib/auth";
 
-// Top（公開・訪問者）。2つの入口: 売りたい / 買いたい。
-// ※お客様ログイン/マイページはいったん見送り（連絡先を登録時に受け取り、ARIOSが管理）。
+// Top（公開・訪問者）。3つの入口: 売りたい / 買いたい / マイページ。
 export const dynamic = "force-dynamic";
 
 const ENTRIES = [
@@ -22,7 +22,10 @@ const ENTRIES = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const user = await getCurrentUser();
+  const myHref = user ? "/mypage" : "/login";
+
   return (
     <main className="mx-auto max-w-xl px-6 pt-14 pb-16">
       <header className="text-center">
@@ -35,8 +38,8 @@ export default function Home() {
           ARIOSがつなぐ。
         </h1>
         <p className="mt-5 leading-relaxed text-muted">
-          「売りたい」か「買いたい」を、ご連絡先とあわせてご登録ください。
-          ARIOSがお相手をお探しし、ご連絡します。
+          まずは「売りたい」か「買いたい」から。マイページに登録すると、
+          やり取りの状況やマッチのお知らせをまとめて確認できます。
         </p>
       </header>
 
@@ -55,15 +58,29 @@ export default function Home() {
             <span className="ml-auto text-xl text-muted">›</span>
           </Link>
         ))}
+
+        {/* マイページ（登録・ログイン） */}
+        <Link
+          href={myHref}
+          className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary"
+        >
+          <span className="text-3xl">👤</span>
+          <span className="min-w-0">
+            <span className="block text-lg font-semibold">
+              マイページ{user ? "" : "（登録・ログイン）"}
+            </span>
+            <span className="mt-0.5 block text-sm text-muted">
+              {user
+                ? "自分の売りたい・買いたい、マッチの状況を確認"
+                : "登録すると状況をまとめて確認できます"}
+            </span>
+          </span>
+          <span className="ml-auto text-xl text-muted">›</span>
+        </Link>
       </section>
 
       <p className="mt-12 text-center text-xs text-muted">
         ARIOS — 一台ごとの人生を、つなぐ。
-      </p>
-      <p className="mt-3 text-center">
-        <Link href="/login" className="text-[11px] text-muted/70 underline-offset-4 hover:underline">
-          関係者ログイン
-        </Link>
       </p>
     </main>
   );

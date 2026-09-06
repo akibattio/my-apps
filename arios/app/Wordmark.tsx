@@ -7,10 +7,10 @@ export default function Wordmark({
   const wrap = align === "center" ? "items-center text-center" : "items-start text-left";
   return (
     <div className={`flex flex-col ${wrap} gap-1.5`}>
-      {/* ブランド（ARIOS）は控えめに上に添える */}
+      {/* ブランド（ARIOS）ロゴは従来サイズ */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-arios.png" alt="ARIOS" className="h-3.5 w-auto opacity-70" />
-      <div className="font-extrabold leading-[1.02] tracking-tight">
+      <img src="/logo-arios.png" alt="ARIOS" className="h-6 w-auto" />
+      <div className="font-extrabold italic leading-[1.02] tracking-tight">
         <span className="block text-[27px] sm:text-[30px]">
           LIFE LINE <span className="text-primary">GARAGE</span>
         </span>
