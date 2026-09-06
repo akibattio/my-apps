@@ -48,7 +48,7 @@ export async function ensureOwner(): Promise<
 // ---- 管理者判定 ----
 // 管理者はメール許可リストで判定する。既定は akiba@sofcom.co.jp。
 // 本番では ADMIN_EMAILS（カンマ区切り）で上書きできる。
-const DEFAULT_ADMIN_EMAILS = ["akiba@sofcom.co.jp"];
+const DEFAULT_ADMIN_EMAILS = ["akiba@sofcom.co.jp", "arios.suzuki@gmail.com"];
 
 export function getAdminEmails(): string[] {
   const env = process.env.ADMIN_EMAILS;

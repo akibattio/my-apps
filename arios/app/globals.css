@@ -38,9 +38,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* 下タブバー表示時、コンテンツがバーに隠れないよう余白を確保 */
-body.with-tabbar {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+/* 下タブバー表示時、コンテンツがバーに隠れないよう余白を確保（スマホのみ） */
+@media (max-width: 767px) {
+  body.with-tabbar {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
 }
 
 /* 固定の下タブバー（すりガラス風・セーフエリア対応） */

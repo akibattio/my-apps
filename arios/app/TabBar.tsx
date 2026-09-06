@@ -4,86 +4,60 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-// アプリらしい下タブバー。ログイン後の主要画面で表示する。
-// 公開共有ページ(パスポート)やログイン・完了画面など「アプリの外」では隠す。
+// お客様向けの固定フッターナビ（スマホ表示）。売りたい / 買いたい / マイページ。
+// TOP はロゴで戻れるためタブには入れない。管理・認証画面では非表示。
 const HIDE_PREFIXES = [
+  "/admin",
+  "/admin-login",
   "/login",
   "/signup",
-  "/thank-you",
-  "/passport",
   "/auth",
   "/gate",
+  "/passport",
+  "/register",
+  "/garage",
+  "/account",
+  "/thank-you",
+  "/welcome",
   "/status",
-  "/sell",
-  "/buy",
-  "/submitted",
-  "/mypage",
-  "/admin",
 ];
-
-type Tab = {
-  href: string;
-  label: string;
-  match: (p: string) => boolean;
-  icon: (active: boolean) => React.ReactNode;
-};
 
 const stroke = (active: boolean) => (active ? "var(--accent)" : "currentColor");
 
-const TABS: Tab[] = [
+const TABS = [
   {
-    href: "/",
-    label: "ホーム",
-    match: (p) => p === "/",
-    icon: (a) => (
+    href: "/sell",
+    label: "売りたい",
+    match: (p: string) => p.startsWith("/sell"),
+    icon: (a: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
         <path
-          d="M3 10.5 12 3l9 7.5M5 9v11h14V9"
-          stroke={stroke(a)}
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: "/register",
-    label: "登録",
-    match: (p) => p.startsWith("/register"),
-    icon: (a) => (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <circle cx="12" cy="12" r="9" stroke={stroke(a)} strokeWidth="1.7" />
-        <path
-          d="M12 8v8M8 12h8"
-          stroke={stroke(a)}
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
-  {
-    href: "/garage",
-    label: "ガレージ",
-    match: (p) => p.startsWith("/garage"),
-    icon: (a) => (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M4 10 12 4l8 6v9H4v-9Z"
+          d="M4 13l1.5-4.5A2 2 0 0 1 7.4 7h9.2a2 2 0 0 1 1.9 1.5L20 13v5h-3v-2H7v2H4v-5Z"
           stroke={stroke(a)}
           strokeWidth="1.7"
           strokeLinejoin="round"
         />
-        <path d="M8 19v-5h8v5" stroke={stroke(a)} strokeWidth="1.7" strokeLinejoin="round" />
+        <circle cx="7.5" cy="15.5" r="1" fill={stroke(a)} />
+        <circle cx="16.5" cy="15.5" r="1" fill={stroke(a)} />
       </svg>
     ),
   },
   {
-    href: "/account",
+    href: "/buy",
+    label: "買いたい",
+    match: (p: string) => p.startsWith("/buy"),
+    icon: (a: boolean) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="11" cy="11" r="6" stroke={stroke(a)} strokeWidth="1.7" />
+        <path d="m20 20-3.2-3.2" stroke={stroke(a)} strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/mypage",
     label: "マイページ",
-    match: (p) => p.startsWith("/account"),
-    icon: (a) => (
+    match: (p: string) => p.startsWith("/mypage"),
+    icon: (a: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
         <circle cx="12" cy="8" r="3.4" stroke={stroke(a)} strokeWidth="1.7" />
         <path
@@ -100,15 +74,12 @@ const TABS: Tab[] = [
 export default function TabBar() {
   const pathname = usePathname() || "/";
   const [mounted, setMounted] = useState(false);
-  // トップ("/")は新しい3入口レイアウトなので下タブバーは出さない。
-  const hidden = pathname === "/" || HIDE_PREFIXES.some((p) => pathname.startsWith(p));
+  const hidden = HIDE_PREFIXES.some((p) => pathname.startsWith(p));
 
-  // クライアントでマウント後にのみ描画し、SSRとのハイドレーション不整合を避ける。
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // タブバー表示中は本文の下部に余白を作り、固定バーで隠れないようにする。
   useEffect(() => {
     document.body.classList.toggle("with-tabbar", mounted && !hidden);
     return () => document.body.classList.remove("with-tabbar");
@@ -117,7 +88,7 @@ export default function TabBar() {
   if (!mounted || hidden) return null;
 
   return (
-    <nav className="tabbar" aria-label="メインメニュー">
+    <nav className="tabbar md:hidden" aria-label="メインメニュー">
       <div className="mx-auto flex max-w-xl items-stretch justify-around">
         {TABS.map((t) => {
           const active = t.match(pathname);

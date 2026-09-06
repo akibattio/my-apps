@@ -10,6 +10,7 @@ export default function AdminLoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -41,15 +42,24 @@ export default function AdminLoginForm() {
         autoComplete="email"
         className={field}
       />
-      <input
-        type="password"
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="パスワード"
-        autoComplete="current-password"
-        className={field}
-      />
+      <div className="relative">
+        <input
+          type={showPw ? "text" : "password"}
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="パスワード"
+          autoComplete="current-password"
+          className={`${field} pr-16`}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPw((v) => !v)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted"
+        >
+          {showPw ? "隠す" : "表示"}
+        </button>
+      </div>
       <button
         type="submit"
         disabled={busy}

@@ -22,6 +22,9 @@ export async function updateMyListing(formData: FormData): Promise<void> {
     .maybeSingle();
   if (!row || (row.email ?? "").toLowerCase() !== email) redirect("/mypage");
 
+  const manufacturer = String(formData.get("manufacturer") ?? "").trim();
+  const model = String(formData.get("model") ?? "").trim();
+  if (!manufacturer || !model) redirect(`/mypage/${id}/edit`);
   const priceRaw = String(formData.get("price") ?? "").replace(/[,\s¥円]/g, "").trim();
   const price = priceRaw && /^\d+$/.test(priceRaw) ? Number(priceRaw) : null;
   const message = String(formData.get("message") ?? "").trim() || null;
@@ -30,7 +33,7 @@ export async function updateMyListing(formData: FormData): Promise<void> {
 
   await supabase
     .from("inquiries")
-    .update({ price, message, contact, name, updated_at: new Date().toISOString() })
+    .update({ manufacturer, model, price, message, contact, name, updated_at: new Date().toISOString() })
     .eq("id", id);
 
   redirect("/mypage");

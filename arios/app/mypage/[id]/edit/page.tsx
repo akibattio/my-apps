@@ -60,6 +60,14 @@ export default async function EditMyListing({
       <form action={updateMyListing} className="space-y-5">
         <input type="hidden" name="id" value={r.id} />
         <div>
+          <label className={label}>メーカー<span className="text-red-400"> 必須</span></label>
+          <input className={field} name="manufacturer" defaultValue={r.manufacturer ?? ""} placeholder="例: フェラーリ" />
+        </div>
+        <div>
+          <label className={label}>車種<span className="text-red-400"> 必須</span></label>
+          <input className={field} name="model" defaultValue={r.model ?? ""} placeholder="例: 488 Pista" />
+        </div>
+        <div>
           <label className={label}>{r.kind === "SELL" ? "販売価格（円）" : "希望価格（円）"}</label>
           <input
             className={field}
@@ -86,9 +94,6 @@ export default async function EditMyListing({
             placeholder="状態・年式・希望条件など"
           />
         </div>
-        <p className="text-xs text-muted">
-          ※ メーカー・車種の変更が必要な場合は、お手数ですが新しく登録し直してください。
-        </p>
         <button
           type="submit"
           className="w-full rounded-full bg-primary px-6 py-4 font-semibold text-black"
