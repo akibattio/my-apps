@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { reorderSeller } from "@/app/listings/actions";
+import { createDeal } from "@/app/admin/deals/actions";
 import { sellerOrder } from "@/app/listings/order";
 import { PARTY_LABEL, STATUS_ACTIVE } from "../../inquiries/constants";
 import { parseMatchKey } from "../key";
@@ -76,6 +77,56 @@ export default async function MatchingDetailPage({
           買い {buyers.length}・売り {sellers.length}
         </span>
       </header>
+
+      {/* 取引にする（買い×売りを選んで成立） */}
+      {isMatch && (
+        <section className="mb-6 rounded-2xl border border-accent/40 bg-accent/[0.06] p-4">
+          <p className="mb-1 text-sm font-medium text-accent">この組み合わせを取引にする</p>
+          <p className="mb-3 text-xs text-muted">
+            買い手と売り手を選ぶと「取引」を作成し、進行履歴・契約を記録できます。
+          </p>
+          <form action={createDeal} className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="manufacturer" value={maker} />
+            <input type="hidden" name="model" value={model} />
+            <label className="block">
+              <span className="text-[11px] text-muted">買い手</span>
+              <select
+                name="buyerId"
+                className="mt-1 block rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-foreground"
+                defaultValue={buyers[0]?.id ?? ""}
+              >
+                {buyers.map((b) => (
+                  <option key={b.id} value={b.id} className="bg-card">
+                    希望 {yen(b.price)}
+                    {b.name ? ` ・ ${b.name}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[11px] text-muted">売り手</span>
+              <select
+                name="sellerId"
+                className="mt-1 block rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-foreground"
+                defaultValue={sellers[0]?.id ?? ""}
+              >
+                {sellers.map((s) => (
+                  <option key={s.id} value={s.id} className="bg-card">
+                    {yen(s.price)}
+                    {s.name ? ` ・ ${s.name}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-black"
+            >
+              取引にする
+            </button>
+          </form>
+        </section>
+      )}
 
       {/* 買いたい */}
       <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
