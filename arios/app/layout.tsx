@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Kanit } from "next/font/google";
+import { Saira } from "next/font/google";
 import "./globals.css";
 import TabBar from "./TabBar";
 
-// ロゴ名（LIFE LINE GARAGE）用のブランドフォント。太字・斜体でスポーティに。
-const brandFont = Kanit({
+// ロゴ名（LIFE LINE GARAGE）用のブランドフォント。
+// Saira = モータースポーツ系のシャープなグロテスク。中太＋斜体でかっこよく。
+const brandFont = Saira({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["500", "600", "700"],
   style: ["normal", "italic"],
   variable: "--font-brand",
   display: "swap",
