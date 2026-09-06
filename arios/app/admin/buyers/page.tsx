@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHANNEL_LABEL, STATUS_LABEL, STATUS_ACTIVE } from "../inquiries/constants";
+import RowLink from "../RowLink";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "買いたい人 — ARIOS GARAGE" };
@@ -63,15 +64,15 @@ export default async function BuyersPage() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
+          <table className="w-full min-w-[880px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-white/[0.02]">
-                <th className={th}>受付</th>
-                <th className={th}>経路</th>
+                <th className={th}>日付</th>
+                <th className={th}>依頼者</th>
                 <th className={th}>メーカー</th>
                 <th className={th}>車種</th>
                 <th className={th}>希望価格</th>
-                <th className={th}>依頼者</th>
+                <th className={th}>経路</th>
                 <th className={th}>連絡先</th>
                 <th className={th}>状態</th>
                 <th className={th}>次アクション</th>
@@ -80,17 +81,21 @@ export default async function BuyersPage() {
             </thead>
             <tbody>
               {list.map((b) => (
-                <tr key={b.id} className="border-t border-white/[0.04] hover:bg-white/[0.02]">
+                <RowLink
+                  key={b.id}
+                  href={`/admin/inquiries/${b.id}`}
+                  className="border-t border-white/[0.04] hover:bg-white/[0.02]"
+                >
                   <td className={`${td} text-xs text-muted`}>
                     {new Date(b.created_at).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
                   </td>
-                  <td className={`${td} text-xs text-muted`}>
-                    {b.channel ? CHANNEL_LABEL[b.channel] ?? b.channel : "—"}
-                  </td>
+                  <td className={`${td} font-medium`}>{b.name || "—"}</td>
                   <td className={`${td} font-medium`}>{b.manufacturer || "—"}</td>
                   <td className={`${td} font-medium`}>{b.model || "—"}</td>
                   <td className={`${td} tabular-nums text-accent`}>{yen(b.price)}</td>
-                  <td className={td}>{b.name || "—"}</td>
+                  <td className={`${td} text-xs text-muted`}>
+                    {b.channel ? CHANNEL_LABEL[b.channel] ?? b.channel : "—"}
+                  </td>
                   <td className={`${td} text-xs text-muted`}>
                     {b.contact ? `${methodLabel(b.contact_method)} ${b.contact}` : "—"}
                   </td>
@@ -107,7 +112,7 @@ export default async function BuyersPage() {
                       開く›
                     </Link>
                   </td>
-                </tr>
+                </RowLink>
               ))}
             </tbody>
           </table>

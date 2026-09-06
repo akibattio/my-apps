@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAdmin } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
 import { sellerOrder } from "./order";
+import { matchKey } from "@/app/admin/matching/key";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 30;
@@ -155,5 +156,6 @@ export async function reorderSeller(formData: FormData): Promise<void> {
     await supabase.from("inquiries").update({ priority: i }).eq("id", ordered[i].id);
   }
 
-  redirect("/admin/matching");
+  // 操作した車のマッチング詳細に留まる
+  redirect(`/admin/matching/${matchKey(cur.manufacturer ?? "", cur.model ?? "")}`);
 }
