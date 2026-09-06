@@ -62,6 +62,9 @@ export default function QuickAddForm() {
   const [contactMethod, setContactMethod] = useState("PHONE");
   const [contact, setContact] = useState("");
   const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
+  const [email, setEmail] = useState("");
+  const [registeredBy, setRegisteredBy] = useState<"STAFF" | "SELF">("STAFF");
   const [message, setMessage] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -143,6 +146,9 @@ export default function QuickAddForm() {
     fd.set("contactMethod", contactMethod);
     fd.set("contact", contact);
     fd.set("name", name);
+    fd.set("company_name", company);
+    fd.set("email", email);
+    fd.set("registeredBy", registeredBy);
     fd.set("message", message);
     startTransition(() => formAction(fd));
   }
@@ -171,6 +177,31 @@ export default function QuickAddForm() {
             {k === "SELL" ? "売りたい" : "買いたい"}
           </button>
         ))}
+      </div>
+
+      {/* 受付区分（本人 or 管理者の代理登録） */}
+      <div>
+        <label className={label}>登録者</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setRegisteredBy("STAFF")}
+            className={`flex-1 ${chip(registeredBy === "STAFF")}`}
+          >
+            管理者が代理で登録
+          </button>
+          <button
+            type="button"
+            onClick={() => setRegisteredBy("SELF")}
+            className={`flex-1 ${chip(registeredBy === "SELF")}`}
+          >
+            お客様本人の申告
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          電話・LINE・来店など、こちらで受けて登録する場合は「代理」。お客様がメールで
+          マイページ管理を希望する場合のみ、下のメールを入れて「本人」にします。
+        </p>
       </div>
 
       {/* AI取り込みパネル */}
@@ -266,7 +297,20 @@ export default function QuickAddForm() {
         <input className={field} value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? "LINE ID" : "電話番号"} />
       </div>
 
-      <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前・会社名（任意）" />
+      <div>
+        <label className={label}>お名前</label>
+        <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" />
+      </div>
+      <div>
+        <label className={label}>会社名（任意）</label>
+        <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="◯◯自動車 株式会社" />
+      </div>
+      <div>
+        <label className={label}>
+          メールアドレス（{registeredBy === "SELF" ? "本人のマイページ用" : "任意"}）
+        </label>
+        <input className={field} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
+      </div>
       <textarea className={`${field} min-h-24`} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="備考・条件（年式/走行/色/希望条件など）" />
 
       {(localError || state.error) && <p className="text-sm text-red-400">{localError || state.error}</p>}

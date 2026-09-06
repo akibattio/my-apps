@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CHANNEL_LABEL, STATUS_LABEL, STATUS_ACTIVE } from "../inquiries/constants";
+import {
+  CHANNEL_LABEL,
+  STATUS_LABEL,
+  STATUS_ACTIVE,
+  REGISTERED_BY_LABEL,
+  REGISTERED_BY_STYLE,
+} from "../inquiries/constants";
 import RowLink from "../RowLink";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +19,7 @@ type Row = {
   price: number | null;
   name: string | null;
   company: string | null;
+  registered_by: string;
   contact: string | null;
   contact_method: string | null;
   channel: string | null;
@@ -37,7 +44,7 @@ export default async function BuyersPage() {
   const { data } = await supabase
     .from("inquiries")
     .select(
-      "id, manufacturer, model, price, name, company, contact, contact_method, channel, message, status, next_action_date, created_at"
+      "id, manufacturer, model, price, name, company, registered_by, contact, contact_method, channel, message, status, next_action_date, created_at"
     )
     .eq("kind", "BUY")
     .in("status", STATUS_ACTIVE)
@@ -91,7 +98,16 @@ export default async function BuyersPage() {
                     {new Date(b.created_at).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
                   </td>
                   <td className={`${td} font-medium`}>
-                    {b.name || "—"}
+                    <span className="flex items-center gap-1.5">
+                      {b.name || "—"}
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-normal ${
+                          REGISTERED_BY_STYLE[b.registered_by] ?? REGISTERED_BY_STYLE.STAFF
+                        }`}
+                      >
+                        {REGISTERED_BY_LABEL[b.registered_by] ?? "代理"}
+                      </span>
+                    </span>
                     {b.company && <span className="block text-xs font-normal text-muted">{b.company}</span>}
                   </td>
                   <td className={`${td} font-medium`}>{b.manufacturer || "—"}</td>

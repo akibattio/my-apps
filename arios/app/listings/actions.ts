@@ -90,6 +90,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         email,
         company: company || null,
         source: "WEB_FORM",
+        registered_by: "SELF",
         status: "NEW",
       })
       .select("id")

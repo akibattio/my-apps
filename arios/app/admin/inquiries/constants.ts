@@ -23,6 +23,17 @@ export const KIND_LABEL: Record<string, string> = {
   BUY: "買いたい",
 };
 
+// 登録者区分（お客様本人が登録 / 管理者が代理登録）。
+export const REGISTERED_BY_LABEL: Record<string, string> = {
+  SELF: "お客様登録",
+  STAFF: "代理登録",
+};
+
+export const REGISTERED_BY_STYLE: Record<string, string> = {
+  SELF: "text-sky-300 bg-sky-400/10",
+  STAFF: "text-primary bg-primary/10",
+};
+
 export const CHANNEL_LABEL: Record<string, string> = {
   LINE: "LINE",
   WHATSAPP: "WhatsApp",

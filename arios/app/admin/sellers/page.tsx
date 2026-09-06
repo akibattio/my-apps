@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sellerOrder } from "@/app/listings/order";
-import { PARTY_LABEL, STATUS_ACTIVE } from "../inquiries/constants";
+import {
+  PARTY_LABEL,
+  STATUS_ACTIVE,
+  REGISTERED_BY_LABEL,
+  REGISTERED_BY_STYLE,
+} from "../inquiries/constants";
 import RowLink from "../RowLink";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +21,7 @@ type Row = {
   party_type: string | null;
   name: string | null;
   company: string | null;
+  registered_by: string;
   contact: string | null;
   contact_method: string | null;
   vin: string | null;
@@ -30,7 +36,7 @@ export default async function SellersPage() {
   const { data } = await supabase
     .from("inquiries")
     .select(
-      "id, manufacturer, model, price, priority, party_type, name, company, contact, contact_method, vin, created_at"
+      "id, manufacturer, model, price, priority, party_type, name, company, registered_by, contact, contact_method, vin, created_at"
     )
     .eq("kind", "SELL")
     .in("status", STATUS_ACTIVE)
@@ -106,7 +112,16 @@ export default async function SellersPage() {
                     {s.contact ? `${methodLabel(s.contact_method)} ${s.contact}` : "—"}
                   </td>
                   <td className={td}>
-                    {s.name || "—"}
+                    <span className="flex items-center gap-1.5">
+                      {s.name || "—"}
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                          REGISTERED_BY_STYLE[s.registered_by] ?? REGISTERED_BY_STYLE.STAFF
+                        }`}
+                      >
+                        {REGISTERED_BY_LABEL[s.registered_by] ?? "代理"}
+                      </span>
+                    </span>
                     {s.company && <span className="block text-xs text-muted">{s.company}</span>}
                   </td>
                   <td className={`${td} text-xs text-muted`}>

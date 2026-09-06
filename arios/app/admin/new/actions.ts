@@ -73,10 +73,15 @@ export async function createListing(
       : null;
   const vin = String(formData.get("vin") ?? "").trim() || null;
   const name = String(formData.get("name") ?? "").trim() || null;
+  const company = String(formData.get("company_name") ?? "").trim() || null;
   const contact = String(formData.get("contact") ?? "").trim() || null;
   const contact_method = String(formData.get("contactMethod") ?? "").trim() || null;
   const channel = String(formData.get("channel") ?? "").trim() || null;
   const message = String(formData.get("message") ?? "").trim() || null;
+  const emailRaw = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : null;
+  // 登録者区分: 既定は管理者の代理登録(STAFF)。本人申告なら SELF。
+  const registered_by = String(formData.get("registeredBy") ?? "") === "SELF" ? "SELF" : "STAFF";
 
   let id: string;
   try {
@@ -91,11 +96,14 @@ export async function createListing(
         party_type,
         vin,
         name,
+        company,
         contact,
         contact_method,
         channel,
         message,
-        source: "AI_ASSIST",
+        email,
+        source: registered_by === "SELF" ? "WEB_FORM" : "AI_ASSIST",
+        registered_by,
         status: "NEW",
       })
       .select("id")

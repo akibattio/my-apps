@@ -8,7 +8,14 @@ import {
   markContacted,
   updateInquiryContact,
 } from "../actions";
-import { STATUS_LABEL, PARTY_LABEL, KIND_LABEL, STATUS_FLOW } from "../constants";
+import {
+  STATUS_LABEL,
+  PARTY_LABEL,
+  KIND_LABEL,
+  STATUS_FLOW,
+  REGISTERED_BY_LABEL,
+  REGISTERED_BY_STYLE,
+} from "../constants";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "依頼の詳細 — LIFE LINE GARAGE" };
@@ -26,7 +33,7 @@ export default async function InquiryDetailPage({
   const { data: inq } = await supabase
     .from("inquiries")
     .select(
-      "id, kind, manufacturer, model, price, vin, party_type, name, company, contact, contact_method, email, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
+      "id, kind, manufacturer, model, price, vin, party_type, name, company, contact, contact_method, email, registered_by, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -88,7 +95,14 @@ export default async function InquiryDetailPage({
           ←
         </Link>
         <h1 className="text-xl font-semibold">依頼の詳細</h1>
-        <span className="ml-auto rounded-full border border-border bg-white/5 px-3 py-1 text-xs text-muted">
+        <span
+          className={`ml-auto rounded-full px-3 py-1 text-xs font-medium ${
+            REGISTERED_BY_STYLE[inq.registered_by] ?? REGISTERED_BY_STYLE.STAFF
+          }`}
+        >
+          {REGISTERED_BY_LABEL[inq.registered_by] ?? "代理登録"}
+        </span>
+        <span className="rounded-full border border-border bg-white/5 px-3 py-1 text-xs text-muted">
           {STATUS_LABEL[inq.status] ?? inq.status}
         </span>
       </header>

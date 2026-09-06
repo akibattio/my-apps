@@ -118,9 +118,9 @@ export default async function AdminDashboard() {
         className="mb-3 flex items-center justify-between rounded-2xl border border-primary/50 bg-primary/10 p-5 hover:border-primary"
       >
         <div>
-          <p className="text-sm font-semibold text-primary">✨ AIで登録</p>
+          <p className="text-sm font-semibold text-primary">＋ 依頼を登録（代理登録OK）</p>
           <p className="mt-1 text-xs text-muted">
-            写真・スクショ・貼り付けから買いたい/売りたいを素早く登録
+            電話・LINE・来店で受けた買いたい/売りたいを登録（AI下書きも可）
           </p>
         </div>
         <span className="text-primary">›</span>
