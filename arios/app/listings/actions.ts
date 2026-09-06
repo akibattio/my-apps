@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentAdmin } from "@/lib/auth";
+import { getCurrentAdmin, getCurrentUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
 import { sellerOrder } from "./order";
 import { matchKey } from "@/app/admin/matching/key";
@@ -50,6 +50,11 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
   const channel = String(formData.get("channel") ?? "").trim() || null;
   const message = String(formData.get("message") ?? "").trim();
 
+  // マイページ紐付け用メール。ログイン中なら本人のメールを最優先（確実に紐付く）。
+  const user = await getCurrentUser();
+  const emailRaw = (user?.email ?? String(formData.get("email") ?? "")).trim().toLowerCase();
+  const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : null;
+
   const photos =
     kind === "SELL"
       ? formData
@@ -77,6 +82,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         contact_method: contactMethod || null,
         channel,
         message: message || null,
+        email,
         source: "WEB_FORM",
         status: "NEW",
       })

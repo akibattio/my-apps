@@ -16,11 +16,13 @@ const CONTACTS = [
   { v: "LINE", label: "LINE ID" },
 ];
 
-export default function SellForm() {
+export default function SellForm({ defaultEmail }: { defaultEmail?: string }) {
   const [state, formAction, isPending] = useActionState<ListingState, FormData>(
     submitSell,
     {}
   );
+  const [email, setEmail] = useState(defaultEmail ?? "");
+  const loggedIn = !!defaultEmail;
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [preparing, setPreparing] = useState(false);
@@ -67,6 +69,7 @@ export default function SellForm() {
     fd.set("contactMethod", contactMethod);
     fd.set("contact", contact);
     fd.set("name", name);
+    fd.set("email", email);
     fd.set("message", message);
     for (const f of files) fd.append("photos", f);
     startTransition(() => formAction(fd));
@@ -134,6 +137,27 @@ export default function SellForm() {
       </div>
 
       <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前・会社名（任意）" />
+
+      <div>
+        <label className={label}>
+          メールアドレス{loggedIn ? "（ログイン中）" : "（マイページで確認する場合）"}
+        </label>
+        <input
+          className={`${field} ${loggedIn ? "opacity-60" : ""}`}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          readOnly={loggedIn}
+          placeholder="you@example.com"
+          autoComplete="email"
+        />
+        <p className="mt-1 text-xs text-muted">
+          {loggedIn
+            ? "この登録はあなたのマイページに表示されます。"
+            : "入れておくと、後でマイページから状況を確認できます（任意）。"}
+        </p>
+      </div>
+
       <textarea className={`${field} min-h-24`} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="備考（状態・年式・走行距離・希望条件など）" />
 
       <div>

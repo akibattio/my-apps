@@ -1,12 +1,15 @@
 import Wordmark from "../Wordmark";
 import BuyForm from "../listings/BuyForm";
+import { getCurrentUser } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
 export const metadata = {
   title: "車を探したい — ARIOS GARAGE",
   description: "お探しの車をご登録ください。ARIOSが売り手をお探しします。",
 };
 
-export default function BuyPage() {
+export default async function BuyPage() {
+  const user = await getCurrentUser();
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <header className="mb-8 flex flex-col items-center text-center">
@@ -17,7 +20,7 @@ export default function BuyPage() {
           お探しの車を1台ずつご登録ください。ARIOSが売り手をお探しします。
         </p>
       </header>
-      <BuyForm />
+      <BuyForm defaultEmail={user?.email ?? undefined} />
     </main>
   );
 }

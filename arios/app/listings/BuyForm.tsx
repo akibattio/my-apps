@@ -20,12 +20,14 @@ const CHANNELS = [
   { v: "OTHER", label: "その他" },
 ];
 
-export default function BuyForm() {
+export default function BuyForm({ defaultEmail }: { defaultEmail?: string }) {
   const [state, formAction, isPending] = useActionState<ListingState, FormData>(
     submitBuy,
     {}
   );
   const [localError, setLocalError] = useState<string | null>(null);
+  const [email, setEmail] = useState(defaultEmail ?? "");
+  const loggedIn = !!defaultEmail;
 
   const [channel, setChannel] = useState("LINE");
   const [manufacturer, setManufacturer] = useState("");
@@ -71,6 +73,7 @@ export default function BuyForm() {
     fd.set("contactMethod", contactMethod);
     fd.set("contact", contact);
     fd.set("name", name);
+    fd.set("email", email);
     fd.set("message", message);
     startTransition(() => formAction(fd));
   }
@@ -162,6 +165,27 @@ export default function BuyForm() {
       </div>
 
       <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前・会社名（任意）" />
+
+      <div>
+        <label className={label}>
+          メールアドレス{loggedIn ? "（ログイン中）" : "（マイページで確認する場合）"}
+        </label>
+        <input
+          className={`${field} ${loggedIn ? "opacity-60" : ""}`}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          readOnly={loggedIn}
+          placeholder="you@example.com"
+          autoComplete="email"
+        />
+        <p className="mt-1 text-xs text-muted">
+          {loggedIn
+            ? "この依頼はあなたのマイページに表示されます。"
+            : "入れておくと、後でマイページから状況を確認できます（任意）。"}
+        </p>
+      </div>
+
       <textarea className={`${field} min-h-24`} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="その他ご希望・備考（任意）" />
 
       {(localError || state.error) && <p className="text-sm text-red-400">{localError || state.error}</p>}

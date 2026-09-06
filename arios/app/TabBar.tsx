@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 // 公開共有ページ(パスポート)やログイン・完了画面など「アプリの外」では隠す。
 const HIDE_PREFIXES = [
   "/login",
+  "/signup",
   "/thank-you",
   "/passport",
   "/auth",
@@ -16,6 +17,7 @@ const HIDE_PREFIXES = [
   "/sell",
   "/buy",
   "/submitted",
+  "/mypage",
   "/admin",
 ];
 
@@ -98,7 +100,8 @@ const TABS: Tab[] = [
 export default function TabBar() {
   const pathname = usePathname() || "/";
   const [mounted, setMounted] = useState(false);
-  const hidden = HIDE_PREFIXES.some((p) => pathname.startsWith(p));
+  // トップ("/")は新しい3入口レイアウトなので下タブバーは出さない。
+  const hidden = pathname === "/" || HIDE_PREFIXES.some((p) => pathname.startsWith(p));
 
   // クライアントでマウント後にのみ描画し、SSRとのハイドレーション不整合を避ける。
   useEffect(() => {

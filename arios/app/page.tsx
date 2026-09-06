@@ -1,25 +1,33 @@
 import Link from "next/link";
 import Wordmark from "./Wordmark";
+import { getCurrentUser } from "@/lib/auth";
 
-// Top（公開・訪問者）。アプリのランディング。下タブバーから各機能へ。
-const PRINCIPLES = [
+// Top（公開・訪問者）。3つの入口: 売りたい / 買いたい / マイページ。
+export const dynamic = "force-dynamic";
+
+const ENTRIES = [
   {
-    title: "History is never deleted",
-    body: "一度刻まれた歴史は消えません。オーナーが変わっても記録は残り続けます。",
+    href: "/sell",
+    emoji: "🚗",
+    title: "車を売りたい",
+    body: "お車の情報を登録。ARIOSが買い手をお探しします。",
+    accent: "border-accent/40 bg-accent/[0.06] hover:border-accent",
   },
   {
-    title: "Vehicle は永久",
-    body: "車を主役に、一本の時間軸へ。所有・整備・修理・旅——すべてが積み重なります。",
-  },
-  {
-    title: "写真から1分で登録",
-    body: "写真を撮る → AIが下書き → 確認 → 保存。難しい入力はいりません。",
+    href: "/buy",
+    emoji: "🔎",
+    title: "車を買いたい",
+    body: "お探しの車を登録。条件に合う一台をお探しします。",
+    accent: "border-sky-400/40 bg-sky-400/[0.06] hover:border-sky-400",
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const user = await getCurrentUser();
+  const myHref = user ? "/mypage" : "/login";
+
   return (
-    <main className="mx-auto max-w-xl px-6 pt-14">
+    <main className="mx-auto max-w-xl px-6 pt-14 pb-16">
       <header className="text-center">
         <div className="flex justify-center">
           <Wordmark />
@@ -28,48 +36,54 @@ export default function Home() {
           LIFE LINE
         </p>
         <h1 className="mt-7 text-3xl leading-snug font-semibold">
-          一台ごとの歴史を、
+          売る人と買う人を、
           <br />
-          100年残す。
+          ARIOSがつなぐ。
         </h1>
-        <p className="mt-5 text-left leading-relaxed text-muted">
-          ARIOS
-          は車の売買サイトではありません。一台の車の人生を一本の時間軸で記録する
-          Vehicle Timeline
-          です。歴史が育った結果として、売買が自然に生まれます。
+        <p className="mt-5 leading-relaxed text-muted">
+          まずは「売りたい」か「買いたい」から。マイページに登録すると、
+          やり取りの状況やマッチのお知らせをまとめて確認できます。
         </p>
       </header>
 
-      <Link
-        href="/register"
-        className="mt-8 block rounded-full bg-primary px-6 py-4 text-center font-semibold text-black shadow-lg shadow-primary/20"
-      >
-        愛車を登録する
-      </Link>
-      <Link
-        href="/garage"
-        className="mt-3 block text-center text-sm text-muted underline-offset-4 hover:underline"
-      >
-        すでにアカウントをお持ちの方は マイガレージへ
-      </Link>
-
-      <section className="mt-12 space-y-3">
-        {PRINCIPLES.map((p) => (
-          <div
-            key={p.title}
-            className="rounded-2xl border border-border bg-card p-5"
+      <section className="mt-9 space-y-3">
+        {ENTRIES.map((e) => (
+          <Link
+            key={e.href}
+            href={e.href}
+            className={`flex items-center gap-4 rounded-2xl border p-5 transition-colors ${e.accent}`}
           >
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-              <h2 className="text-sm font-medium tracking-wide">{p.title}</h2>
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{p.body}</p>
-          </div>
+            <span className="text-3xl">{e.emoji}</span>
+            <span className="min-w-0">
+              <span className="block text-lg font-semibold">{e.title}</span>
+              <span className="mt-0.5 block text-sm text-muted">{e.body}</span>
+            </span>
+            <span className="ml-auto text-xl text-muted">›</span>
+          </Link>
         ))}
+
+        {/* マイページ（登録・ログイン） */}
+        <Link
+          href={myHref}
+          className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary"
+        >
+          <span className="text-3xl">👤</span>
+          <span className="min-w-0">
+            <span className="block text-lg font-semibold">
+              マイページ{user ? "" : "（登録・ログイン）"}
+            </span>
+            <span className="mt-0.5 block text-sm text-muted">
+              {user
+                ? "自分の売りたい・買いたい、マッチの状況を確認"
+                : "登録すると状況をまとめて確認できます"}
+            </span>
+          </span>
+          <span className="ml-auto text-xl text-muted">›</span>
+        </Link>
       </section>
 
-      <p className="mt-10 text-center text-xs text-muted">
-        History is never deleted.
+      <p className="mt-12 text-center text-xs text-muted">
+        ARIOS — 一台ごとの人生を、つなぐ。
       </p>
     </main>
   );
