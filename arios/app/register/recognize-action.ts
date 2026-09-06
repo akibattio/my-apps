@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { recognizeVehicle, type Recognition } from "@/lib/ai/recognize";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
 
 export type RecognizeResult =
@@ -15,6 +16,10 @@ export async function recognizePhoto(
   base64: string,
   mediaType: string
 ): Promise<RecognizeResult> {
+  // 認証必須（有料AIの無認証乱用を防ぐ）
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "ログインが必要です。" };
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ok: false, error: "AIキーが未設定です（.env の ANTHROPIC_API_KEY）。" };
   }

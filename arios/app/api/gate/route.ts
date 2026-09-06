@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
+import { safeNext } from "@/lib/nav";
 
 // 合言葉の検証。正しければ Cookie を発行して next へ、違えば /gate に戻す。
 export async function POST(request: Request) {
   const form = await request.formData();
   const code = String(form.get("code") ?? "");
-  const rawNext = String(form.get("next") ?? "/");
-  // オープンリダイレクト対策: 自サイト内パスのみ許可
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+  // オープンリダイレクト対策: 自サイト内パスのみ許可（バックスラッシュ等も拒否）
+  const next = safeNext(String(form.get("next") ?? "/"), "/");
 
   const passcode = process.env.SITE_PASSCODE;
   const origin = new URL(request.url).origin;

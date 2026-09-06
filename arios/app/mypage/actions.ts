@@ -11,7 +11,6 @@ const MAX_PHOTOS = 20;
 export async function addListingPhotos(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/mypage");
-  const email = (user.email ?? "").toLowerCase();
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/mypage");
@@ -19,10 +18,11 @@ export async function addListingPhotos(formData: FormData): Promise<void> {
   const supabase = createAdminClient();
   const { data: row } = await supabase
     .from("inquiries")
-    .select("id, email, photo_urls")
+    .select("id, auth_user_id, photo_urls")
     .eq("id", id)
     .maybeSingle();
-  if (!row || (row.email ?? "").toLowerCase() !== email) redirect("/mypage");
+  // 本人確認: 認証ユーザーIDで判定（メール文字列では判定しない）
+  if (!row || row.auth_user_id !== user.id) redirect("/mypage");
 
   const existing: string[] = row.photo_urls ?? [];
   const photos = formData
@@ -60,7 +60,6 @@ export async function addListingPhotos(formData: FormData): Promise<void> {
 export async function removeListingPhoto(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/mypage");
-  const email = (user.email ?? "").toLowerCase();
 
   const id = String(formData.get("id") ?? "").trim();
   const path = String(formData.get("path") ?? "").trim();
@@ -69,10 +68,10 @@ export async function removeListingPhoto(formData: FormData): Promise<void> {
   const supabase = createAdminClient();
   const { data: row } = await supabase
     .from("inquiries")
-    .select("id, email, photo_urls")
+    .select("id, auth_user_id, photo_urls")
     .eq("id", id)
     .maybeSingle();
-  if (!row || (row.email ?? "").toLowerCase() !== email) redirect("/mypage");
+  if (!row || row.auth_user_id !== user.id) redirect("/mypage");
 
   const existing: string[] = row.photo_urls ?? [];
   if (!existing.includes(path)) redirect(`/mypage/${id}/edit`);
@@ -85,23 +84,22 @@ export async function removeListingPhoto(formData: FormData): Promise<void> {
   redirect(`/mypage/${id}/edit`);
 }
 
-// 自分の依頼(売り/買い)を修正更新する。本人のメールと一致する行のみ更新可。
+// 自分の依頼(売り/買い)を修正更新する。認証ユーザーID一致の行のみ更新可。
 export async function updateMyListing(formData: FormData): Promise<void> {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/mypage");
-  const email = (user.email ?? "").toLowerCase();
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/mypage");
 
   const supabase = createAdminClient();
-  // 本人確認: この依頼のメールがログイン中のメールと一致するか。
+  // 本人確認: 認証ユーザーIDで判定（メール文字列では判定しない）
   const { data: row } = await supabase
     .from("inquiries")
-    .select("id, email")
+    .select("id, auth_user_id")
     .eq("id", id)
     .maybeSingle();
-  if (!row || (row.email ?? "").toLowerCase() !== email) redirect("/mypage");
+  if (!row || row.auth_user_id !== user.id) redirect("/mypage");
 
   const manufacturer = String(formData.get("manufacturer") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim();

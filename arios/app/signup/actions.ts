@@ -1,8 +1,11 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAdminEmails } from "@/lib/auth";
+import { rateLimit } from "@/lib/ratelimit";
 
-export type SignupResult = { error?: "invalid" | "exists" | "failed" };
+export type SignupResult = { error?: "invalid" | "exists" | "failed" | "ratelimited" };
 
 export type SignupProfile = {
   name?: string;
@@ -22,6 +25,16 @@ export async function signUpCustomer(
   const em = (email ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return { error: "invalid" };
   if (!password || password.length < 6) return { error: "invalid" };
+
+  // レート制限（IP単位・ベストエフォート。本番は共有ストア推奨）。
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  const rl = rateLimit(`signup:${ip}`, 5, 60_000);
+  const rlDay = rateLimit(`signup:day:${ip}`, 30, 24 * 60 * 60_000);
+  if (!rl.ok || !rlDay.ok) return { error: "ratelimited" };
+
+  // 管理者メールは会員登録で作成させない（成りすまし防止）。管理者は別経路で発行。
+  if (getAdminEmails().includes(em)) return { error: "failed" };
 
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.createUser({

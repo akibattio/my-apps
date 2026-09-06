@@ -4,14 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/nav";
 
 // メール＋パスワードでログイン。
 export default function LoginForm() {
   const supabase = createClient();
   const router = useRouter();
   const params = useSearchParams();
-  const rawNext = params.get("next") ?? "/mypage";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/mypage";
+  const next = safeNext(params.get("next"), "/mypage");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

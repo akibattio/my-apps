@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentAdmin } from "@/lib/auth";
+import { getCurrentAdmin, getCurrentUser } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
 import { sellerOrder } from "./order";
 import { matchKey } from "@/app/admin/matching/key";
@@ -16,6 +16,10 @@ export type ListingState = { error?: string };
 
 // 公開フォームからの送信（買いたい/売りたい）。認証不要・スパム対策あり。
 async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<ListingState> {
+  // 認証必須（会員のみ登録可）。所有権は auth_user_id で判定する。
+  const user = await getCurrentUser();
+  if (!user) return { error: "ログインが必要です。" };
+
   // ハニーポット（botが埋める隠しフィールド）→ 成功したふりで無視
   if (String(formData.get("company") ?? "").trim()) {
     redirect(`/submitted?kind=${kind}`);
@@ -89,6 +93,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         message: message || null,
         email,
         company: company || null,
+        auth_user_id: user.id,
         source: "WEB_FORM",
         registered_by: "SELF",
         status: "NEW",

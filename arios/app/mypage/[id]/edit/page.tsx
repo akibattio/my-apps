@@ -20,7 +20,7 @@ type Row = {
   message: string | null;
   contact: string | null;
   name: string | null;
-  email: string | null;
+  auth_user_id: string | null;
   photo_urls: string[] | null;
 };
 
@@ -32,18 +32,17 @@ export default async function EditMyListing({
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/mypage/${id}/edit`);
-  const email = (user.email ?? "").toLowerCase();
 
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("inquiries")
-    .select("id, kind, manufacturer, model, price, message, contact, name, email, photo_urls")
+    .select("id, kind, manufacturer, model, price, message, contact, name, auth_user_id, photo_urls")
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
   const r = data as Row;
-  // 本人以外は自分のマイページへ戻す。
-  if ((r.email ?? "").toLowerCase() !== email) redirect("/mypage");
+  // 本人以外（認証ユーザーID不一致）は自分のマイページへ戻す。
+  if (r.auth_user_id !== user.id) redirect("/mypage");
 
   // 既存写真は非公開バケットなので署名付きURLで表示。
   const paths: string[] = r.photo_urls ?? [];

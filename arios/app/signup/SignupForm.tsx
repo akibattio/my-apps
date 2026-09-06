@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { safeNext } from "@/lib/nav";
 import { signUpCustomer } from "./actions";
 
 // メール＋パスワードで新規登録。
@@ -13,8 +14,7 @@ export default function SignupForm() {
   const supabase = createClient();
   const router = useRouter();
   const params = useSearchParams();
-  const rawNext = params.get("next") ?? "/mypage";
-  const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/mypage";
+  const next = safeNext(params.get("next"), "/mypage");
 
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
@@ -49,9 +49,14 @@ export default function SignupForm() {
       contact,
       contactMethod,
     });
+    if (res.error === "ratelimited") {
+      setBusy(false);
+      setError("登録の試行が集中しています。少し時間をおいてお試しください。");
+      return;
+    }
     if (res.error === "exists") {
       setBusy(false);
-      setError("このメールアドレスは既に登録されています。ログインしてください。");
+      setError("このメールアドレスは登録できません。すでにアカウントをお持ちの場合はログインしてください。");
       return;
     }
     if (res.error) {

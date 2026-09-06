@@ -29,7 +29,6 @@ const key = (mk: string | null, md: string | null) =>
 export default async function MyPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/mypage");
-  const email = (user.email ?? "").toLowerCase();
   const meta = (user.user_metadata ?? {}) as {
     name?: string;
     company?: string;
@@ -42,7 +41,7 @@ export default async function MyPage() {
     supabase
       .from("inquiries")
       .select("id, kind, manufacturer, model, price, status, message, contact, name, created_at")
-      .eq("email", email)
+      .eq("auth_user_id", user.id)
       .order("created_at", { ascending: false }),
     supabase.from("inquiries").select("kind, manufacturer, model").in("status", STATUS_ACTIVE),
   ]);

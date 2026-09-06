@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ensureOwner } from "@/lib/auth";
+import { ensureOwner, getCurrentUser } from "@/lib/auth";
 
 const BUCKET = "vehicle-images";
 const MAX_PHOTOS = 10;
@@ -15,6 +15,10 @@ export async function registerVehicle(
   _prev: RegisterState,
   formData: FormData
 ): Promise<RegisterState> {
+  // 認証必須（ページだけでなくアクション自体でガードする）
+  const user = await getCurrentUser();
+  if (!user) return { error: "ログインが必要です。" };
+
   const manufacturer = String(formData.get("manufacturer") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim();
   const yearRaw = String(formData.get("year") ?? "").trim();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/nav";
 
 // ログインの受け口。2通りに対応する:
 //  - メールのマジックリンク（PKCE）: ?code=... → exchangeCodeForSession
@@ -10,10 +11,8 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
   const type = (searchParams.get("type") ?? "email") as EmailOtpType;
-  // オープンリダイレクト対策: 自サイト内の単一スラッシュ始まりパスのみ許可
-  const rawNext = searchParams.get("next") ?? "/garage";
-  const next =
-    rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/garage";
+  // オープンリダイレクト対策: 自サイト内パスのみ許可（バックスラッシュ等も拒否）
+  const next = safeNext(searchParams.get("next"), "/mypage");
 
   const supabase = await createClient();
 
