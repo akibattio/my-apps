@@ -6,7 +6,7 @@ import TabBar from "./TabBar";
 // ロゴ名（LIFE LINE GARAGE）用のブランドフォント。太字・斜体でスポーティに。
 const brandFont = Kanit({
   subsets: ["latin"],
-  weight: ["600", "700"],
+  weight: ["400", "500"],
   style: ["normal", "italic"],
   variable: "--font-brand",
   display: "swap",

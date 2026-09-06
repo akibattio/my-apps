@@ -11,7 +11,7 @@ export default function Wordmark({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-arios.png" alt="ARIOS" className="h-10 w-auto" />
       <div
-        className="font-bold italic leading-[1.02] tracking-tight"
+        className="font-normal italic leading-[1.02] tracking-tight"
         style={{ fontFamily: "var(--font-brand), system-ui, sans-serif" }}
       >
         <span className="block text-[30px] sm:text-[34px]">
