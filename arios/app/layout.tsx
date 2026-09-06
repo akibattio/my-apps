@@ -1,6 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import { Kanit } from "next/font/google";
 import "./globals.css";
 import TabBar from "./TabBar";
+
+// ロゴ名（LIFE LINE GARAGE）用のブランドフォント。太字・斜体でスポーティに。
+const brandFont = Kanit({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-brand",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "LIFE LINE GARAGE — 一台ごとの歴史を100年残す",
@@ -40,7 +50,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ja">
+    <html lang="ja" className={brandFont.variable}>
       <body>
         {children}
         <TabBar />

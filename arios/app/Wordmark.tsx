@@ -10,7 +10,10 @@ export default function Wordmark({
       {/* ブランド（ARIOS）ロゴは従来サイズ */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-arios.png" alt="ARIOS" className="h-10 w-auto" />
-      <div className="font-extrabold italic leading-[1.02] tracking-tight">
+      <div
+        className="font-bold italic leading-[1.02] tracking-tight"
+        style={{ fontFamily: "var(--font-brand), system-ui, sans-serif" }}
+      >
         <span className="block text-[30px] sm:text-[34px]">
           LIFE LINE <span className="text-primary">GARAGE</span>
         </span>
