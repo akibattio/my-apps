@@ -6,7 +6,7 @@ import { createDeal } from "@/app/admin/deals/actions";
 import { sellerOrder } from "@/app/listings/order";
 import { PARTY_LABEL, STATUS_ACTIVE } from "../../inquiries/constants";
 import { parseMatchKey } from "../key";
-import { gradePair, GRADE_LABEL, GRADE_STYLE, GRADE_RANK } from "../score";
+import { gradePairFull, GRADE_LABEL, GRADE_STYLE, GRADE_RANK } from "../score";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング詳細 — ARIOS GARAGE" };
@@ -63,8 +63,8 @@ export default async function MatchingDetailPage({
   const pairs = buyers
     .flatMap((b) =>
       sellers.map((s) => {
-        const { grade, reason } = gradePair(b.price, s.price);
-        return { b, s, grade, reason };
+        const { grade, reasons } = gradePairFull(b, s);
+        return { b, s, grade, reasons };
       })
     )
     .sort((a, z) => {
@@ -151,7 +151,7 @@ export default async function MatchingDetailPage({
             おすすめの組み合わせ（成立可能性で判定）
           </div>
           <ul className="divide-y divide-white/[0.04]">
-            {pairs.map(({ b, s, grade, reason }) => (
+            {pairs.map(({ b, s, grade, reasons }) => (
               <li key={b.id + "|" + s.id} className="px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span
@@ -177,10 +177,13 @@ export default async function MatchingDetailPage({
                     </button>
                   </form>
                 </div>
-                <p className="mt-1 text-xs text-muted">
-                  {reason}
-                  <span className="ml-1 opacity-70">／ 色・状態などの条件は要確認</span>
-                </p>
+                <ul className="mt-1 space-y-0.5 text-xs text-muted">
+                  {reasons.map((r, i) => (
+                    <li key={i} className={r.startsWith("⚠") ? "text-red-300" : undefined}>
+                      {r}
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>

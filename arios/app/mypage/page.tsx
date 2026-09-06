@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { signOut } from "@/app/auth/actions";
 import { STATUS_LABEL, STATUS_ACTIVE } from "@/app/admin/inquiries/constants";
+import { DEAL_STATUS_LABEL, DEAL_STATUS_STYLE } from "@/app/admin/deals/constants";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マイページ — ARIOS GARAGE" };
@@ -41,13 +42,26 @@ export default async function MyPage() {
   ]);
   const mine = (mineData ?? []) as Row[];
 
+  // 自分の依頼が「取引」に紐付いているか（進捗表示用）。依頼ID → 取引ステータス。
+  const dealByInquiry = new Map<string, string>();
+  const mineIds = mine.map((r) => r.id);
+  if (mineIds.length > 0) {
+    const [{ data: asBuyer }, { data: asSeller }] = await Promise.all([
+      supabase.from("deals").select("status, buyer_inquiry_id").in("buyer_inquiry_id", mineIds),
+      supabase.from("deals").select("status, seller_inquiry_id").in("seller_inquiry_id", mineIds),
+    ]);
+    for (const d of asBuyer ?? []) if (d.buyer_inquiry_id) dealByInquiry.set(d.buyer_inquiry_id, d.status);
+    for (const d of asSeller ?? []) if (d.seller_inquiry_id) dealByInquiry.set(d.seller_inquiry_id, d.status);
+  }
+
   // マッチ判定用: 有効な依頼の「種別:メーカー×車種」集合。
   const present = new Set<string>();
   for (const r of activeData ?? []) present.add(`${r.kind}:${key(r.manufacturer, r.model)}`);
 
-  // 自分の有効な出品のうち、反対側(相手)が存在するもの＝マッチあり。
+  // 自分の有効な出品のうち、反対側(相手)が存在し、まだ取引になっていないもの＝マッチあり。
   const matched = mine.filter((r) => {
     if (!STATUS_ACTIVE.includes(r.status)) return false;
+    if (dealByInquiry.has(r.id)) return false; // すでに取引に進んでいる
     const opposite = r.kind === "BUY" ? "SELL" : "BUY";
     return present.has(`${opposite}:${key(r.manufacturer, r.model)}`);
   });
@@ -57,17 +71,28 @@ export default async function MyPage() {
 
   const listItem = (r: Row) => {
     const hasMatch = matched.some((m) => m.id === r.id);
+    const dealStatus = dealByInquiry.get(r.id);
     return (
       <li key={r.id} className="flex items-center gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="font-medium">
               {r.manufacturer || "—"} {r.model || ""}
             </span>
-            {hasMatch && (
-              <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">
-                マッチあり
+            {dealStatus ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  DEAL_STATUS_STYLE[dealStatus] ?? DEAL_STATUS_STYLE.CANCELLED
+                }`}
+              >
+                取引 {DEAL_STATUS_LABEL[dealStatus] ?? dealStatus}
               </span>
+            ) : (
+              hasMatch && (
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">
+                  マッチあり
+                </span>
+              )
             )}
           </div>
           <div className="mt-0.5 text-xs text-muted">

@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE } from "../inquiries/constants";
 import RowLink from "../RowLink";
 import { matchKey } from "./key";
-import { bestGrade, GRADE_LABEL, GRADE_STYLE } from "./score";
+import { bestGradeFull, GRADE_LABEL, GRADE_STYLE } from "./score";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング — ARIOS GARAGE" };
@@ -14,6 +14,7 @@ type Row = {
   manufacturer: string | null;
   model: string | null;
   price: number | null;
+  message: string | null;
 };
 
 const yen = (n: number | null) => (n == null ? "—" : "¥" + Number(n).toLocaleString("ja-JP"));
@@ -22,7 +23,7 @@ export default async function MatchingPage() {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("inquiries")
-    .select("id, kind, manufacturer, model, price")
+    .select("id, kind, manufacturer, model, price, message")
     .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
   const rows = (data ?? []) as Row[];
@@ -48,10 +49,7 @@ export default async function MatchingPage() {
       isMatch: g.buyers.length > 0 && g.sellers.length > 0,
       grade:
         g.buyers.length > 0 && g.sellers.length > 0
-          ? bestGrade(
-              g.buyers.map((b) => b.price),
-              g.sellers.map((s) => s.price)
-            )
+          ? bestGradeFull(g.buyers, g.sellers)
           : null,
       minSell: g.sellers.reduce<number | null>(
         (m, s) => (s.price == null ? m : m == null ? s.price : Math.min(m, s.price)),
