@@ -10,6 +10,12 @@ export const metadata = {
 
 export default async function BuyPage() {
   const user = await getCurrentUser();
+  const m = (user?.user_metadata ?? {}) as {
+    name?: string;
+    company?: string;
+    contact?: string;
+    contact_method?: string;
+  };
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
       <header className="mb-8 flex flex-col items-center text-center">
@@ -19,7 +25,13 @@ export default async function BuyPage() {
           お探しの車を1台ずつご登録ください。ARIOSが売り手をお探しします。
         </p>
       </header>
-      <BuyForm defaultEmail={user?.email ?? undefined} />
+      <BuyForm
+        defaultEmail={user?.email ?? undefined}
+        defaultName={m.name ?? undefined}
+        defaultCompany={m.company ?? undefined}
+        defaultContact={m.contact ?? undefined}
+        defaultContactMethod={m.contact_method ?? undefined}
+      />
     </main>
   );
 }

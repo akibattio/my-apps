@@ -20,7 +20,19 @@ const CHANNELS = [
   { v: "OTHER", label: "その他" },
 ];
 
-export default function BuyForm({ defaultEmail }: { defaultEmail?: string }) {
+export default function BuyForm({
+  defaultEmail,
+  defaultName,
+  defaultCompany,
+  defaultContact,
+  defaultContactMethod,
+}: {
+  defaultEmail?: string;
+  defaultName?: string;
+  defaultCompany?: string;
+  defaultContact?: string;
+  defaultContactMethod?: string;
+}) {
   const [state, formAction, isPending] = useActionState<ListingState, FormData>(
     submitBuy,
     {}
@@ -39,11 +51,11 @@ export default function BuyForm({ defaultEmail }: { defaultEmail?: string }) {
   const [interior, setInterior] = useState("");
   const [modified, setModified] = useState("");
   const [options, setOptions] = useState("");
-  // 連絡先ほか
-  const [contactMethod, setContactMethod] = useState("PHONE");
-  const [contact, setContact] = useState("");
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
+  // 連絡先ほか（ログイン中はプロフィールを初期値に）
+  const [contactMethod, setContactMethod] = useState(defaultContactMethod || "PHONE");
+  const [contact, setContact] = useState(defaultContact ?? "");
+  const [name, setName] = useState(defaultName ?? "");
+  const [company, setCompany] = useState(defaultCompany ?? "");
   const [memo, setMemo] = useState("");
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {

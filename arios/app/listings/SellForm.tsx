@@ -16,7 +16,19 @@ const CONTACTS = [
   { v: "LINE", label: "LINE ID" },
 ];
 
-export default function SellForm({ defaultEmail }: { defaultEmail?: string }) {
+export default function SellForm({
+  defaultEmail,
+  defaultName,
+  defaultCompany,
+  defaultContact,
+  defaultContactMethod,
+}: {
+  defaultEmail?: string;
+  defaultName?: string;
+  defaultCompany?: string;
+  defaultContact?: string;
+  defaultContactMethod?: string;
+}) {
   const [state, formAction, isPending] = useActionState<ListingState, FormData>(
     submitSell,
     {}
@@ -34,10 +46,10 @@ export default function SellForm({ defaultEmail }: { defaultEmail?: string }) {
   const [model, setModel] = useState("");
   const [price, setPrice] = useState("");
   const [vin, setVin] = useState("");
-  const [contactMethod, setContactMethod] = useState("PHONE");
-  const [contact, setContact] = useState("");
-  const [name, setName] = useState("");
-  const [company, setCompany] = useState("");
+  const [contactMethod, setContactMethod] = useState(defaultContactMethod || "PHONE");
+  const [contact, setContact] = useState(defaultContact ?? "");
+  const [name, setName] = useState(defaultName ?? "");
+  const [company, setCompany] = useState(defaultCompany ?? "");
   const [message, setMessage] = useState("");
 
   async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
