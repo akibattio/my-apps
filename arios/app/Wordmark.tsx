@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 // アプリのワードマーク。「LIFE LINE GARAGE」を主役に、ARIOSは小さくブランド表記。
+// クリックでトップ（/）へ戻る。
 export default function Wordmark({
   align = "center",
 }: {
@@ -6,7 +9,7 @@ export default function Wordmark({
 }) {
   const wrap = align === "center" ? "items-center text-center" : "items-start text-left";
   return (
-    <div className={`flex flex-col ${wrap} gap-1.5`}>
+    <Link href="/" aria-label="トップへ戻る" className={`flex flex-col ${wrap} gap-1.5`}>
       {/* ブランド（ARIOS）ロゴは従来サイズ */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-arios.png" alt="ARIOS" className="h-10 w-auto" />
@@ -18,6 +21,6 @@ export default function Wordmark({
           LIFE LINE <span className="text-primary">GARAGE</span>
         </span>
       </div>
-    </div>
+    </Link>
   );
 }
