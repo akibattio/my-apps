@@ -1,8 +1,8 @@
 import Wordmark from "../Wordmark";
 
 export const metadata = {
-  title: "ARIOS GARAGE 開発進捗",
-  description: "ARIOS GARAGE の開発進捗（内部運用フェーズ）",
+  title: "LIFE LINE GARAGE 開発進捗",
+  description: "LIFE LINE GARAGE の開発進捗（内部運用フェーズ）",
 };
 
 // 依頼者に共有するための公開進捗ページ（合言葉なしで閲覧可・検索非掲載）。
@@ -148,7 +148,7 @@ export default function StatusPage() {
       </section>
 
       <footer className="mt-8 text-center text-xs text-muted">
-        ARIOS GARAGE ／ 株式会社ソフコム ・ 開発中（内部運用）
+        LIFE LINE GARAGE ／ 株式会社ソフコム ・ 開発中（内部運用）
       </footer>
     </main>
   );

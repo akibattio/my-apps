@@ -3,16 +3,16 @@ import "./globals.css";
 import TabBar from "./TabBar";
 
 export const metadata: Metadata = {
-  title: "ARIOS GARAGE — 一台ごとの歴史を100年残す",
+  title: "LIFE LINE GARAGE — 一台ごとの歴史を100年残す",
   description:
     "写真を撮るだけで、その車の消えない履歴書ができる。一台の車の人生を一本の時間軸で記録する Vehicle Timeline。History is never deleted.",
   manifest: "/manifest.webmanifest",
-  applicationName: "ARIOS GARAGE",
+  applicationName: "LIFE LINE GARAGE",
   // 開発中の限定公開のため、検索エンジン・クローラには載せない
   robots: { index: false, follow: false },
   appleWebApp: {
     capable: true,
-    title: "ARIOS GARAGE",
+    title: "LIFE LINE GARAGE",
     statusBarStyle: "black-translucent",
   },
   icons: {

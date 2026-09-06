@@ -6,7 +6,7 @@ import Wordmark from "../Wordmark";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "ログイン — ARIOS GARAGE" };
+export const metadata = { title: "ログイン — LIFE LINE GARAGE" };
 
 export default async function LoginPage() {
   // 既にログイン済みならマイページへ

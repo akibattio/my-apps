@@ -6,7 +6,7 @@ import { updateMyListing } from "../../actions";
 import { KIND_LABEL } from "@/app/admin/inquiries/constants";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "情報を編集 — ARIOS GARAGE" };
+export const metadata = { title: "情報を編集 — LIFE LINE GARAGE" };
 
 type Row = {
   id: string;

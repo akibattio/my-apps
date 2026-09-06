@@ -10,7 +10,7 @@ export default function Error({
 }) {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-5 px-6 text-center">
-      <p className="text-xs tracking-[0.4em] text-accent">ARIOS GARAGE</p>
+      <p className="text-xs tracking-[0.4em] text-accent">LIFE LINE GARAGE</p>
       <h1 className="text-lg font-semibold">
         一時的なエラーが発生しました
       </h1>

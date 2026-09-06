@@ -10,7 +10,7 @@ import {
 import { STATUS_LABEL, PARTY_LABEL, KIND_LABEL, STATUS_FLOW } from "../constants";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "依頼の詳細 — ARIOS GARAGE" };
+export const metadata = { title: "依頼の詳細 — LIFE LINE GARAGE" };
 
 const BUCKET = "inquiry-photos";
 

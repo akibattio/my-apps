@@ -6,7 +6,7 @@ import { matchKey } from "./key";
 import { bestGradeFull, GRADE_LABEL, GRADE_STYLE } from "./score";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マッチング — ARIOS GARAGE" };
+export const metadata = { title: "マッチング — LIFE LINE GARAGE" };
 
 type Row = {
   id: string;

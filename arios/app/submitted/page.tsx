@@ -1,6 +1,6 @@
 import Wordmark from "../Wordmark";
 
-export const metadata = { title: "送信ありがとうございます — ARIOS GARAGE" };
+export const metadata = { title: "送信ありがとうございます — LIFE LINE GARAGE" };
 
 export default async function SubmittedPage({
   searchParams,

@@ -10,7 +10,7 @@ import { KIND_LABEL } from "../../inquiries/constants";
 import { saveDealContract, setDealStatus, addDealEvent } from "../actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "取引の詳細 — ARIOS GARAGE" };
+export const metadata = { title: "取引の詳細 — LIFE LINE GARAGE" };
 
 type Deal = {
   id: string;

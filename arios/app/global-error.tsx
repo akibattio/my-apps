@@ -29,7 +29,7 @@ export default function GlobalError({
         }}
       >
         <p style={{ letterSpacing: "0.4em", fontSize: "12px", color: "#c8a24a", margin: 0 }}>
-          ARIOS GARAGE
+          LIFE LINE GARAGE
         </p>
         <h1 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>
           一時的なエラーが発生しました

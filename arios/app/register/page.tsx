@@ -4,7 +4,7 @@ import RegisterForm from "./RegisterForm";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "愛車を登録 — ARIOS GARAGE" };
+export const metadata = { title: "愛車を登録 — LIFE LINE GARAGE" };
 
 // AI下書きを含む写真登録は社内(ログイン)のみ。AIを外部に出さない。
 export default async function RegisterPage() {

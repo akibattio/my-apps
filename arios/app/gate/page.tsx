@@ -1,6 +1,6 @@
 import Wordmark from "../Wordmark";
 
-export const metadata = { title: "ARIOS GARAGE" };
+export const metadata = { title: "LIFE LINE GARAGE" };
 
 // 合言葉ゲート。関係者向けの限定公開。正しい合言葉で Cookie を得て中に入れる。
 export default async function GatePage({

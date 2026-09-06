@@ -4,7 +4,7 @@ import RowLink from "../RowLink";
 import { DEAL_STATUS_LABEL, DEAL_STATUS_STYLE } from "./constants";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "取引 — ARIOS GARAGE" };
+export const metadata = { title: "取引 — LIFE LINE GARAGE" };
 
 type Row = {
   id: string;

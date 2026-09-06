@@ -32,10 +32,7 @@ export default async function Home() {
         <div className="flex justify-center">
           <Wordmark />
         </div>
-        <p className="mt-4 pl-[0.5em] text-[11px] tracking-[0.5em] text-accent">
-          LIFE LINE
-        </p>
-        <h1 className="mt-7 text-3xl leading-snug font-semibold">
+        <h1 className="mt-8 text-3xl leading-snug font-semibold">
           売る人と買う人を、
           <br />
           ARIOSがつなぐ。

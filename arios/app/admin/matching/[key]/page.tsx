@@ -9,7 +9,7 @@ import { parseMatchKey } from "../key";
 import { gradePairFull, GRADE_LABEL, GRADE_STYLE, GRADE_RANK } from "../score";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マッチング詳細 — ARIOS GARAGE" };
+export const metadata = { title: "マッチング詳細 — LIFE LINE GARAGE" };
 
 type Row = {
   id: string;

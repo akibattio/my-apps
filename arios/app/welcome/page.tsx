@@ -2,7 +2,7 @@ import Link from "next/link";
 import Wordmark from "../Wordmark";
 
 export const metadata = {
-  title: "ARIOS GARAGE を試す — ご案内",
+  title: "LIFE LINE GARAGE を試す — ご案内",
   description:
     "写真を撮るだけで、その車の記録が残る。ログイン不要で「登録 → 公開パスポート」を試せます。",
 };
@@ -126,7 +126,7 @@ export default function WelcomePage() {
       </div>
 
       <footer className="mt-10 text-center text-xs text-muted">
-        株式会社ソフコム ／ ARIOS GARAGE（開発中デモ）
+        株式会社ソフコム ／ LIFE LINE GARAGE（開発中デモ）
       </footer>
     </main>
   );

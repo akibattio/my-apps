@@ -3,7 +3,7 @@ import { getCurrentAdmin } from "@/lib/auth";
 import AdminNav from "./AdminNav";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "管理 — ARIOS GARAGE" };
+export const metadata = { title: "管理 — LIFE LINE GARAGE" };
 
 // 管理者エリアのゲート。管理者(メール許可リスト)以外はトップへ。
 export default async function AdminLayout({

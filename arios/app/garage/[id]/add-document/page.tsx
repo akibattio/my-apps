@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import AddDocumentForm from "./AddDocumentForm";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "書類を追加 — ARIOS GARAGE" };
+export const metadata = { title: "書類を追加 — LIFE LINE GARAGE" };
 
 export default async function AddDocumentPage({
   params,

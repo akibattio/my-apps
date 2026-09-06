@@ -1,6 +1,6 @@
 import QuickAddForm from "./QuickAddForm";
 
-export const metadata = { title: "AIで登録 — ARIOS GARAGE" };
+export const metadata = { title: "AIで登録 — LIFE LINE GARAGE" };
 
 export default function AdminNewPage() {
   return (

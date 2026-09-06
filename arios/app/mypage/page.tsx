@@ -7,7 +7,7 @@ import { STATUS_LABEL, STATUS_ACTIVE } from "@/app/admin/inquiries/constants";
 import { DEAL_STATUS_LABEL, DEAL_STATUS_STYLE } from "@/app/admin/deals/constants";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マイページ — ARIOS GARAGE" };
+export const metadata = { title: "マイページ — LIFE LINE GARAGE" };
 
 type Row = {
   id: string;
