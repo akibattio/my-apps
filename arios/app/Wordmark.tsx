@@ -9,7 +9,7 @@ export default function Wordmark({
     <div className={`flex flex-col ${wrap} gap-1.5`}>
       {/* ブランド（ARIOS）ロゴは従来サイズ */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-arios.png" alt="ARIOS" className="h-6 w-auto" />
+      <img src="/logo-arios.png" alt="ARIOS" className="h-10 w-auto" />
       <div className="font-extrabold leading-[1.02] tracking-tight">
         <span className="block text-[30px] sm:text-[34px]">
           LIFE LINE <span className="text-primary">GARAGE</span>
