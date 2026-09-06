@@ -1,8 +1,8 @@
 import Link from "next/link";
 import Wordmark from "./Wordmark";
-import { getCurrentUser } from "@/lib/auth";
 
-// Top（公開・訪問者）。3つの入口: 売りたい / 買いたい / マイページ。
+// Top（公開・訪問者）。2つの入口: 売りたい / 買いたい。
+// ※お客様ログイン/マイページはいったん見送り（連絡先を登録時に受け取り、ARIOSが管理）。
 export const dynamic = "force-dynamic";
 
 const ENTRIES = [
@@ -10,22 +10,19 @@ const ENTRIES = [
     href: "/sell",
     emoji: "🚗",
     title: "車を売りたい",
-    body: "お車の情報を登録。ARIOSが買い手をお探しします。",
+    body: "お車の情報とご連絡先を登録。ARIOSが買い手をお探しします。",
     accent: "border-accent/40 bg-accent/[0.06] hover:border-accent",
   },
   {
     href: "/buy",
     emoji: "🔎",
     title: "車を買いたい",
-    body: "お探しの車を登録。条件に合う一台をお探しします。",
+    body: "お探しの車とご連絡先を登録。条件に合う一台をお探しします。",
     accent: "border-sky-400/40 bg-sky-400/[0.06] hover:border-sky-400",
   },
 ];
 
-export default async function Home() {
-  const user = await getCurrentUser();
-  const myHref = user ? "/mypage" : "/login";
-
+export default function Home() {
   return (
     <main className="mx-auto max-w-xl px-6 pt-14 pb-16">
       <header className="text-center">
@@ -38,8 +35,8 @@ export default async function Home() {
           ARIOSがつなぐ。
         </h1>
         <p className="mt-5 leading-relaxed text-muted">
-          まずは「売りたい」か「買いたい」から。マイページに登録すると、
-          やり取りの状況やマッチのお知らせをまとめて確認できます。
+          「売りたい」か「買いたい」を、ご連絡先とあわせてご登録ください。
+          ARIOSがお相手をお探しし、ご連絡します。
         </p>
       </header>
 
@@ -58,29 +55,15 @@ export default async function Home() {
             <span className="ml-auto text-xl text-muted">›</span>
           </Link>
         ))}
-
-        {/* マイページ（登録・ログイン） */}
-        <Link
-          href={myHref}
-          className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary"
-        >
-          <span className="text-3xl">👤</span>
-          <span className="min-w-0">
-            <span className="block text-lg font-semibold">
-              マイページ{user ? "" : "（登録・ログイン）"}
-            </span>
-            <span className="mt-0.5 block text-sm text-muted">
-              {user
-                ? "自分の売りたい・買いたい、マッチの状況を確認"
-                : "登録すると状況をまとめて確認できます"}
-            </span>
-          </span>
-          <span className="ml-auto text-xl text-muted">›</span>
-        </Link>
       </section>
 
       <p className="mt-12 text-center text-xs text-muted">
         ARIOS — 一台ごとの人生を、つなぐ。
+      </p>
+      <p className="mt-3 text-center">
+        <Link href="/login" className="text-[11px] text-muted/70 underline-offset-4 hover:underline">
+          関係者ログイン
+        </Link>
       </p>
     </main>
   );

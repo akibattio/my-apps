@@ -6,6 +6,7 @@ import {
   linkInquiryToVehicle,
   saveFollowup,
   markContacted,
+  updateInquiryContact,
 } from "../actions";
 import { STATUS_LABEL, PARTY_LABEL, KIND_LABEL, STATUS_FLOW } from "../constants";
 
@@ -25,7 +26,7 @@ export default async function InquiryDetailPage({
   const { data: inq } = await supabase
     .from("inquiries")
     .select(
-      "id, kind, manufacturer, model, price, vin, party_type, name, contact, contact_method, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
+      "id, kind, manufacturer, model, price, vin, party_type, name, company, contact, contact_method, email, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -74,7 +75,9 @@ export default async function InquiryDetailPage({
     ],
     ["区分", inq.party_type ? PARTY_LABEL[inq.party_type] ?? inq.party_type : null],
     [contactMethodLabel, inq.contact],
-    ["お名前・会社名", inq.name],
+    ["お名前", inq.name],
+    ["会社名", inq.company],
+    ["メール", inq.email],
     ["車体番号", inq.vin],
   ];
 
@@ -125,6 +128,77 @@ export default async function InquiryDetailPage({
           </div>
         </section>
       )}
+
+      {/* 登録者情報の修正（名前・会社名・連絡先・メール） */}
+      <section className="mb-6 rounded-2xl border border-border bg-card p-5">
+        <p className="mb-3 text-sm text-muted">登録者情報を修正</p>
+        <form action={updateInquiryContact} className="space-y-3">
+          <input type="hidden" name="id" value={inq.id} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm text-muted">お名前</span>
+              <input
+                name="name"
+                defaultValue={inq.name ?? ""}
+                className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-2.5 text-foreground"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-sm text-muted">会社名</span>
+              <input
+                name="company_name"
+                defaultValue={inq.company ?? ""}
+                className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-2.5 text-foreground"
+              />
+            </label>
+          </div>
+          <div>
+            <span className="mb-1 block text-sm text-muted">連絡先の種類</span>
+            <div className="flex gap-2">
+              {[
+                { v: "PHONE", label: "電話番号" },
+                { v: "LINE", label: "LINE ID" },
+              ].map((m) => (
+                <label
+                  key={m.v}
+                  className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs"
+                >
+                  <input
+                    type="radio"
+                    name="contactMethod"
+                    value={m.v}
+                    defaultChecked={(inq.contact_method ?? "PHONE") === m.v}
+                  />
+                  {m.label}
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-sm text-muted">連絡先（電話番号 / LINE ID）</span>
+            <input
+              name="contact"
+              defaultValue={inq.contact ?? ""}
+              className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-2.5 text-foreground"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm text-muted">メールアドレス</span>
+            <input
+              name="email"
+              type="email"
+              defaultValue={inq.email ?? ""}
+              className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-2.5 text-foreground"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-black"
+          >
+            登録者情報を保存
+          </button>
+        </form>
+      </section>
 
       <section className="mb-6 rounded-2xl border border-border bg-card p-5">
         <p className="mb-3 text-sm text-muted">フォロー（取りこぼさない）</p>

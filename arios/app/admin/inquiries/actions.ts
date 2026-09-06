@@ -132,6 +132,40 @@ export async function saveFollowup(formData: FormData): Promise<void> {
   redirect(`/admin/inquiries/${id}`);
 }
 
+// 登録者情報（名前・会社名・連絡先・メール）を管理者が修正する。
+export async function updateInquiryContact(formData: FormData): Promise<void> {
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect("/");
+  const id = String(formData.get("id") ?? "");
+  if (!id) redirect("/admin/inquiries");
+
+  const name = String(formData.get("name") ?? "").trim() || null;
+  const company = String(formData.get("company_name") ?? "").trim() || null;
+  const contact = String(formData.get("contact") ?? "").trim() || null;
+  const contactMethod = String(formData.get("contactMethod") ?? "").trim() || null;
+  const emailRaw = String(formData.get("email") ?? "").trim().toLowerCase();
+  const email = emailRaw
+    ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)
+      ? emailRaw
+      : null
+    : null;
+
+  const supabase = createAdminClient();
+  await supabase
+    .from("inquiries")
+    .update({
+      name,
+      company,
+      contact,
+      contact_method: contactMethod,
+      email,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  redirect(`/admin/inquiries/${id}`);
+}
+
 // 「今、連絡した」を記録（最終接触を更新し、新規なら連絡済へ）。
 export async function markContacted(formData: FormData): Promise<void> {
   const admin = await getCurrentAdmin();

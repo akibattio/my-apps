@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentAdmin, getCurrentUser } from "@/lib/auth";
+import { getCurrentAdmin } from "@/lib/auth";
 import { rateLimit } from "@/lib/ratelimit";
 import { sellerOrder } from "./order";
 import { matchKey } from "@/app/admin/matching/key";
@@ -45,15 +45,20 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
       : null;
   const vin = String(formData.get("vin") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
+  const company = String(formData.get("company_name") ?? "").trim();
   const contact = String(formData.get("contact") ?? "").trim();
   const contactMethod = String(formData.get("contactMethod") ?? "").trim();
   const channel = String(formData.get("channel") ?? "").trim() || null;
   const message = String(formData.get("message") ?? "").trim();
 
-  // マイページ紐付け用メール。ログイン中なら本人のメールを最優先（確実に紐付く）。
-  const user = await getCurrentUser();
-  const emailRaw = (user?.email ?? String(formData.get("email") ?? "")).trim().toLowerCase();
+  // 連絡用メール（必須）。入力されたメールをそのまま使う。
+  const emailRaw = String(formData.get("email") ?? "").trim().toLowerCase();
   const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : null;
+
+  // 必須項目: 名前・連絡先(電話/LINE)・メール
+  if (!name) return { error: "お名前（必須）を入力してください。" };
+  if (!contact) return { error: "連絡先（電話番号 または LINE ID・必須）を入力してください。" };
+  if (!email) return { error: "メールアドレス（必須）を正しく入力してください。" };
 
   const photos =
     kind === "SELL"
@@ -83,6 +88,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         channel,
         message: message || null,
         email,
+        company: company || null,
         source: "WEB_FORM",
         status: "NEW",
       })

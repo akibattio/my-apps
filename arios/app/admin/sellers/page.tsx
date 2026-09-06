@@ -15,6 +15,7 @@ type Row = {
   priority: number | null;
   party_type: string | null;
   name: string | null;
+  company: string | null;
   contact: string | null;
   contact_method: string | null;
   vin: string | null;
@@ -29,7 +30,7 @@ export default async function SellersPage() {
   const { data } = await supabase
     .from("inquiries")
     .select(
-      "id, manufacturer, model, price, priority, party_type, name, contact, contact_method, vin, created_at"
+      "id, manufacturer, model, price, priority, party_type, name, company, contact, contact_method, vin, created_at"
     )
     .eq("kind", "SELL")
     .in("status", STATUS_ACTIVE)
@@ -104,7 +105,10 @@ export default async function SellersPage() {
                   <td className={`${td} text-xs text-muted`}>
                     {s.contact ? `${methodLabel(s.contact_method)} ${s.contact}` : "—"}
                   </td>
-                  <td className={td}>{s.name || "—"}</td>
+                  <td className={td}>
+                    {s.name || "—"}
+                    {s.company && <span className="block text-xs text-muted">{s.company}</span>}
+                  </td>
                   <td className={`${td} text-xs text-muted`}>
                     {new Date(s.created_at).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
                   </td>

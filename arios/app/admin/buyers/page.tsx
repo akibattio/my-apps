@@ -12,6 +12,7 @@ type Row = {
   model: string | null;
   price: number | null;
   name: string | null;
+  company: string | null;
   contact: string | null;
   contact_method: string | null;
   channel: string | null;
@@ -36,7 +37,7 @@ export default async function BuyersPage() {
   const { data } = await supabase
     .from("inquiries")
     .select(
-      "id, manufacturer, model, price, name, contact, contact_method, channel, message, status, next_action_date, created_at"
+      "id, manufacturer, model, price, name, company, contact, contact_method, channel, message, status, next_action_date, created_at"
     )
     .eq("kind", "BUY")
     .in("status", STATUS_ACTIVE)
@@ -89,7 +90,10 @@ export default async function BuyersPage() {
                   <td className={`${td} text-xs text-muted`}>
                     {new Date(b.created_at).toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" })}
                   </td>
-                  <td className={`${td} font-medium`}>{b.name || "—"}</td>
+                  <td className={`${td} font-medium`}>
+                    {b.name || "—"}
+                    {b.company && <span className="block text-xs font-normal text-muted">{b.company}</span>}
+                  </td>
                   <td className={`${td} font-medium`}>{b.manufacturer || "—"}</td>
                   <td className={`${td} font-medium`}>{b.model || "—"}</td>
                   <td className={`${td} tabular-nums text-accent`}>{yen(b.price)}</td>

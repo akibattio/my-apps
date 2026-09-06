@@ -37,6 +37,7 @@ export default function SellForm({ defaultEmail }: { defaultEmail?: string }) {
   const [contactMethod, setContactMethod] = useState("PHONE");
   const [contact, setContact] = useState("");
   const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
   const [message, setMessage] = useState("");
 
   async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -58,6 +59,18 @@ export default function SellForm({ defaultEmail }: { defaultEmail?: string }) {
       setLocalError("メーカーと車種（必須）を入力してください。");
       return;
     }
+    if (!name.trim()) {
+      setLocalError("お名前（必須）を入力してください。");
+      return;
+    }
+    if (!contact.trim()) {
+      setLocalError("連絡先（電話番号 または LINE ID・必須）を入力してください。");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setLocalError("メールアドレス（必須）を正しく入力してください。");
+      return;
+    }
     setLocalError(null);
     const fd = new FormData();
     fd.set("company", ""); // honeypot（人は空のまま）
@@ -69,6 +82,7 @@ export default function SellForm({ defaultEmail }: { defaultEmail?: string }) {
     fd.set("contactMethod", contactMethod);
     fd.set("contact", contact);
     fd.set("name", name);
+    fd.set("company_name", company);
     fd.set("email", email);
     fd.set("message", message);
     for (const f of files) fd.append("photos", f);
@@ -117,45 +131,48 @@ export default function SellForm({ defaultEmail }: { defaultEmail?: string }) {
         <input className={field} value={vin} onChange={(e) => setVin(e.target.value)} placeholder="例: ZFF79ALA4J0231234" autoCapitalize="characters" />
       </div>
 
-      <div>
-        <label className={label}>連絡先</label>
-        <div className="mb-2 flex gap-2">
-          {CONTACTS.map((m) => (
-            <button
-              type="button"
-              key={m.v}
-              onClick={() => setContactMethod(m.v)}
-              className={`rounded-full border px-4 py-2 text-sm ${
-                contactMethod === m.v ? "border-accent bg-accent/10 text-accent" : "border-neutral-700 text-muted"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <p className="mb-3 text-sm font-medium">ご連絡先（ARIOSからのご連絡用）</p>
+        <div className="space-y-3">
+          <div>
+            <label className={label}>連絡先{req}</label>
+            <div className="mb-2 flex gap-2">
+              {CONTACTS.map((m) => (
+                <button
+                  type="button"
+                  key={m.v}
+                  onClick={() => setContactMethod(m.v)}
+                  className={`rounded-full border px-4 py-2 text-sm ${
+                    contactMethod === m.v ? "border-accent bg-accent/10 text-accent" : "border-neutral-700 text-muted"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <input className={field} value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? "LINE ID" : "電話番号"} />
+          </div>
+          <div>
+            <label className={label}>お名前{req}</label>
+            <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" autoComplete="name" />
+          </div>
+          <div>
+            <label className={label}>会社名（任意）</label>
+            <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="◯◯自動車 株式会社" autoComplete="organization" />
+          </div>
+          <div>
+            <label className={label}>メールアドレス{req}</label>
+            <input
+              className={`${field} ${loggedIn ? "opacity-60" : ""}`}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              readOnly={loggedIn}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </div>
         </div>
-        <input className={field} value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? "LINE ID" : "電話番号"} />
-      </div>
-
-      <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="お名前・会社名（任意）" />
-
-      <div>
-        <label className={label}>
-          メールアドレス{loggedIn ? "（ログイン中）" : "（マイページで確認する場合）"}
-        </label>
-        <input
-          className={`${field} ${loggedIn ? "opacity-60" : ""}`}
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          readOnly={loggedIn}
-          placeholder="you@example.com"
-          autoComplete="email"
-        />
-        <p className="mt-1 text-xs text-muted">
-          {loggedIn
-            ? "この登録はあなたのマイページに表示されます。"
-            : "入れておくと、後でマイページから状況を確認できます（任意）。"}
-        </p>
       </div>
 
       <textarea className={`${field} min-h-24`} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="備考（状態・年式・走行距離・希望条件など）" />
