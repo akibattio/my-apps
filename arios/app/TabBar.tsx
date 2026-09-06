@@ -74,7 +74,8 @@ const TABS = [
 export default function TabBar() {
   const pathname = usePathname() || "/";
   const [mounted, setMounted] = useState(false);
-  const hidden = HIDE_PREFIXES.some((p) => pathname.startsWith(p));
+  // トップ("/")は独自のカード導線があるので下タブは出さない。
+  const hidden = pathname === "/" || HIDE_PREFIXES.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
     setMounted(true);

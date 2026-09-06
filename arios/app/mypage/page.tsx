@@ -156,6 +156,9 @@ export default async function MyPage() {
           <p className="text-xs tracking-[0.35em] text-accent">MY PAGE</p>
           <h1 className="mt-1 text-2xl font-semibold">マイページ</h1>
           <p className="mt-1 text-sm text-muted">{user.email}</p>
+          <p className="mt-1 text-xs text-muted">
+            マッチング状況・登録＆リクエスト情報・会員情報
+          </p>
         </div>
         <form action={signOut}>
           <button className="rounded-full border border-border px-3 py-1.5 text-xs text-muted">
@@ -164,7 +167,8 @@ export default async function MyPage() {
         </form>
       </header>
 
-      {matched.length > 0 && (
+      {/* マッチング状況（常に一番上に表示） */}
+      {matched.length > 0 ? (
         <div className="mb-6 rounded-2xl border border-accent/50 bg-accent/10 p-4">
           <p className="text-sm font-semibold text-accent">🔔 マッチングがあります</p>
           <p className="mt-1 text-xs text-muted">
@@ -180,6 +184,13 @@ export default async function MyPage() {
               </li>
             ))}
           </ul>
+        </div>
+      ) : (
+        <div className="mb-6 rounded-2xl border border-border bg-card p-4">
+          <p className="text-sm font-medium">マッチング状況</p>
+          <p className="mt-1 text-xs text-muted">
+            現在、新しいマッチングはありません。見つかり次第ここでお知らせします。
+          </p>
         </div>
       )}
 
@@ -206,7 +217,7 @@ export default async function MyPage() {
       {/* 個人情報（登録情報）*/}
       <section className="mt-8 overflow-hidden rounded-2xl border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-xs tracking-wide text-muted">登録情報（あなたの情報）</span>
+          <span className="text-xs tracking-wide text-muted">会員情報</span>
           <Link href="/mypage/profile" className="text-xs text-accent">
             編集
           </Link>

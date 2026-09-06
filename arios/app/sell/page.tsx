@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Wordmark from "../Wordmark";
 import SellForm from "../listings/SellForm";
 import { getCurrentUser } from "@/lib/auth";
@@ -10,7 +11,8 @@ export const metadata = {
 
 export default async function SellPage() {
   const user = await getCurrentUser();
-  const m = (user?.user_metadata ?? {}) as {
+  if (!user) redirect("/login?next=/sell");
+  const m = (user.user_metadata ?? {}) as {
     name?: string;
     company?: string;
     contact?: string;
