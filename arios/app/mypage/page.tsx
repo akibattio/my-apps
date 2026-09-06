@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getCurrentAdmin } from "@/lib/auth";
 import { signOut } from "@/app/auth/actions";
 import { STATUS_LABEL, STATUS_ACTIVE } from "@/app/admin/inquiries/constants";
 import { DEAL_STATUS_LABEL, DEAL_STATUS_STYLE } from "@/app/admin/deals/constants";
@@ -30,6 +30,7 @@ export default async function MyPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/mypage");
   const email = (user.email ?? "").toLowerCase();
+  const admin = await getCurrentAdmin();
 
   const supabase = createAdminClient();
   const [{ data: mineData }, { data: activeData }] = await Promise.all([
@@ -141,6 +142,16 @@ export default async function MyPage() {
           </button>
         </form>
       </header>
+
+      {admin && (
+        <Link
+          href="/admin"
+          className="mb-6 flex items-center justify-between rounded-2xl border border-primary/50 bg-primary/10 px-4 py-3 hover:border-primary"
+        >
+          <span className="text-sm font-semibold text-primary">🛠 管理画面へ</span>
+          <span className="text-primary">›</span>
+        </Link>
+      )}
 
       {matched.length > 0 && (
         <div className="mb-6 rounded-2xl border border-accent/50 bg-accent/10 p-4">
