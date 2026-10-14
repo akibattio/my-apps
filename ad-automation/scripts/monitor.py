@@ -294,6 +294,17 @@ def main():
     for a in data.get("accounts", []):
         alerts += check_account(a)
 
+    # 接続/トークン失効（build_console_data が記録）→ 媒体全体の重大アラート化（サイレント障害を防ぐ）
+    _MJP = {"meta": "Meta広告", "google": "Google広告", "yahoo": "Yahoo!広告"}
+    for ci in (data.get("connectionIssues") or []):
+        mj = _MJP.get(ci.get("media"), ci.get("media") or "媒体")
+        alerts.append({
+            "client": f"{mj}（媒体全体）", "media": ci.get("media") or "",
+            "severity": "critical", "kind": "接続/トークン失効",
+            "fact": f"{mj}のデータ取得に失敗（トークン失効の可能性）。この媒体の監視が停止しています。",
+            "approve": "接続担当：トークンを再発行し GitHub Secret を更新",
+        })
+
     # cadence(日次/週次) 決定：benchmarks(=console bench.cadence)優先、無ければ配信日数で自動
     bench_cad = {}
     for a in data.get("accounts", []):

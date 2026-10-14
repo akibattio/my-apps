@@ -280,11 +280,20 @@ def main():
         print("SOFCOM_META_SYSTEM_USER_TOKEN が未設定です（.env）。")
         raise SystemExit(2)
 
-    accts_resp = get("me/adaccounts", {"fields": "name,account_id", "limit": "100"}, tok)
-    accts = accts_resp.get("data", []) if "__error__" not in accts_resp else []
-    if not accts:
-        print("読み取り可能な広告アカウントがありません:", accts_resp.get("__error__"))
-        raise SystemExit(1)
+    conn_issues = []  # 媒体ごとの接続/トークン失効。全体を止めず記録し、monitorで重大アラート化する（サイレント障害防止）。
+    try:
+        accts_resp = get("me/adaccounts", {"fields": "name,account_id", "limit": "100"}, tok)
+    except Exception as e:
+        accts_resp = {"__error__": str(e)[:200]}
+    if "__error__" in accts_resp:
+        err = str(accts_resp.get("__error__"))[:200]
+        print("Meta 取得失敗（トークン失効の可能性・後続媒体は継続）:", err)
+        conn_issues.append({"media": "meta", "detail": err})
+        accts = []
+    else:
+        accts = accts_resp.get("data", [])
+        if not accts:
+            print("Metaに読み取り可能な広告アカウントがありません（0件）")
     # 除外アカウントをスキップ
     excluded = [a.get("name") for a in accts if a.get("name") in EXCLUDE_ACCOUNTS]
     accts = [a for a in accts if a.get("name") not in EXCLUDE_ACCOUNTS]
@@ -345,14 +354,22 @@ def main():
     meta_n = len(accounts)
     # Google（MCC配下の稼働アカウント）を統合
     print("Google Ads を取得中…")
-    g_accounts, g_proposals = pull_google(bench_cfg, lm_days, len(accounts))
+    try:
+        g_accounts, g_proposals = pull_google(bench_cfg, lm_days, len(accounts))
+    except Exception as e:
+        print("Google 取得失敗（後続は継続）:", str(e)[:200]); g_accounts, g_proposals = [], []
+        conn_issues.append({"media": "google", "detail": str(e)[:200]})
     accounts += g_accounts
     proposals += g_proposals
     google_n = len(g_accounts)
 
     # LINEヤフー広告（検索/ディスプレイ）を統合（未接続なら自動スキップ）
     print("LINEヤフー広告 を取得中…")
-    y_accounts, y_proposals = pull_yahoo(bench_cfg, lm_days, len(accounts))
+    try:
+        y_accounts, y_proposals = pull_yahoo(bench_cfg, lm_days, len(accounts))
+    except Exception as e:
+        print("Yahoo 取得失敗（後続は継続）:", str(e)[:200]); y_accounts, y_proposals = [], []
+        conn_issues.append({"media": "yahoo", "detail": str(e)[:200]})
     accounts += y_accounts
     proposals += y_proposals
     yahoo_n = len(y_accounts)
@@ -364,9 +381,22 @@ def main():
         "googleMcc": re.sub(r"\D", "", os.environ.get("GOOGLE_LOGIN_CUSTOMER_ID", "") or ""),  # 媒体ページへのリンク用
         "accounts": accounts,
         "proposals": proposals,
+        "connectionIssues": conn_issues,  # 媒体の取得失敗（トークン失効等）→ monitorが重大アラート化
     }
+    # 全媒体が0件（全滅）のときは前回データを温存して画面を空にしない（generatedAtに注記＝古さが分かる）
+    out_path = Path("console/data.json")
+    if not accounts and out_path.exists():
+        try:
+            prev = json.loads(out_path.read_text(encoding="utf-8"))
+            if prev.get("accounts"):
+                out["accounts"] = prev["accounts"]
+                out["proposals"] = prev.get("proposals", [])
+                out["generatedAt"] = (prev.get("generatedAt") or out["generatedAt"]) + "（更新失敗・前回値）"
+                out["stale"] = True
+        except Exception:
+            pass
     Path("console").mkdir(exist_ok=True)
-    Path("console/data.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {google_n} / Yahoo {yahoo_n}） / 提案{len(proposals)}件")
     for a in accounts:
         m7, ml = a["metrics"]["d7"], a["metrics"]["lm"]
