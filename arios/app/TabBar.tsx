@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { tr, type Lang } from "@/lib/i18n";
 
 // お客様向けの固定フッターナビ（スマホ表示）。売りたい / 買いたい / マイページ。
 // TOP はロゴで戻れるためタブには入れない。管理・認証画面では非表示。
@@ -27,7 +28,7 @@ const stroke = (active: boolean) => (active ? "var(--accent)" : "currentColor");
 const TABS = [
   {
     href: "/sell",
-    label: "売りたい",
+    label: "tab_sell",
     match: (p: string) => p.startsWith("/sell"),
     icon: (a: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -44,7 +45,7 @@ const TABS = [
   },
   {
     href: "/buy",
-    label: "買いたい",
+    label: "tab_buy",
     match: (p: string) => p.startsWith("/buy"),
     icon: (a: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -55,7 +56,7 @@ const TABS = [
   },
   {
     href: "/mypage",
-    label: "マイページ",
+    label: "tab_mypage",
     match: (p: string) => p.startsWith("/mypage"),
     icon: (a: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -74,11 +75,14 @@ const TABS = [
 export default function TabBar() {
   const pathname = usePathname() || "/";
   const [mounted, setMounted] = useState(false);
+  const [lang, setLang] = useState<Lang>("ja");
   // トップ("/")は独自のカード導線があるので下タブは出さない。
   const hidden = pathname === "/" || HIDE_PREFIXES.some((p) => pathname.startsWith(p));
 
   useEffect(() => {
     setMounted(true);
+    const m = document.cookie.match(/(?:^|;\s*)lang=(en|ja)/);
+    if (m) setLang(m[1] as Lang);
   }, []);
 
   useEffect(() => {
@@ -88,22 +92,24 @@ export default function TabBar() {
 
   if (!mounted || hidden) return null;
 
+  const L = tr(lang);
+
   return (
-    <nav className="tabbar md:hidden" aria-label="メインメニュー">
+    <nav className="tabbar md:hidden" aria-label="menu">
       <div className="mx-auto flex max-w-xl items-stretch justify-around">
-        {TABS.map((t) => {
-          const active = t.match(pathname);
+        {TABS.map((tab) => {
+          const active = tab.match(pathname);
           return (
             <Link
-              key={t.href}
-              href={t.href}
+              key={tab.href}
+              href={tab.href}
               aria-current={active ? "page" : undefined}
               className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors ${
                 active ? "text-accent" : "text-muted"
               }`}
             >
-              {t.icon(active)}
-              <span>{t.label}</span>
+              {tab.icon(active)}
+              <span>{L(tab.label)}</span>
             </Link>
           );
         })}

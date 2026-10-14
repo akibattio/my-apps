@@ -1,8 +1,11 @@
 import Link from "next/link";
 import Wordmark from "./Wordmark";
+import LangToggle from "./LangToggle";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE } from "@/app/admin/inquiries/constants";
+import { getLang } from "@/lib/lang";
+import { tr } from "@/lib/i18n";
 
 // Top（公開）。未ログイン=会員登録/ログイン。ログイン後=マッチ通知＋売りたい/買いたい/マイページ。
 export const dynamic = "force-dynamic";
@@ -10,50 +13,28 @@ export const dynamic = "force-dynamic";
 const key = (mk: string | null, md: string | null) =>
   (mk ?? "").trim().toLowerCase() + "||" + (md ?? "").trim().toLowerCase();
 
-const ENTRIES = [
-  {
-    href: "/sell",
-    emoji: "🚗",
-    title: "車を売りたい",
-    body: "お車の情報とご連絡先を登録。ARIOSが買い手をお探しします。",
-    accent: "border-accent/40 bg-accent/[0.06] hover:border-accent",
-  },
-  {
-    href: "/buy",
-    emoji: "🔎",
-    title: "車を買いたい",
-    body: "お探しの車とご連絡先を登録。条件に合う一台をお探しします。",
-    accent: "border-sky-400/40 bg-sky-400/[0.06] hover:border-sky-400",
-  },
-  {
-    href: "/mypage",
-    emoji: "👤",
-    title: "マイページ",
-    body: "登録・リクエストの状況、マッチング、会員情報を確認",
-    accent: "border-border bg-card hover:border-primary",
-  },
-];
-
 export default async function Home() {
+  const lang = await getLang();
+  const t = tr(lang);
   const user = await getCurrentUser();
 
   // 未ログイン: 会員登録 / ログイン
   if (!user) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-12">
+        <div className="mb-6 flex justify-end">
+          <LangToggle lang={lang} />
+        </div>
         <header className="text-center">
           <div className="flex justify-center">
             <Wordmark />
           </div>
           <h1 className="mt-8 text-2xl leading-snug font-semibold">
-            売る人と買う人を、
+            {t("top_hero1")}
             <br />
-            ARIOSがつなぐ。
+            {t("top_hero2")}
           </h1>
-          <p className="mt-4 text-sm leading-relaxed text-muted">
-            ご利用には会員登録が必要です。登録すると「売りたい・買いたい」の登録や、
-            マッチングの確認ができます。
-          </p>
+          <p className="mt-4 text-sm leading-relaxed text-muted">{t("top_lead_guest")}</p>
         </header>
 
         <div className="mt-8 space-y-3">
@@ -61,13 +42,13 @@ export default async function Home() {
             href="/signup"
             className="block rounded-full bg-primary px-6 py-4 text-center font-semibold text-black"
           >
-            会員登録する
+            {t("top_cta_signup")}
           </Link>
           <Link
             href="/login"
             className="block rounded-full border border-border px-6 py-4 text-center text-sm"
           >
-            ログイン
+            {t("login")}
           </Link>
         </div>
 
@@ -76,7 +57,7 @@ export default async function Home() {
             href="/admin-login"
             className="text-[11px] text-muted/70 underline-offset-4 hover:underline"
           >
-            管理者ログイン
+            {t("top_adminlogin")}
           </Link>
         </p>
       </main>
@@ -90,10 +71,11 @@ export default async function Home() {
     supabase
       .from("inquiries")
       .select("id, kind, manufacturer, model, status")
-      .eq("email", email)
+      .eq("auth_user_id", user.id)
       .in("status", STATUS_ACTIVE),
     supabase.from("inquiries").select("kind, manufacturer, model").in("status", STATUS_ACTIVE),
   ]);
+  void email;
   const present = new Set<string>();
   for (const r of activeData ?? []) present.add(`${r.kind}:${key(r.manufacturer, r.model)}`);
   const matchedCount = (mineData ?? []).filter((r) => {
@@ -101,8 +83,35 @@ export default async function Home() {
     return present.has(`${opposite}:${key(r.manufacturer, r.model)}`);
   }).length;
 
+  const ENTRIES = [
+    {
+      href: "/sell",
+      emoji: "🚗",
+      title: t("top_sell_title"),
+      body: t("top_sell_body"),
+      accent: "border-accent/40 bg-accent/[0.06] hover:border-accent",
+    },
+    {
+      href: "/buy",
+      emoji: "🔎",
+      title: t("top_buy_title"),
+      body: t("top_buy_body"),
+      accent: "border-sky-400/40 bg-sky-400/[0.06] hover:border-sky-400",
+    },
+    {
+      href: "/mypage",
+      emoji: "👤",
+      title: t("top_mypage_title"),
+      body: t("top_mypage_body"),
+      accent: "border-border bg-card hover:border-primary",
+    },
+  ];
+
   return (
-    <main className="mx-auto max-w-xl px-6 pt-14 pb-16">
+    <main className="mx-auto max-w-xl px-6 pt-10 pb-16">
+      <div className="mb-4 flex justify-end">
+        <LangToggle lang={lang} />
+      </div>
       <header className="text-center">
         <div className="flex justify-center">
           <Wordmark />
@@ -115,9 +124,9 @@ export default async function Home() {
           className="mt-8 flex items-center justify-between rounded-2xl border border-accent/50 bg-accent/10 p-4 hover:border-accent"
         >
           <span>
-            <span className="block text-sm font-semibold text-accent">🔔 マッチングがあります</span>
+            <span className="block text-sm font-semibold text-accent">{t("top_match_title")}</span>
             <span className="mt-0.5 block text-xs text-muted">
-              条件の合う相手が見つかっています（{matchedCount}件）。マイページで確認
+              {t("top_match_body")}（{matchedCount}）
             </span>
           </span>
           <span className="text-accent">›</span>
@@ -141,9 +150,7 @@ export default async function Home() {
         ))}
       </section>
 
-      <p className="mt-12 text-center text-xs text-muted">
-        ARIOS — 一台ごとの人生を、つなぐ。
-      </p>
+      <p className="mt-12 text-center text-xs text-muted">{t("top_footer")}</p>
     </main>
   );
 }

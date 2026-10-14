@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import SignupForm from "./SignupForm";
 import Wordmark from "../Wordmark";
+import LangToggle from "../LangToggle";
 import { getCurrentUser } from "@/lib/auth";
+import { getLang } from "@/lib/lang";
+import { tr } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "新規登録 — LIFE LINE GARAGE" };
@@ -11,24 +14,27 @@ export const metadata = { title: "新規登録 — LIFE LINE GARAGE" };
 export default async function SignupPage() {
   const user = await getCurrentUser();
   if (user) redirect("/mypage");
+  const lang = await getLang();
+  const t = tr(lang);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-10">
+      <div className="mb-6 flex justify-end">
+        <LangToggle lang={lang} />
+      </div>
       <header className="mb-8">
         <Wordmark align="left" />
-        <h1 className="mt-5 text-2xl font-semibold">マイページ登録</h1>
-        <p className="mt-2 text-sm text-muted">
-          登録すると、売りたい・買いたいの状況をマイページでまとめて確認できます。
-        </p>
+        <h1 className="mt-5 text-2xl font-semibold">{t("signup_title")}</h1>
+        <p className="mt-2 text-sm text-muted">{t("signup_sub")}</p>
       </header>
 
-      <Suspense fallback={<p className="text-sm text-muted">読み込み中…</p>}>
-        <SignupForm />
+      <Suspense fallback={<p className="text-sm text-muted">…</p>}>
+        <SignupForm lang={lang} />
       </Suspense>
 
       <p className="mt-10 text-center text-xs text-muted">
         <Link href="/" className="text-accent">
-          トップへ戻る
+          {t("backTop")}
         </Link>
       </p>
     </main>

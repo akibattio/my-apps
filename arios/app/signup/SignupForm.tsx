@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/nav";
+import { tr, type Lang } from "@/lib/i18n";
 import { signUpCustomer } from "./actions";
 
 // メール＋パスワードで新規登録。
-// サーバー側で「確認済みユーザー」を作成 → クライアントでログイン → マイページへ。
-// （確認メールを送らないので、メール配信が未整備でも登録できる）
-export default function SignupForm() {
+export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
+  const t = tr(lang);
   const supabase = createClient();
   const router = useRouter();
   const params = useSearchParams();
@@ -30,15 +30,15 @@ export default function SignupForm() {
     e.preventDefault();
     setError(null);
     if (!name.trim()) {
-      setError("お名前（必須）を入力してください。");
+      setError(t("signup_err_name"));
       return;
     }
     if (!contact.trim()) {
-      setError("連絡先（電話番号 または LINE ID・必須）を入力してください。");
+      setError(t("signup_err_contact"));
       return;
     }
     if (password.length < 6) {
-      setError("パスワードは6文字以上にしてください。");
+      setError(t("signup_err_pw"));
       return;
     }
     setBusy(true);
@@ -51,24 +51,24 @@ export default function SignupForm() {
     });
     if (res.error === "ratelimited") {
       setBusy(false);
-      setError("登録の試行が集中しています。少し時間をおいてお試しください。");
+      setError(t("signup_err_rate"));
       return;
     }
     if (res.error === "exists") {
       setBusy(false);
-      setError("このメールアドレスは登録できません。すでにアカウントをお持ちの場合はログインしてください。");
+      setError(t("signup_err_exists"));
       return;
     }
     if (res.error) {
       setBusy(false);
-      setError("登録に失敗しました。入力内容を確認してください。");
+      setError(t("signup_err_failed"));
       return;
     }
     // 2) 作成できたらそのままログイン
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setBusy(false);
-      setError("登録は完了しました。お手数ですがログインしてください。");
+      setError(t("signup_err_failed"));
       return;
     }
     router.push(next);
@@ -79,24 +79,24 @@ export default function SignupForm() {
     "w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500";
 
   const labelC = "mb-1 block text-sm text-muted";
-  const req = <span className="text-red-400"> 必須</span>;
+  const req = <span className="text-red-400"> {t("required")}</span>;
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className={labelC}>お名前{req}</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" autoComplete="name" className={field} />
+        <label className={labelC}>{t("name")}{req}</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form_name_ph")} autoComplete="name" className={field} />
       </div>
       <div>
-        <label className={labelC}>会社名（任意）</label>
-        <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="◯◯自動車 株式会社" autoComplete="organization" className={field} />
+        <label className={labelC}>{t("company")}（{t("optional")}）</label>
+        <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder={t("form_company_ph")} autoComplete="organization" className={field} />
       </div>
       <div>
-        <label className={labelC}>連絡先{req}</label>
+        <label className={labelC}>{t("contact")}{req}</label>
         <div className="mb-2 flex gap-2">
           {[
-            { v: "PHONE", label: "電話番号" },
-            { v: "LINE", label: "LINE ID" },
+            { v: "PHONE", label: t("phone") },
+            { v: "LINE", label: t("lineId") },
           ].map((m) => (
             <button
               type="button"
@@ -110,29 +110,29 @@ export default function SignupForm() {
             </button>
           ))}
         </div>
-        <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? "LINE ID" : "電話番号"} className={field} />
+        <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? t("lineId") : t("phone")} className={field} />
       </div>
       <div>
-        <label className={labelC}>メールアドレス{req}</label>
+        <label className={labelC}>{t("email")}{req}</label>
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
+          placeholder={t("form_email_ph")}
           autoComplete="email"
           className={field}
         />
       </div>
       <div>
-        <label className={labelC}>パスワード{req}</label>
+        <label className={labelC}>{t("password")}{req}</label>
         <div className="relative">
           <input
             type={showPw ? "text" : "password"}
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="6文字以上"
+            placeholder={t("signup_pw_ph")}
             autoComplete="new-password"
             className={`${field} pr-16`}
           />
@@ -141,7 +141,7 @@ export default function SignupForm() {
             onClick={() => setShowPw((v) => !v)}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted"
           >
-            {showPw ? "隠す" : "表示"}
+            {showPw ? t("login_hide") : t("login_show")}
           </button>
         </div>
       </div>
@@ -150,16 +150,16 @@ export default function SignupForm() {
         disabled={busy}
         className="w-full rounded-full bg-primary px-6 py-4 font-medium text-black disabled:opacity-60"
       >
-        {busy ? "登録中…" : "登録する"}
+        {busy ? t("signup_doing") : t("signup_do")}
       </button>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <p className="text-center text-sm text-muted">
-        既にアカウントをお持ちの方は{" "}
+        {t("signup_have")}{" "}
         <Link
           href={next !== "/mypage" ? `/login?next=${encodeURIComponent(next)}` : "/login"}
           className="text-accent underline-offset-4 hover:underline"
         >
-          ログイン
+          {t("login")}
         </Link>
       </p>
     </form>

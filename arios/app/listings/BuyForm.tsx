@@ -2,37 +2,42 @@
 
 import { useActionState, useState, startTransition } from "react";
 import { submitBuy, type ListingState } from "./actions";
-
-const CONTACTS = [
-  { v: "PHONE", label: "電話番号" },
-  { v: "LINE", label: "LINE ID" },
-];
-const MODIFIED = [
-  { v: "", label: "不問" },
-  { v: "なし", label: "改造なし" },
-  { v: "あり", label: "改造あり" },
-];
-const CHANNELS = [
-  { v: "LINE", label: "LINE" },
-  { v: "WHATSAPP", label: "WhatsApp" },
-  { v: "PHONE", label: "電話" },
-  { v: "REFERRAL", label: "紹介" },
-  { v: "OTHER", label: "その他" },
-];
+import { tr, type Lang } from "@/lib/i18n";
 
 export default function BuyForm({
+  lang = "ja",
   defaultEmail,
   defaultName,
   defaultCompany,
   defaultContact,
   defaultContactMethod,
 }: {
+  lang?: Lang;
   defaultEmail?: string;
   defaultName?: string;
   defaultCompany?: string;
   defaultContact?: string;
   defaultContactMethod?: string;
 }) {
+  const t = tr(lang);
+  const en = lang === "en";
+  const CONTACTS = [
+    { v: "PHONE", label: t("phone") },
+    { v: "LINE", label: t("lineId") },
+  ];
+  const MODIFIED = [
+    { v: "", label: t("buy_mod_any") },
+    { v: "なし", label: t("buy_mod_no") },
+    { v: "あり", label: t("buy_mod_yes") },
+  ];
+  const CHANNELS = [
+    { v: "LINE", label: "LINE" },
+    { v: "WHATSAPP", label: "WhatsApp" },
+    { v: "PHONE", label: en ? "Phone" : "電話" },
+    { v: "REFERRAL", label: en ? "Referral" : "紹介" },
+    { v: "OTHER", label: en ? "Other" : "その他" },
+  ];
+
   const [state, formAction, isPending] = useActionState<ListingState, FormData>(
     submitBuy,
     {}
@@ -45,13 +50,11 @@ export default function BuyForm({
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
   const [price, setPrice] = useState("");
-  // こだわり条件
   const [accidentNG, setAccidentNG] = useState(false);
   const [color, setColor] = useState("");
   const [interior, setInterior] = useState("");
   const [modified, setModified] = useState("");
   const [options, setOptions] = useState("");
-  // 連絡先ほか（ログイン中はプロフィールを初期値に）
   const [contactMethod, setContactMethod] = useState(defaultContactMethod || "PHONE");
   const [contact, setContact] = useState(defaultContact ?? "");
   const [name, setName] = useState(defaultName ?? "");
@@ -61,23 +64,23 @@ export default function BuyForm({
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!manufacturer.trim() || !model.trim()) {
-      setLocalError("メーカーと車種（必須）を入力してください。");
+      setLocalError(t("form_err_makermodel"));
       return;
     }
     if (!name.trim()) {
-      setLocalError("お名前（必須）を入力してください。");
+      setLocalError(t("signup_err_name"));
       return;
     }
     if (!contact.trim()) {
-      setLocalError("連絡先（電話番号 または LINE ID・必須）を入力してください。");
+      setLocalError(t("signup_err_contact"));
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setLocalError("メールアドレス（必須）を正しく入力してください。");
+      setLocalError(en ? "Please enter a valid email (required)." : "メールアドレス（必須）を正しく入力してください。");
       return;
     }
     setLocalError(null);
-    // こだわり条件＋備考を message にまとめる
+    // こだわり条件＋備考を message にまとめる（判定ロジック用に日本語マーカーは固定）
     const message = [
       accidentNG ? "事故車NG" : null,
       color.trim() ? `カラー: ${color.trim()}` : null,
@@ -107,12 +110,12 @@ export default function BuyForm({
   const field =
     "w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500";
   const label = "mb-1 block text-sm text-muted";
-  const req = <span className="text-red-400"> 必須</span>;
+  const req = <span className="text-red-400"> {t("required")}</span>;
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div>
-        <label className={label}>受付経路</label>
+        <label className={label}>{t("form_channel")}</label>
         <div className="flex flex-wrap gap-2">
           {CHANNELS.map((c) => (
             <button
@@ -129,30 +132,30 @@ export default function BuyForm({
         </div>
       </div>
       <div>
-        <label className={label}>メーカー{req}</label>
-        <input className={field} value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="例: フェラーリ" />
+        <label className={label}>{t("form_maker")}{req}</label>
+        <input className={field} value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t("form_maker_ph")} />
       </div>
       <div>
-        <label className={label}>車種{req}</label>
-        <input className={field} value={model} onChange={(e) => setModel(e.target.value)} placeholder="例: 488 Pista" />
+        <label className={label}>{t("form_model")}{req}</label>
+        <input className={field} value={model} onChange={(e) => setModel(e.target.value)} placeholder={t("form_model_ph")} />
       </div>
       <div>
-        <label className={label}>希望価格（円・任意）</label>
-        <input className={field} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="例: 30000000" />
+        <label className={label}>{t("buy_price")}</label>
+        <input className={field} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="30000000" />
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">
-        <p className="mb-3 text-sm font-medium">こだわり条件（任意）</p>
+        <p className="mb-3 text-sm font-medium">{t("buy_pref")}</p>
         <label className="mb-3 flex items-center gap-3 text-sm">
           <input type="checkbox" checked={accidentNG} onChange={(e) => setAccidentNG(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
-          事故車はNG
+          {t("buy_accident")}
         </label>
         <div className="space-y-3">
-          <input className={field} value={color} onChange={(e) => setColor(e.target.value)} placeholder="ボディカラー（例: 赤 / 白）" />
-          <input className={field} value={interior} onChange={(e) => setInterior(e.target.value)} placeholder="内装色（例: 黒 / タン）" />
-          <input className={field} value={options} onChange={(e) => setOptions(e.target.value)} placeholder="希望オプション（例: サンルーフ / カーボン）" />
+          <input className={field} value={color} onChange={(e) => setColor(e.target.value)} placeholder={t("buy_color_ph")} />
+          <input className={field} value={interior} onChange={(e) => setInterior(e.target.value)} placeholder={t("buy_interior_ph")} />
+          <input className={field} value={options} onChange={(e) => setOptions(e.target.value)} placeholder={t("buy_option_ph")} />
           <div>
-            <span className={label}>改造</span>
+            <span className={label}>{t("buy_mod")}</span>
             <div className="flex gap-2">
               {MODIFIED.map((m) => (
                 <button
@@ -172,10 +175,10 @@ export default function BuyForm({
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">
-        <p className="mb-3 text-sm font-medium">ご連絡先（ARIOSからのご連絡用）</p>
+        <p className="mb-3 text-sm font-medium">{t("form_contact_block")}</p>
         <div className="space-y-3">
           <div>
-            <label className={label}>連絡先{req}</label>
+            <label className={label}>{t("contact")}{req}</label>
             <div className="mb-2 flex gap-2">
               {CONTACTS.map((m) => (
                 <button
@@ -190,37 +193,37 @@ export default function BuyForm({
                 </button>
               ))}
             </div>
-            <input className={field} value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? "LINE ID" : "電話番号"} />
+            <input className={field} value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? t("lineId") : t("phone")} />
           </div>
           <div>
-            <label className={label}>お名前{req}</label>
-            <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" autoComplete="name" />
+            <label className={label}>{t("name")}{req}</label>
+            <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form_name_ph")} autoComplete="name" />
           </div>
           <div>
-            <label className={label}>会社名（任意）</label>
-            <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="◯◯自動車 株式会社" autoComplete="organization" />
+            <label className={label}>{t("company")}（{t("optional")}）</label>
+            <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder={t("form_company_ph")} autoComplete="organization" />
           </div>
           <div>
-            <label className={label}>メールアドレス{req}</label>
+            <label className={label}>{t("email")}{req}</label>
             <input
               className={`${field} ${loggedIn ? "opacity-60" : ""}`}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               readOnly={loggedIn}
-              placeholder="you@example.com"
+              placeholder={t("form_email_ph")}
               autoComplete="email"
             />
           </div>
         </div>
       </div>
 
-      <textarea className={`${field} min-h-24`} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="その他ご希望・備考（任意）" />
+      <textarea className={`${field} min-h-24`} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t("buy_memo_ph")} />
 
       {(localError || state.error) && <p className="text-sm text-red-400">{localError || state.error}</p>}
 
       <button type="submit" disabled={isPending} className="w-full rounded-full bg-primary px-6 py-4 font-semibold text-black disabled:opacity-60">
-        {isPending ? "送信中…" : "この内容で送信する"}
+        {isPending ? t("form_submitting") : t("form_submit")}
       </button>
     </form>
   );
