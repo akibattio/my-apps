@@ -1,3 +1,5 @@
 # ad-automation 実行に必要なPythonパッケージ
 # Meta取得は標準ライブラリ(urllib)のみ。Google Ads取得に下記が必要。
 google-ads==31.1.0
+# Microsoft広告(Microsoft Advertising / 旧Bing Ads)の Reporting API 取得に必要。
+bingads==13.0.23.2

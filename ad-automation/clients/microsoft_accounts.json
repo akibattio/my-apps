@@ -1,0 +1,11 @@
+[
+  {
+    "_comment": "Microsoft広告(Microsoft Advertising / 旧Bing Ads)のアカウント対応表。accountId/customerIdはMicrosoft Advertising管理画面の数値。MCC配下。実値は後で記入。slug=report-glass識別子（report-glass/pipeline/clients.json と一致）。サービス中のみ。"
+  },
+  {
+    "client": "【展示会ブース装飾】",
+    "accountId": "<未設定>",
+    "customerId": "<未設定>",
+    "slug": "tenjikai"
+  }
+]
