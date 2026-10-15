@@ -3,6 +3,7 @@
 import { useState, startTransition } from "react";
 import { resizeImage } from "@/app/listings/resize";
 import { addListingPhotos, removeListingPhoto } from "../../actions";
+import { tr, type Lang } from "@/lib/i18n";
 
 const MAX_PHOTOS = 20;
 
@@ -10,10 +11,13 @@ const MAX_PHOTOS = 20;
 export default function ListingPhotos({
   id,
   photos,
+  lang = "ja",
 }: {
   id: string;
   photos: { path: string; url: string }[];
+  lang?: Lang;
 }) {
+  const t = tr(lang);
   const [preparing, setPreparing] = useState(false);
   const [busy, setBusy] = useState(false);
   const room = MAX_PHOTOS - photos.length;
@@ -44,7 +48,7 @@ export default function ListingPhotos({
                 <input type="hidden" name="path" value={p.path} />
                 <button
                   type="submit"
-                  aria-label="削除"
+                  aria-label={lang === "en" ? "Delete" : "削除"}
                   className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white"
                 >
                   ×
@@ -59,7 +63,13 @@ export default function ListingPhotos({
         <label className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-neutral-600 text-muted">
           <span className="text-2xl text-accent">＋</span>
           <span className="mt-1 text-sm">
-            {busy ? "アップロード中…" : preparing ? "準備中…" : `写真を追加（あと${room}枚）`}
+            {busy
+              ? t("lp_uploading")
+              : preparing
+                ? t("lp_preparing")
+                : lang === "en"
+                  ? `Add photos (${room} left)`
+                  : `写真を追加（あと${room}枚）`}
           </span>
           <input
             type="file"
@@ -71,11 +81,9 @@ export default function ListingPhotos({
           />
         </label>
       ) : (
-        <p className="text-xs text-muted">写真は最大 {MAX_PHOTOS} 枚までです。</p>
+        <p className="text-xs text-muted">{t("lp_max")}</p>
       )}
-      <p className="mt-2 text-xs text-muted">
-        写真はあとから何度でも追加できます（1枚ずつでもOK）。
-      </p>
+      <p className="mt-2 text-xs text-muted">{t("lp_note")}</p>
     </div>
   );
 }

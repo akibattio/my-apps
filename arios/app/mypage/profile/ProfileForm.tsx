@@ -3,13 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { tr, type Lang } from "@/lib/i18n";
 
 // 個人情報（お名前・会社名・連絡先）の編集。ログイン中の本人の user_metadata を更新する。
 export default function ProfileForm({
   initial,
+  lang = "ja",
 }: {
   initial: { name: string; company: string; contact: string; contactMethod: string };
+  lang?: Lang;
 }) {
+  const t = tr(lang);
   const supabase = createClient();
   const router = useRouter();
   const [name, setName] = useState(initial.name);
@@ -23,11 +27,11 @@ export default function ProfileForm({
     e.preventDefault();
     setError(null);
     if (!name.trim()) {
-      setError("お名前（必須）を入力してください。");
+      setError(t("signup_err_name"));
       return;
     }
     if (!contact.trim()) {
-      setError("連絡先（必須）を入力してください。");
+      setError(t("signup_err_contact"));
       return;
     }
     setBusy(true);
@@ -41,7 +45,7 @@ export default function ProfileForm({
     });
     if (error) {
       setBusy(false);
-      setError("保存に失敗しました。時間をおいてお試しください。");
+      setError(lang === "en" ? "Failed to save. Please try again later." : "保存に失敗しました。時間をおいてお試しください。");
       return;
     }
     router.push("/mypage");
@@ -51,24 +55,24 @@ export default function ProfileForm({
   const field =
     "w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500";
   const label = "mb-1 block text-sm text-muted";
-  const req = <span className="text-red-400"> 必須</span>;
+  const req = <span className="text-red-400"> {t("required")}</span>;
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div>
-        <label className={label}>お名前{req}</label>
-        <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" />
+        <label className={label}>{t("name")}{req}</label>
+        <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form_name_ph")} />
       </div>
       <div>
-        <label className={label}>会社名（任意）</label>
-        <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="◯◯自動車 株式会社" />
+        <label className={label}>{t("company")}（{t("optional")}）</label>
+        <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder={t("form_company_ph")} />
       </div>
       <div>
-        <label className={label}>連絡先{req}</label>
+        <label className={label}>{t("contact")}{req}</label>
         <div className="mb-2 flex gap-2">
           {[
-            { v: "PHONE", label: "電話番号" },
-            { v: "LINE", label: "LINE ID" },
+            { v: "PHONE", label: t("phone") },
+            { v: "LINE", label: t("lineId") },
           ].map((m) => (
             <button
               type="button"
@@ -82,7 +86,7 @@ export default function ProfileForm({
             </button>
           ))}
         </div>
-        <input className={field} value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? "LINE ID" : "電話番号"} />
+        <input className={field} value={contact} onChange={(e) => setContact(e.target.value)} placeholder={contactMethod === "LINE" ? t("lineId") : t("phone")} />
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
@@ -92,7 +96,7 @@ export default function ProfileForm({
         disabled={busy}
         className="w-full rounded-full bg-primary px-6 py-4 font-semibold text-black disabled:opacity-60"
       >
-        {busy ? "保存中…" : "保存する"}
+        {busy ? (lang === "en" ? "Saving…" : "保存中…") : t("save")}
       </button>
     </form>
   );

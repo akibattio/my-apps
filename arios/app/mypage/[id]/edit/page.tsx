@@ -3,8 +3,9 @@ import { redirect, notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { updateMyListing } from "../../actions";
-import { KIND_LABEL } from "@/app/admin/inquiries/constants";
 import ListingPhotos from "./ListingPhotos";
+import { getLang } from "@/lib/lang";
+import { tr } from "@/lib/i18n";
 
 const BUCKET = "inquiry-photos";
 
@@ -32,6 +33,8 @@ export default async function EditMyListing({
   const { id } = await params;
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/mypage/${id}/edit`);
+  const lang = await getLang();
+  const t = tr(lang);
 
   const supabase = createAdminClient();
   const { data } = await supabase
@@ -59,64 +62,64 @@ export default async function EditMyListing({
   return (
     <main className="mx-auto max-w-xl px-6 py-10">
       <Link href="/mypage" className="text-sm text-accent">
-        ‹ マイページへ
+        {t("back_mypage")}
       </Link>
       <header className="mb-6 mt-2">
-        <h1 className="text-2xl font-semibold">情報を編集</h1>
+        <h1 className="text-2xl font-semibold">{t("edit_title")}</h1>
         <p className="mt-1 text-sm text-muted">
-          {KIND_LABEL[r.kind] ?? r.kind}：{r.manufacturer} {r.model}
+          {(r.kind === "SELL" ? t("tab_sell") : t("tab_buy"))}：{r.manufacturer} {r.model}
         </p>
       </header>
 
       <form action={updateMyListing} className="space-y-5">
         <input type="hidden" name="id" value={r.id} />
         <div>
-          <label className={label}>メーカー<span className="text-red-400"> 必須</span></label>
-          <input className={field} name="manufacturer" defaultValue={r.manufacturer ?? ""} placeholder="例: フェラーリ" />
+          <label className={label}>{t("form_maker")}<span className="text-red-400"> {t("required")}</span></label>
+          <input className={field} name="manufacturer" defaultValue={r.manufacturer ?? ""} placeholder={t("form_maker_ph")} />
         </div>
         <div>
-          <label className={label}>車種<span className="text-red-400"> 必須</span></label>
-          <input className={field} name="model" defaultValue={r.model ?? ""} placeholder="例: 488 Pista" />
+          <label className={label}>{t("form_model")}<span className="text-red-400"> {t("required")}</span></label>
+          <input className={field} name="model" defaultValue={r.model ?? ""} placeholder={t("form_model_ph")} />
         </div>
         <div>
-          <label className={label}>{r.kind === "SELL" ? "販売価格（円）" : "希望価格（円）"}</label>
+          <label className={label}>{r.kind === "SELL" ? t("edit_price_sell") : t("edit_price_buy")}</label>
           <input
             className={field}
             name="price"
             defaultValue={r.price ?? ""}
             inputMode="numeric"
-            placeholder="例: 12000000"
+            placeholder="12000000"
           />
         </div>
         <div>
-          <label className={label}>連絡先</label>
-          <input className={field} name="contact" defaultValue={r.contact ?? ""} placeholder="電話番号 / LINE ID" />
+          <label className={label}>{t("contact")}</label>
+          <input className={field} name="contact" defaultValue={r.contact ?? ""} placeholder={lang === "en" ? "Phone / LINE ID" : "電話番号 / LINE ID"} />
         </div>
         <div>
-          <label className={label}>お名前・会社名</label>
-          <input className={field} name="name" defaultValue={r.name ?? ""} placeholder="任意" />
+          <label className={label}>{t("edit_name_company")}</label>
+          <input className={field} name="name" defaultValue={r.name ?? ""} placeholder={t("optional")} />
         </div>
         <div>
-          <label className={label}>備考・希望条件</label>
+          <label className={label}>{t("edit_memo")}</label>
           <textarea
             className={`${field} min-h-28`}
             name="message"
             defaultValue={r.message ?? ""}
-            placeholder="状態・年式・希望条件など"
+            placeholder={t("edit_memo_ph")}
           />
         </div>
         <button
           type="submit"
           className="w-full rounded-full bg-primary px-6 py-4 font-semibold text-black"
         >
-          保存する
+          {t("save")}
         </button>
       </form>
 
       {r.kind === "SELL" && (
         <section className="mt-8">
-          <h2 className="mb-2 text-sm font-medium">写真</h2>
-          <ListingPhotos id={r.id} photos={photos} />
+          <h2 className="mb-2 text-sm font-medium">{t("photos")}</h2>
+          <ListingPhotos id={r.id} photos={photos} lang={lang} />
         </section>
       )}
     </main>

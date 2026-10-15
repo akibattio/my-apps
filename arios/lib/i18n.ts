@@ -134,6 +134,22 @@ const ja: Dict = {
   tab_sell: "売りたい",
   tab_buy: "買いたい",
   tab_mypage: "マイページ",
+  // マイページ編集 / 会員情報編集
+  back_mypage: "‹ マイページへ",
+  edit_title: "情報を編集",
+  edit_price_sell: "販売価格（円）",
+  edit_price_buy: "希望価格（円）",
+  edit_name_company: "お名前・会社名",
+  edit_memo: "備考・希望条件",
+  edit_memo_ph: "状態・年式・希望条件など",
+  photos: "写真",
+  lp_note: "写真はあとから何度でも追加できます（1枚ずつでもOK）。",
+  lp_max: "写真は最大20枚までです。",
+  lp_preparing: "準備中…",
+  lp_uploading: "アップロード中…",
+  profile_title: "登録情報の編集",
+  profile_sub: "お名前・会社名・連絡先を変更できます。次回の登録フォームにも反映されます。",
+  profile_email_note: "メールアドレスはログインIDのため、ここでは変更できません。変更が必要な場合はARIOSまでご連絡ください。",
 };
 
 const en: Dict = {
@@ -256,6 +272,21 @@ const en: Dict = {
   tab_sell: "Sell",
   tab_buy: "Buy",
   tab_mypage: "My Page",
+  back_mypage: "‹ Back to My Page",
+  edit_title: "Edit listing",
+  edit_price_sell: "Asking price (JPY)",
+  edit_price_buy: "Budget (JPY)",
+  edit_name_company: "Name / Company",
+  edit_memo: "Notes / preferences",
+  edit_memo_ph: "Condition, year, preferences, etc.",
+  photos: "Photos",
+  lp_note: "You can add photos anytime, even one at a time.",
+  lp_max: "Up to 20 photos.",
+  lp_preparing: "Preparing…",
+  lp_uploading: "Uploading…",
+  profile_title: "Edit your details",
+  profile_sub: "Update your name, company and contact. These prefill your next form too.",
+  profile_email_note: "Your email is your login ID and can't be changed here. Contact ARIOS if you need to change it.",
 };
 
 const DICT: Record<Lang, Dict> = { ja, en };
