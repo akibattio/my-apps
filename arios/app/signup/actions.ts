@@ -3,14 +3,14 @@
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminEmails } from "@/lib/auth";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitDb, clientIp } from "@/lib/ratelimit";
 
 // status:
 //  - "signedIn": 確認メール設定OFF時。即セッション確立（従来どおりの体験）。
 //  - "confirm" : 確認メール設定ON時。確認メールを送信。確認するまでログイン不可。
 export type SignupResult = {
   status: "signedIn" | "confirm" | "error";
-  error?: "invalid" | "exists" | "failed" | "ratelimited";
+  error?: "invalid" | "exists" | "failed" | "ratelimited" | "captcha";
 };
 
 export type SignupProfile = {
@@ -37,17 +37,18 @@ function siteOrigin(h: Headers): string {
 export async function signUpCustomer(
   email: string,
   password: string,
-  profile: SignupProfile = {}
+  profile: SignupProfile = {},
+  captchaToken?: string
 ): Promise<SignupResult> {
   const em = (email ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return { status: "error", error: "invalid" };
   if (!password || password.length < 6) return { status: "error", error: "invalid" };
 
-  // レート制限（IP単位・ベストエフォート。本番は共有ストア推奨）。
+  // レート制限（共有ストア=Supabase。全インスタンス共通。IP単位）。
   const h = await headers();
-  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-  const rl = rateLimit(`signup:${ip}`, 5, 60_000);
-  const rlDay = rateLimit(`signup:day:${ip}`, 30, 24 * 60 * 60_000);
+  const ip = clientIp(h);
+  const rl = await rateLimitDb(`signup:min:${ip}`, 5, 60_000);
+  const rlDay = await rateLimitDb(`signup:day:${ip}`, 30, 24 * 60 * 60_000);
   if (!rl.ok || !rlDay.ok) return { status: "error", error: "ratelimited" };
 
   // 管理者メールは会員登録で作成させない（成りすまし防止）。管理者は別経路で発行。
@@ -61,6 +62,9 @@ export async function signUpCustomer(
     options: {
       // 確認メールのリンク先。/auth/callback がセッションを確立してマイページへ。
       emailRedirectTo: `${origin}/auth/callback?next=/mypage`,
+      // CAPTCHA（Supabase Auth で Turnstile 等を有効化したときのみ検証される）。
+      // 未設定なら undefined で、Supabase 側が無効なら影響なし。
+      captchaToken: captchaToken || undefined,
       data: {
         name: (profile.name ?? "").trim() || null,
         company: (profile.company ?? "").trim() || null,
@@ -75,6 +79,9 @@ export async function signUpCustomer(
     const code = (error as { code?: string }).code ?? "";
     if (code === "user_already_exists" || code === "email_exists" || msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
       return { status: "error", error: "exists" };
+    }
+    if (msg.includes("captcha")) {
+      return { status: "error", error: "captcha" };
     }
     console.error("[signup] signUp failed:", error);
     return { status: "error", error: "failed" };

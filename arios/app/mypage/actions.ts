@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { validateImageFile } from "@/lib/upload";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 20;
@@ -36,11 +37,16 @@ export async function addListingPhotos(formData: FormData): Promise<void> {
   const added: string[] = [];
   for (let i = 0; i < toUpload.length; i++) {
     const file = toUpload[i];
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `inquiries/${id}/${Date.now()}-${i}.${ext}`;
+    // 実バイトで画像か検証（拡張子/申告MIMEは信用しない）。非画像・過大はスキップ。
+    const v = await validateImageFile(file);
+    if (!v.ok) {
+      console.warn("[mypage-photo] rejected upload:", v.reason, file.name);
+      continue;
+    }
+    const path = `inquiries/${id}/${Date.now()}-${i}.${v.ext}`;
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(path, file, { contentType: file.type || undefined });
+      .upload(path, file, { contentType: v.contentType });
     if (error) {
       console.error("[mypage-photo] upload failed:", error);
       continue;
@@ -48,10 +54,15 @@ export async function addListingPhotos(formData: FormData): Promise<void> {
     added.push(path);
   }
   if (added.length > 0) {
-    await supabase
+    const { error: updErr } = await supabase
       .from("inquiries")
       .update({ photo_urls: [...existing, ...added], updated_at: new Date().toISOString() })
       .eq("id", id);
+    // DB更新に失敗したらアップロード済みの孤立ファイルを消す。
+    if (updErr) {
+      console.error("[mypage-photo] photo_urls update failed, cleaning up:", updErr);
+      await supabase.storage.from(BUCKET).remove(added).catch(() => {});
+    }
   }
   redirect(`/mypage/${id}/edit`);
 }

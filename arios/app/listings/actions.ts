@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAdmin, getCurrentUser } from "@/lib/auth";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitDb, clientIp } from "@/lib/ratelimit";
+import { validateImageFile } from "@/lib/upload";
 import { sellerOrder } from "./order";
 import { matchKey } from "@/app/admin/matching/key";
 
@@ -25,11 +26,13 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
     redirect(`/submitted?kind=${kind}`);
   }
 
-  // IP単位のレート制限
+  // レート制限（共有ストア=Supabase）。ログインユーザーID＋IP の両方で制限。
   const h = await headers();
-  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
-  const rl = rateLimit(`listing:${ip}`, 12, 60_000);
-  if (!rl.ok) {
+  const ip = clientIp(h);
+  const rlUser = await rateLimitDb(`listing:user:${user.id}`, 12, 60_000);
+  const rlIp = await rateLimitDb(`listing:ip:${ip}`, 20, 60_000);
+  const rlDay = await rateLimitDb(`listing:day:user:${user.id}`, 60, 24 * 60 * 60_000);
+  if (!rlUser.ok || !rlIp.ok || !rlDay.ok) {
     return { error: "送信が集中しています。少し時間をおいてお試しください。" };
   }
 
@@ -109,11 +112,16 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
     const paths: string[] = [];
     for (let i = 0; i < photos.length; i++) {
       const file = photos[i];
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `inquiries/${id}/${String(i).padStart(2, "0")}-${Date.now()}.${ext}`;
+      // 実バイトで画像かどうか検証（拡張子/申告MIMEは信用しない）。非画像・過大はスキップ。
+      const v = await validateImageFile(file);
+      if (!v.ok) {
+        console.warn("[listing] rejected upload:", v.reason, file.name);
+        continue;
+      }
+      const path = `inquiries/${id}/${String(i).padStart(2, "0")}-${Date.now()}.${v.ext}`;
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, file, { contentType: file.type || undefined });
+        .upload(path, file, { contentType: v.contentType });
       if (upErr) {
         console.error("[listing] upload failed:", upErr);
         continue;
@@ -121,7 +129,15 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
       paths.push(path);
     }
     if (paths.length > 0) {
-      await supabase.from("inquiries").update({ photo_urls: paths }).eq("id", id);
+      const { error: updErr } = await supabase
+        .from("inquiries")
+        .update({ photo_urls: paths })
+        .eq("id", id);
+      // DB更新に失敗したらアップロード済みの孤立ファイルを消す。
+      if (updErr) {
+        console.error("[listing] photo_urls update failed, cleaning up:", updErr);
+        await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
+      }
     }
   } catch (e) {
     console.error("[listing] unexpected:", e);

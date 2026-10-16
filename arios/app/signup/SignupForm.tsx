@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/nav";
 import { tr, type Lang } from "@/lib/i18n";
 import { signUpCustomer } from "./actions";
+import Turnstile from "../Turnstile";
+
+// CAPTCHA サイトキー（設定時のみウィジェットを表示）。ビルド時に焼き込まれる。
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 // メール＋パスワードで新規登録。
 export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
@@ -25,6 +29,7 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
   // 確認メール送信後の画面
   const [sent, setSent] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
@@ -45,14 +50,23 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
       setError(t("signup_err_pw"));
       return;
     }
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setError(t("signup_captcha_required"));
+      return;
+    }
     setBusy(true);
     // サーバーで会員登録（プロフィールも保存）。Supabase の確認メール設定で挙動が変わる。
-    const res = await signUpCustomer(email, password, {
-      name,
-      company,
-      contact,
-      contactMethod,
-    });
+    const res = await signUpCustomer(
+      email,
+      password,
+      { name, company, contact, contactMethod },
+      captchaToken || undefined
+    );
+    if (res.error === "captcha") {
+      setBusy(false);
+      setError(t("signup_err_captcha"));
+      return;
+    }
     if (res.error === "ratelimited") {
       setBusy(false);
       setError(t("signup_err_rate"));
@@ -192,6 +206,9 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
           </button>
         </div>
       </div>
+      {TURNSTILE_SITE_KEY && (
+        <Turnstile siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />
+      )}
       <button
         type="submit"
         disabled={busy}

@@ -57,6 +57,8 @@ const ja: Dict = {
   signup_err_exists: "このメールアドレスは登録できません。すでにアカウントをお持ちの場合はログインしてください。",
   signup_err_rate: "登録の試行が集中しています。少し時間をおいてお試しください。",
   signup_err_failed: "登録に失敗しました。入力内容を確認してください。",
+  signup_captcha_required: "確認のため、チェックを完了してください。",
+  signup_err_captcha: "確認（CAPTCHA）に失敗しました。もう一度お試しください。",
   // 売り/買いフォーム共通
   form_channel: "受付経路",
   form_maker: "メーカー",
@@ -229,6 +231,8 @@ const en: Dict = {
   signup_err_exists: "This email can't be registered. If you already have an account, please log in.",
   signup_err_rate: "Too many attempts. Please wait a moment and try again.",
   signup_err_failed: "Sign up failed. Please check your details.",
+  signup_captcha_required: "Please complete the verification check.",
+  signup_err_captcha: "Verification (CAPTCHA) failed. Please try again.",
   form_channel: "How you reached us",
   form_maker: "Make",
   form_model: "Model",
