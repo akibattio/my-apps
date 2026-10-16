@@ -25,6 +25,10 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 確認メール送信後の画面
+  const [sent, setSent] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,7 +46,7 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
       return;
     }
     setBusy(true);
-    // 1) サーバーで確認済みユーザーを作成（プロフィールも保存）
+    // サーバーで会員登録（プロフィールも保存）。Supabase の確認メール設定で挙動が変わる。
     const res = await signUpCustomer(email, password, {
       name,
       company,
@@ -64,15 +68,27 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
       setError(t("signup_err_failed"));
       return;
     }
-    // 2) 作成できたらそのままログイン
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
+    if (res.status === "confirm") {
+      // 確認メール送信済み。確認するまでログインできない。
       setBusy(false);
-      setError(t("signup_err_failed"));
+      setSent(true);
       return;
     }
+    // signedIn: サーバー側でセッション確立済み。マイページへ。
     router.push(next);
     router.refresh();
+  }
+
+  async function onResend() {
+    setResendMsg(null);
+    setResending(true);
+    await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/mypage` },
+    });
+    setResending(false);
+    setResendMsg(t("vfy_resent"));
   }
 
   const field =
@@ -80,6 +96,37 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
 
   const labelC = "mb-1 block text-sm text-muted";
   const req = <span className="text-red-400"> {t("required")}</span>;
+
+  // 確認メール送信後の画面
+  if (sent) {
+    return (
+      <div className="space-y-5 text-center">
+        <div className="text-4xl">📧</div>
+        <h2 className="text-lg font-semibold">{t("vfy_sent_title")}</h2>
+        <p className="text-sm text-muted">
+          <span className="text-foreground">{email}</span> {t("vfy_sent_body")}
+        </p>
+        <p className="text-xs text-muted">{t("vfy_sent_note")}</p>
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={resending}
+          className="w-full rounded-full border border-neutral-700 px-6 py-3 text-sm text-foreground disabled:opacity-60"
+        >
+          {resending ? t("vfy_resending") : t("vfy_resend")}
+        </button>
+        {resendMsg && <p className="text-sm text-accent">{resendMsg}</p>}
+        <p>
+          <Link
+            href={next !== "/mypage" ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+            className="text-sm text-accent underline-offset-4 hover:underline"
+          >
+            {t("vfy_open_login")}
+          </Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">

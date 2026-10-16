@@ -20,19 +20,44 @@ export default function LoginForm({ lang = "ja" }: { lang?: Lang }) {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // メール未確認のとき確認メール再送を促す
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setResendMsg(null);
+    setUnconfirmed(false);
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setBusy(false);
+      const code = (error as { code?: string }).code ?? "";
+      const msg = (error.message ?? "").toLowerCase();
+      if (code === "email_not_confirmed" || msg.includes("not confirmed") || msg.includes("confirm")) {
+        setUnconfirmed(true);
+        setError(t("login_unconfirmed"));
+        return;
+      }
       setError(t("login_err"));
       return;
     }
     router.push(next);
     router.refresh();
+  }
+
+  async function onResend() {
+    setResendMsg(null);
+    setResending(true);
+    await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/mypage` },
+    });
+    setResending(false);
+    setResendMsg(t("vfy_resent"));
   }
 
   const field =
@@ -75,6 +100,24 @@ export default function LoginForm({ lang = "ja" }: { lang?: Lang }) {
         {busy ? t("login_doing") : t("login")}
       </button>
       {error && <p className="text-sm text-red-400">{error}</p>}
+      {unconfirmed && (
+        <div className="space-y-1 text-center">
+          <button
+            type="button"
+            onClick={onResend}
+            disabled={resending}
+            className="text-sm text-accent underline-offset-4 hover:underline disabled:opacity-60"
+          >
+            {resending ? t("vfy_resending") : t("login_resend")}
+          </button>
+          {resendMsg && <p className="text-sm text-accent">{resendMsg}</p>}
+        </div>
+      )}
+      <p className="text-center text-sm">
+        <Link href="/forgot" className="text-muted underline-offset-4 hover:underline">
+          {t("login_forgot")}
+        </Link>
+      </p>
       <p className="text-center text-sm text-muted">
         {t("login_first")}{" "}
         <Link
