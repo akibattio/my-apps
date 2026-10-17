@@ -87,10 +87,10 @@ export default async function Home() {
     {
       href: "/sell",
       icon: (
-        <svg viewBox="0 0 48 44" fill="none" className="h-9 w-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M9 30 L9 26 Q9 23 12 23 L17 23 L21 16 Q22 14 25 14 L28 14 Q31 14 32 16 L36 23 L40 23 Q43 23 43 26 L43 30" />
-          <circle cx="17" cy="31" r="4.5" />
-          <circle cx="36" cy="31" r="4.5" />
+        <svg viewBox="0 0 24 24" fill="none" className="h-9 w-9" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6" />
+          <circle cx="7" cy="17" r="2" />
+          <circle cx="17" cy="17" r="2" />
         </svg>
       ),
       color: "text-accent",
@@ -119,7 +119,7 @@ export default async function Home() {
           <path d="M11 39 Q11 28 24 28 Q37 28 37 39" />
         </svg>
       ),
-      color: "text-primary",
+      color: "text-emerald-400",
       title: t("top_mypage_title"),
       body: t("top_mypage_body"),
       accent: "border-border bg-card hover:border-primary",
