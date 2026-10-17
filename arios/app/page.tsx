@@ -87,11 +87,8 @@ export default async function Home() {
     {
       href: "/sell",
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" className="h-9 w-9" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6" />
-          <circle cx="7" cy="17" r="2" />
-          <circle cx="17" cy="17" r="2" />
-        </svg>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/icon-sell.png" alt="" className="h-12 w-12 object-contain" />
       ),
       color: "text-accent",
       title: t("top_sell_title"),
@@ -101,10 +98,8 @@ export default async function Home() {
     {
       href: "/buy",
       icon: (
-        <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <circle cx="21" cy="21" r="11" />
-          <path d="M29 29 L41 41" />
-        </svg>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/icon-buy.png" alt="" className="h-12 w-12 object-contain" />
       ),
       color: "text-sky-400",
       title: t("top_buy_title"),
