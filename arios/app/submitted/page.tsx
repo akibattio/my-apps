@@ -42,6 +42,9 @@ export default async function SubmittedPage({
             >
               {t("done_more")}
             </Link>
+            <Link href="/" className="block pt-1 text-sm text-accent hover:underline">
+              {t("backTop")}
+            </Link>
           </>
         ) : (
           <Link

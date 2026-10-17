@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import Wordmark from "../Wordmark";
 import LangToggle from "../LangToggle";
@@ -25,7 +26,10 @@ export default async function BuyPage() {
   };
   return (
     <main className="mx-auto max-w-xl px-6 py-12">
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex items-center justify-between">
+        <Link href="/" className="text-sm text-accent hover:underline">
+          ‹ {t("backTop")}
+        </Link>
         <LangToggle lang={lang} />
       </div>
       <header className="mb-8 flex flex-col items-center text-center">

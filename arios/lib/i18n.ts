@@ -133,6 +133,7 @@ const ja: Dict = {
   deal_CLOSED: "成約",
   deal_CANCELLED: "キャンセル",
   // 下タブ
+  tab_home: "ホーム",
   tab_sell: "売りたい",
   tab_buy: "買いたい",
   tab_mypage: "マイページ",
@@ -300,6 +301,7 @@ const en: Dict = {
   deal_IN_PROGRESS: "In progress",
   deal_CLOSED: "Closed",
   deal_CANCELLED: "Cancelled",
+  tab_home: "Home",
   tab_sell: "Sell",
   tab_buy: "Buy",
   tab_mypage: "My Page",

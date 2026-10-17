@@ -27,6 +27,29 @@ const stroke = (active: boolean) => (active ? "var(--accent)" : "currentColor");
 
 const TABS = [
   {
+    href: "/",
+    label: "tab_home",
+    match: (p: string) => p === "/",
+    icon: (a: boolean) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M4 10.5 12 4l8 6.5"
+          stroke={stroke(a)}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M6 9.5V19a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9.5"
+          stroke={stroke(a)}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: "/sell",
     label: "tab_sell",
     match: (p: string) => p.startsWith("/sell"),
