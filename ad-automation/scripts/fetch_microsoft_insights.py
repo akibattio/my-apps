@@ -33,6 +33,9 @@
   # 任意:
   MS_ADS_ENVIRONMENT       既定 production
   MS_ADS_REDIRECT_URI      OAuthWebAuthCodeGrant 用（confidential client のとき）
+  # Googleでサインインする広告ユーザー（例 promo@sc-scc.com）の場合はこちら。あれば優先して使う。
+  #   Microsoftアカウントのトークンだと IdentityTypeMismatch(126) になるため。取得: scripts/microsoft_google_refresh_token.py
+  MS_ADS_GOOGLE_CLIENT_ID / MS_ADS_GOOGLE_CLIENT_SECRET / MS_ADS_GOOGLE_REFRESH_TOKEN
 
 注意（稼働前に要確認）:
   - 列挙名（*ReportColumn のメンバ）とレポート種別は bingads v13 リファレンスで最新を確認すること。
@@ -83,9 +86,10 @@ def load_env(path=PROJ / ".env"):
 
 def ms_enabled() -> bool:
     """接続情報が揃っているか（揃っていなければパイプラインは Microsoft をスキップ）。"""
-    need = ("MS_ADS_DEVELOPER_TOKEN", "MS_ADS_CLIENT_ID",
-            "MS_ADS_REFRESH_TOKEN", "MS_ADS_CUSTOMER_ID")
-    return all(os.environ.get(k, "").strip() for k in need)
+    has = lambda *ks: all(os.environ.get(k, "").strip() for k in ks)
+    return has("MS_ADS_DEVELOPER_TOKEN", "MS_ADS_CUSTOMER_ID") and (
+        has("MS_ADS_GOOGLE_CLIENT_ID", "MS_ADS_GOOGLE_REFRESH_TOKEN")
+        or has("MS_ADS_CLIENT_ID", "MS_ADS_REFRESH_TOKEN"))
 
 
 def _require_bingads():
@@ -106,20 +110,29 @@ def _require_bingads():
 def _authorization_data(account_id: str):
     """refresh_token から OAuth を復元し AuthorizationData を組む。読み取りのみ。"""
     _require_bingads()
-    from bingads.authorization import AuthorizationData, OAuthDesktopMobileAuthCodeGrant, OAuthWebAuthCodeGrant
-    client_id = os.environ["MS_ADS_CLIENT_ID"].strip()
-    client_secret = os.environ.get("MS_ADS_CLIENT_SECRET", "").strip()
-    refresh_token = os.environ["MS_ADS_REFRESH_TOKEN"].strip()
+    from bingads.authorization import (AuthorizationData, OAuthDesktopMobileAuthCodeGrant, OAuthWebAuthCodeGrant,
+                                       GoogleOAuthDesktopMobileAuthCodeGrant)
     dev_token = os.environ["MS_ADS_DEVELOPER_TOKEN"].strip()
     customer_id = int(str(os.environ["MS_ADS_CUSTOMER_ID"]).replace("-", "").strip())
     acct = int(str(account_id).replace("-", "").strip())
 
-    # client_secret があれば confidential(Web) フロー、無ければ public(Desktop/Mobile) フロー。
-    if client_secret:
-        redirect_uri = os.environ.get("MS_ADS_REDIRECT_URI", "https://login.microsoftonline.com/common/oauth2/nativeclient").strip()
-        auth = OAuthWebAuthCodeGrant(client_id, client_secret, redirect_uri, env=ENVIRONMENT)
+    g_refresh = os.environ.get("MS_ADS_GOOGLE_REFRESH_TOKEN", "").strip()
+    if g_refresh:
+        # Googleでサインインする広告ユーザー用。Googleのトークンをそのまま AuthenticationToken に載せる（SDK 13.0.26〜）。
+        refresh_token = g_refresh
+        auth = GoogleOAuthDesktopMobileAuthCodeGrant(
+            os.environ["MS_ADS_GOOGLE_CLIENT_ID"].strip(),
+            os.environ.get("MS_ADS_GOOGLE_CLIENT_SECRET", "").strip() or None, env=ENVIRONMENT)
     else:
-        auth = OAuthDesktopMobileAuthCodeGrant(client_id, env=ENVIRONMENT)
+        client_id = os.environ["MS_ADS_CLIENT_ID"].strip()
+        client_secret = os.environ.get("MS_ADS_CLIENT_SECRET", "").strip()
+        refresh_token = os.environ["MS_ADS_REFRESH_TOKEN"].strip()
+        # client_secret があれば confidential(Web) フロー、無ければ public(Desktop/Mobile) フロー。
+        if client_secret:
+            redirect_uri = os.environ.get("MS_ADS_REDIRECT_URI", "https://login.microsoftonline.com/common/oauth2/nativeclient").strip()
+            auth = OAuthWebAuthCodeGrant(client_id, client_secret, redirect_uri, env=ENVIRONMENT)
+        else:
+            auth = OAuthDesktopMobileAuthCodeGrant(client_id, env=ENVIRONMENT)
     # refresh_token から access/refresh を更新（ここでのみトークンを使う。保存しない）。
     auth.request_oauth_tokens_by_refresh_token(refresh_token)
 
@@ -143,7 +156,8 @@ def _mk_date(svc, d: datetime.date):
 
 
 def _run_report(account_id: str, report_type: str, scope_type: str,
-                columns: list[str], aggregation: str, start: str, end: str) -> list[dict]:
+                columns: list[str], aggregation: str, start: str, end: str,
+                name_col: str | None = None) -> list[dict]:
     """1レポートを submit→poll→download(CSV)→parse して行dictのリストで返す。読み取りのみ。
 
     report_type : 例 'CampaignPerformanceReport'（末尾 Request は付けない）
@@ -205,10 +219,10 @@ def _run_report(account_id: str, report_type: str, scope_type: str,
         if not result_path or not os.path.exists(result_path):
             return []  # データ無し（期間に実績が無い等）
         text = Path(result_path).read_text(encoding="utf-8-sig", errors="replace")
-    return _parse_csv(text)
+    return _parse_csv(text, name_col)
 
 
-def _parse_csv(text: str) -> list[dict]:
+def _parse_csv(text: str, name_col: str | None = None) -> list[dict]:
     """Microsoftレポートの CSV を列別名で正規化して行dictへ。
     Microsoft の CSV は先頭に数行のメタ情報（Report Name 等）と末尾にコピーライト行が付く。
     既知の列名を含む行をヘッダとして検出し、その後のデータ行だけを読む。"""
@@ -241,6 +255,9 @@ def _parse_csv(text: str) -> list[dict]:
         # 呼び出し側の aggregation に応じて使う側で date/month/hour を読み分ける。
         if k and k not in idx:
             idx[k] = i
+    # name 候補が複数ある（例: AdGroupName と AgeGroup）レポートは、集計軸の列を明示して上書き
+    if name_col and name_col in [c.strip().strip('"') for c in header]:
+        idx["name"] = [c.strip().strip('"') for c in header].index(name_col)
 
     def num(r, k):
         if k not in idx or idx[k] >= len(r):
@@ -324,7 +341,8 @@ def ms_campaigns(account_id: str, start: str, end: str) -> list[dict]:
                        ["CampaignName", "CampaignType", "Spend", "Impressions", "Clicks", "Conversions"],
                        "Summary", start, end)
     _type_map = {"Search": "検索", "Audience": "オーディエンス", "Shopping": "ショッピング",
-                 "DynamicSearchAds": "動的検索", "SearchAndContent": "検索＋コンテンツ"}
+                 "DynamicSearchAds": "動的検索", "SearchAndContent": "検索＋コンテンツ",
+                 "Search & content": "検索＋コンテンツ"}  # CSV(FormatVersion 2.0)はこの表記で返る
     agg = {}
     for x in rows:
         name = x.get("name")
@@ -428,10 +446,12 @@ def ms_monthly(account_id: str, start: str, end: str) -> list[dict]:
 
 
 def ms_ages(account_id: str, start: str, end: str) -> list[dict]:
-    """年齢層別（AgeGenderAudienceReport の AgeGroup）。"""
+    """年齢層別（AgeGenderAudienceReport の AgeGroup）。
+    AccountName・AdGroupName・AgeGroup・Gender の4つが必須列（欠けると RequiredColumnsNotSelected）。
+    name は name_col で集計軸を指定（AdGroupName を拾わないように）。"""
     rows = _run_report(account_id, "AgeGenderAudienceReport", "AccountThroughAdGroupReportScope",
-                       ["AgeGroup", "Impressions", "Clicks", "Spend", "Conversions"],
-                       "Summary", start, end)
+                       ["AgeGroup", "Gender", "AccountName", "AdGroupName", "Impressions", "Clicks", "Spend", "Conversions"],
+                       "Summary", start, end, name_col="AgeGroup")
     agg = _agg(rows)
     return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
             for n, v in agg.items()]
@@ -440,8 +460,8 @@ def ms_ages(account_id: str, start: str, end: str) -> list[dict]:
 def ms_genders(account_id: str, start: str, end: str) -> list[dict]:
     """性別別（AgeGenderAudienceReport の Gender）。"""
     rows = _run_report(account_id, "AgeGenderAudienceReport", "AccountThroughAdGroupReportScope",
-                       ["Gender", "Impressions", "Clicks", "Spend", "Conversions"],
-                       "Summary", start, end)
+                       ["Gender", "AgeGroup", "AccountName", "AdGroupName", "Impressions", "Clicks", "Spend", "Conversions"],
+                       "Summary", start, end, name_col="Gender")
     agg = _agg(rows)
     return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
             for n, v in agg.items()]

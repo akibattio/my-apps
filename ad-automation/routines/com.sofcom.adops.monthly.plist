@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sofcom.adops.monthly</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/som-013/dev/ad-automation/scripts/monthly_adreport_export.sh</string>
+  </array>
+
+  <!-- 毎月3日 9:00（媒体側の前月数値が確定してから）。スリープで取りこぼした場合は次回起動時に実行される。 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Day</key><integer>3</integer>
+    <key>Hour</key><integer>9</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key><false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/som-013/dev/ad-automation/logs/launchd.monthly.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/som-013/dev/ad-automation/logs/launchd.monthly.err.log</string>
+</dict>
+</plist>
