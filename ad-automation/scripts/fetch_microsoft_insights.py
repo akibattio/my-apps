@@ -45,7 +45,7 @@
     ages/genders/regions/adgroups/ads/hourly は「取れれば入れる・失敗しても空配列で握りつぶす（安全）」。
 """
 from __future__ import annotations
-import os, io, csv, sys, json, tempfile, datetime
+import os, io, re, csv, sys, json, tempfile, datetime
 from pathlib import Path
 
 PROJ = Path(__file__).resolve().parent.parent
@@ -322,6 +322,28 @@ def _norm_month(raw: str) -> str:
     return s
 
 
+# レポートは管理画面に出る文字をそのまま表示するので、英語の区分名は受け渡し時に日本語へ寄せる
+_PREF = {"Hokkaido": "北海道", "Aomori": "青森県", "Iwate": "岩手県", "Miyagi": "宮城県", "Akita": "秋田県",
+         "Yamagata": "山形県", "Fukushima": "福島県", "Ibaraki": "茨城県", "Tochigi": "栃木県", "Gunma": "群馬県",
+         "Saitama": "埼玉県", "Chiba": "千葉県", "Tokyo": "東京都", "Kanagawa": "神奈川県", "Niigata": "新潟県",
+         "Toyama": "富山県", "Ishikawa": "石川県", "Fukui": "福井県", "Yamanashi": "山梨県", "Nagano": "長野県",
+         "Gifu": "岐阜県", "Shizuoka": "静岡県", "Aichi": "愛知県", "Mie": "三重県", "Shiga": "滋賀県",
+         "Kyoto": "京都府", "Osaka": "大阪府", "Hyogo": "兵庫県", "Nara": "奈良県", "Wakayama": "和歌山県",
+         "Tottori": "鳥取県", "Shimane": "島根県", "Okayama": "岡山県", "Hiroshima": "広島県", "Yamaguchi": "山口県",
+         "Tokushima": "徳島県", "Kagawa": "香川県", "Ehime": "愛媛県", "Kochi": "高知県", "Fukuoka": "福岡県",
+         "Saga": "佐賀県", "Nagasaki": "長崎県", "Kumamoto": "熊本県", "Oita": "大分県", "Miyazaki": "宮崎県",
+         "Kagoshima": "鹿児島県", "Okinawa": "沖縄県"}
+_LABEL = {"Computer": "パソコン", "Smartphone": "スマートフォン", "Tablet": "タブレット",
+          "Connected TVs": "テレビ", "Male": "男性", "Female": "女性", "Unknown": "不明", "65+": "65歳以上"}
+
+
+def _ja(name: str) -> str:
+    """区分名の日本語化（知らない名前はそのまま返す）。都道府県は -ken/-to/-fu 付きでも引ける。"""
+    if name in _LABEL:
+        return _LABEL[name]
+    base = re.sub(r"[- ](ken|to|fu|do)$", "", name or "", flags=re.I)
+    return _PREF.get(base, name)
+
 def _agg(rows: list[dict]) -> dict:
     """name をキーに cost/imp/clk/cv を合算。"""
     agg = {}
@@ -403,7 +425,7 @@ def ms_devices(account_id: str, start: str, end: str) -> list[dict]:
                        ["DeviceType", "Spend", "Impressions", "Clicks", "Conversions"],
                        "Summary", start, end)
     agg = _agg(rows)
-    return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
+    return [{"name": _ja(n), "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
             for n, v in agg.items()]
 
 
@@ -453,7 +475,7 @@ def ms_ages(account_id: str, start: str, end: str) -> list[dict]:
                        ["AgeGroup", "Gender", "AccountName", "AdGroupName", "Impressions", "Clicks", "Spend", "Conversions"],
                        "Summary", start, end, name_col="AgeGroup")
     agg = _agg(rows)
-    return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
+    return [{"name": _ja(n), "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
             for n, v in agg.items()]
 
 
@@ -463,7 +485,7 @@ def ms_genders(account_id: str, start: str, end: str) -> list[dict]:
                        ["Gender", "AgeGroup", "AccountName", "AdGroupName", "Impressions", "Clicks", "Spend", "Conversions"],
                        "Summary", start, end, name_col="Gender")
     agg = _agg(rows)
-    return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
+    return [{"name": _ja(n), "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
             for n, v in agg.items()]
 
 
@@ -473,7 +495,7 @@ def ms_regions(account_id: str, start: str, end: str) -> list[dict]:
                        ["State", "Spend", "Impressions", "Clicks", "Conversions"],
                        "Summary", start, end)
     agg = _agg(rows)
-    return [{"name": n, "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
+    return [{"name": _ja(n), "cost": round(v["cost"]), "impressions": v["imp"], "clicks": v["clk"], "conversions": round(v["cv"])}
             for n, v in agg.items()]
 
 
