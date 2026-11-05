@@ -157,9 +157,10 @@ def _run_report(account_id: str, report_type: str, scope_type: str,
 
     req = svc.factory.create(f"{report_type}Request")
     req.Format = "Csv"
+    req.FormatVersion = "2.0"  # CSVヘッダをAPI列名(英名)に固定。COL_ALIASES は英名前提。
+    # ※ レポートリクエストに Language 属性は存在しない（セットすると suds が「Type not found: 'Language'」で落ちる）
     req.ReturnOnlyCompleteData = False
     req.Aggregation = aggregation
-    req.Language = "English"  # CSVヘッダを英語で固定（COL_ALIASES は英名）
 
     # Scope（アカウント配下すべて）
     scope = svc.factory.create(scope_type)
