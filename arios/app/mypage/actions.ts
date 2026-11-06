@@ -40,7 +40,7 @@ export async function addListingPhotos(formData: FormData): Promise<void> {
     // 実バイトで画像か検証（拡張子/申告MIMEは信用しない）。非画像・過大はスキップ。
     const v = await validateImageFile(file);
     if (!v.ok) {
-      console.warn("[mypage-photo] rejected upload:", v.reason, file.name);
+      console.warn("[mypage-photo] rejected upload:", v.reason);
       continue;
     }
     const path = `inquiries/${id}/${Date.now()}-${i}.${v.ext}`;

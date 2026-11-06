@@ -72,11 +72,6 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
       setError(t("signup_err_rate"));
       return;
     }
-    if (res.error === "exists") {
-      setBusy(false);
-      setError(t("signup_err_exists"));
-      return;
-    }
     if (res.error) {
       setBusy(false);
       setError(t("signup_err_failed"));

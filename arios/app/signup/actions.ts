@@ -52,7 +52,9 @@ export async function signUpCustomer(
   if (!rl.ok || !rlDay.ok) return { status: "error", error: "ratelimited" };
 
   // 管理者メールは会員登録で作成させない（成りすまし防止）。管理者は別経路で発行。
-  if (getAdminEmails().includes(em)) return { status: "error", error: "failed" };
+  // 列挙防止: 管理者メールかどうかを外部に漏らさないため、通常の「確認メール送信」と同じ応答を返す
+  // （アカウントは作らない）。
+  if (getAdminEmails().includes(em)) return { status: "confirm" };
 
   const origin = siteOrigin(h);
   const supabase = await createClient();
@@ -78,7 +80,8 @@ export async function signUpCustomer(
     const msg = (error.message ?? "").toLowerCase();
     const code = (error as { code?: string }).code ?? "";
     if (code === "user_already_exists" || code === "email_exists" || msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
-      return { status: "error", error: "exists" };
+      // 列挙防止: 既存メールでも「確認メールを送信しました」と同じ応答にする（存在を漏らさない）。
+      return { status: "confirm" };
     }
     if (msg.includes("captcha")) {
       return { status: "error", error: "captcha" };

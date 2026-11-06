@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureOwner } from "@/lib/auth";
+import { validateImageFile } from "@/lib/upload";
 
 const BUCKET = "vehicle-images";
 const MAX_PHOTOS = 10;
@@ -79,11 +80,16 @@ export async function addHistory(
 
   for (let i = 0; i < photos.length; i++) {
     const file = photos[i];
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `vehicles/${vehicleId}/history/${Date.now()}-${i}.${ext}`;
+    // 実バイト(マジックナンバー)で画像か検証。拡張子/申告MIMEは信用しない。
+    const v = await validateImageFile(file);
+    if (!v.ok) {
+      console.warn("[add-history] rejected upload:", v.reason);
+      continue;
+    }
+    const path = `vehicles/${vehicleId}/history/${Date.now()}-${i}.${v.ext}`;
     const { error: upErr } = await admin.storage
       .from(BUCKET)
-      .upload(path, file, { contentType: file.type || undefined });
+      .upload(path, file, { contentType: v.contentType });
     if (upErr) continue;
     const { data: pub } = admin.storage.from(BUCKET).getPublicUrl(path);
     await admin.from("images").insert({

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAdmin, ensureOwner } from "@/lib/auth";
+import { validateImageFile } from "@/lib/upload";
 import { STATUS_LABEL } from "./constants";
 
 const BUCKET = "inquiry-photos"; // 非公開バケット
@@ -70,11 +71,16 @@ export async function createInquiry(
     const paths: string[] = [];
     for (let i = 0; i < photos.length; i++) {
       const file = photos[i];
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `inquiries/${inquiryId}/${String(i).padStart(2, "0")}-${Date.now()}.${ext}`;
+      // 実バイト(マジックナンバー)で画像か検証。拡張子/申告MIMEは信用しない。
+      const v = await validateImageFile(file);
+      if (!v.ok) {
+        console.warn("[inquiry] rejected upload:", v.reason);
+        continue;
+      }
+      const path = `inquiries/${inquiryId}/${String(i).padStart(2, "0")}-${Date.now()}.${v.ext}`;
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, file, { contentType: file.type || undefined });
+        .upload(path, file, { contentType: v.contentType });
       if (upErr) {
         console.error("[inquiry] upload failed:", upErr);
         continue;
@@ -82,7 +88,15 @@ export async function createInquiry(
       paths.push(path);
     }
     if (paths.length > 0) {
-      await supabase.from("inquiries").update({ photo_urls: paths }).eq("id", inquiryId);
+      const { error: updErr } = await supabase
+        .from("inquiries")
+        .update({ photo_urls: paths })
+        .eq("id", inquiryId);
+      // DB更新に失敗したらアップロード済みの孤立ファイルを消す。
+      if (updErr) {
+        console.error("[inquiry] photo_urls update failed, cleaning up:", updErr);
+        await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
+      }
     }
   } catch (e) {
     console.error("[inquiry] unexpected:", e);

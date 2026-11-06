@@ -115,7 +115,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
       // 実バイトで画像かどうか検証（拡張子/申告MIMEは信用しない）。非画像・過大はスキップ。
       const v = await validateImageFile(file);
       if (!v.ok) {
-        console.warn("[listing] rejected upload:", v.reason, file.name);
+        console.warn("[listing] rejected upload:", v.reason);
         continue;
       }
       const path = `inquiries/${id}/${String(i).padStart(2, "0")}-${Date.now()}.${v.ext}`;

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureOwner, getCurrentUser } from "@/lib/auth";
+import { validateImageFile } from "@/lib/upload";
 
 const BUCKET = "vehicle-images";
 const MAX_PHOTOS = 10;
@@ -97,12 +98,17 @@ export async function registerVehicle(
     // 4. 写真を Storage にアップロードして images に記録（1枚失敗しても他は続行）
     for (let i = 0; i < photos.length; i++) {
       const file = photos[i];
-      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const path = `vehicles/${vehicleId}/${String(i).padStart(2, "0")}-${Date.now()}.${ext}`;
+      // 実バイト(マジックナンバー)で画像か検証。拡張子/申告MIMEは信用しない。非画像・過大はスキップ。
+      const v = await validateImageFile(file);
+      if (!v.ok) {
+        console.warn("[register] rejected upload:", v.reason);
+        continue;
+      }
+      const path = `vehicles/${vehicleId}/${String(i).padStart(2, "0")}-${Date.now()}.${v.ext}`;
 
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
-        .upload(path, file, { contentType: file.type || undefined, upsert: false });
+        .upload(path, file, { contentType: v.contentType, upsert: false });
       if (upErr) {
         console.error("[register] image upload failed:", upErr);
         continue;
