@@ -40,3 +40,4 @@ console/breakdowns.json
 
 # 実行ログ
 logs/
+.wrangler/  # wrangler pages dev のローカル状態（試験用KV）

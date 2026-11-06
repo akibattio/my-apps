@@ -133,6 +133,7 @@ export default function AdOpsConsole() {
   const [reportClient, setReportClient] = useState(""); // レポートタブの対象クライアント
   const [reportMonth, setReportMonth] = useState(""); // レポートタブの対象月（既定＝先月）
   const [budgets, setBudgets] = useState({}); // クライアント別 契約予算（媒体別内訳＋月次の変更/追加）
+  const [mediaAccounts, setMediaAccounts] = useState({ list: [] }); // 担当者が追加した Yahoo!/Microsoft のアカウント（共有KV）
   const [showLog, setShowLog] = useState(false);
   useEffect(() => {
     try {
@@ -156,6 +157,7 @@ export default function AdOpsConsole() {
     if (j.alertOps) setAlertOps(j.alertOps);
     if (j.approvals) setApprovals(j.approvals);
     if (j.budgets) setBudgets(j.budgets);
+    if (j.mediaAccounts && Array.isArray(j.mediaAccounts.list)) setMediaAccounts(j.mediaAccounts);
     return true;
   };
   useEffect(() => {
@@ -169,6 +171,7 @@ export default function AdOpsConsole() {
       if (has(j.alertOps)) setAlertOps(j.alertOps); else { const a = ls("adops_alert_ops", "{}"); if (has(a)) putState("alertOps", a); }
       if (has(j.approvals)) setApprovals(j.approvals); else { const a = ls("adops_approvals", "{}"); if (has(a)) putState("approvals", a); }
       if (has(j.budgets)) setBudgets(j.budgets); else { const bg = ls("adops_budgets", "{}"); if (has(bg)) putState("budgets", bg); }
+      if (j.mediaAccounts && Array.isArray(j.mediaAccounts.list)) setMediaAccounts(j.mediaAccounts);
     }).catch(() => {});
     // 定期同期：45秒ごとに共有状態を取得（他スタッフの変更を自分の画面へ反映）
     const id = setInterval(() => {
@@ -177,6 +180,8 @@ export default function AdOpsConsole() {
     return () => clearInterval(id);
   }, []);
   // アラート対応（確認済み/様子見/メモ）— localStorage＋共有(KV)に保存
+  // 媒体アカウントの追加/削除（共有KVのみ。localStorageには持たない＝全員で同じ一覧）
+  const saveMediaAccounts = (list) => { const next = { list }; setMediaAccounts(next); putState("mediaAccounts", next); };
   const saveAlertOps = (next) => { setAlertOps(next); try { localStorage.setItem("adops_alert_ops", JSON.stringify(next)); } catch (e) {} putState("alertOps", next); };
   const setAlertOp = (key, patch) => {
     const cur = alertOps[key] || {};
@@ -1079,6 +1084,7 @@ export default function AdOpsConsole() {
               ・Metaは無期限のSystem User Tokenを組織で保有（担当者の個人アカウントに依存しない）。<br />
               ・期限が近い／失効した接続は赤く表示。引き継ぎ時も一目で分かる。
             </div>
+            <MediaAccountsPanel list={mediaAccounts.list} clients={[...new Set(A.map((c) => c.client))]} operator={operator} onSave={saveMediaAccounts} />
           </>
         )}
 
@@ -1708,6 +1714,76 @@ function CreativeWeekly({ rows, weeks, media, generated }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 5 }}>
         <div style={{ fontSize: 10.5, color: "#94a3b8" }}>週は月曜始まり。色はその広告の期間平均より上（青）／下（赤）。CTRは表示100未満の週を薄字（ブレが大きいため比較から除外）。セルにカーソルで内訳。傾向＝直近の完了週 vs その前3週の平均。{isMeta ? "MetaのCTRはリンククリック基準。" : ""}{generated ? ` 取得 ${generated}` : ""}</div>
         {rows.length > 8 && <button onClick={() => setOpen(!open)} style={{ fontSize: 11, color: "#0891b2", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>{open ? "上位8本に戻す" : `すべて表示（${rows.length}本）`}</button>}
+      </div>
+    </div>
+  );
+}
+
+// 担当者が Yahoo!・Microsoft広告のアカウントを追加する（修正依頼 2026-09-09 田上）。
+// 保存先は共有KV(mediaAccounts)。Mac側の取得（scripts/media_accounts.py）が翌朝からコンソールに、毎月3日からREPORT GLASSに反映する。
+const MEDIA_ACCOUNT_KINDS = [
+  { v: "yahoo_search", label: "Yahoo!検索" },
+  { v: "yahoo_display", label: "Yahoo!ディスプレイ" },
+  { v: "microsoft", label: "Microsoft広告" },
+];
+function MediaAccountsPanel({ list, clients, operator, onSave }) {
+  const empty = { client: "", media: "yahoo_search", accountId: "", customerId: "", slug: "" };
+  const [f, setF] = useState(empty);
+  const [msg, setMsg] = useState("");
+  const set = (k, v) => { setMsg(""); setF((p) => ({ ...p, [k]: v })); };
+  const isMs = f.media === "microsoft";
+  const add = () => {
+    const row = { ...f, client: f.client.trim(), accountId: f.accountId.replace(/[^0-9]/g, ""), customerId: f.customerId.replace(/[^0-9]/g, ""), slug: f.slug.trim().toLowerCase() };
+    if (!row.client) return setMsg("クライアント名を入れてください（Google広告のMCC表示名と同じ書き方）");
+    if (!row.accountId) return setMsg("アカウントIDを数字で入れてください");
+    if (isMs && !row.customerId) return setMsg("Microsoftは顧客ID（Customer ID）も必要です");
+    if (row.slug && !/^[a-z0-9]+$/.test(row.slug)) return setMsg("REPORT GLASS識別子は半角英数字のみです（例: tenjikai）");
+    if (list.some((x) => x.accountId === row.accountId && x.media === row.media)) return setMsg("同じアカウントがすでに登録されています");
+    if (!isMs) delete row.customerId;
+    onSave([...list, { ...row, addedBy: operator || "", addedAt: new Date().toISOString().slice(0, 10) }]);
+    setF({ ...empty, client: row.client, slug: row.slug });
+    setMsg("追加しました。翌朝の取得からコンソールに出ます。");
+  };
+  const remove = (i) => { if (window.confirm(`${list[i].client} の ${list[i].accountId} を一覧から外しますか？（広告アカウント自体は消えません）`)) onSave(list.filter((_, idx) => idx !== i)); };
+  const inp = { padding: "7px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff", minWidth: 0 };
+  const label = (m) => (MEDIA_ACCOUNT_KINDS.find((k) => k.v === m) || {}).label || m;
+  return (
+    <div style={{ marginTop: 22 }}>
+      <SectionTitle icon={<Cable size={16} color="#0891b2" />} title="Yahoo!・Microsoft広告アカウントの追加" note="Google・Meta以外の媒体を担当者が追加できます。翌朝の取得からコンソールに、毎月3日の自動取得からREPORT GLASSに反映。" />
+      <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, padding: 14 }}>
+        <datalist id="ma-clients">{clients.map((c) => <option key={c} value={c} />)}</datalist>
+        <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.9fr auto", gap: 8, alignItems: "end" }}>
+          <label style={{ fontSize: 10.5, color: "#64748b" }}>クライアント名<input list="ma-clients" value={f.client} onChange={(e) => set("client", e.target.value)} placeholder="例: 【展示会ブース装飾】" style={{ ...inp, width: "100%", display: "block", marginTop: 3 }} /></label>
+          <label style={{ fontSize: 10.5, color: "#64748b" }}>媒体<select value={f.media} onChange={(e) => set("media", e.target.value)} style={{ ...inp, width: "100%", display: "block", marginTop: 3 }}>{MEDIA_ACCOUNT_KINDS.map((k) => <option key={k.v} value={k.v}>{k.label}</option>)}</select></label>
+          <label style={{ fontSize: 10.5, color: "#64748b" }}>アカウントID<input value={f.accountId} onChange={(e) => set("accountId", e.target.value)} placeholder={isMs ? "例: 189352838" : "例: 1454216"} style={{ ...inp, width: "100%", display: "block", marginTop: 3 }} /></label>
+          <label style={{ fontSize: 10.5, color: isMs ? "#64748b" : "#cbd5e1" }}>顧客ID（Microsoftのみ）<input value={f.customerId} disabled={!isMs} onChange={(e) => set("customerId", e.target.value)} placeholder={isMs ? "例: 255052515" : "—"} style={{ ...inp, width: "100%", display: "block", marginTop: 3, background: isMs ? "#fff" : "#f8faf9" }} /></label>
+          <label style={{ fontSize: 10.5, color: "#64748b" }}>REPORT GLASS識別子<input value={f.slug} onChange={(e) => set("slug", e.target.value)} placeholder="例: tenjikai" style={{ ...inp, width: "100%", display: "block", marginTop: 3 }} /></label>
+          <button onClick={add} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#0891b2", color: "#fff", fontWeight: 700, fontSize: 12.5, cursor: "pointer" }}>追加</button>
+        </div>
+        {msg && <div style={{ marginTop: 8, fontSize: 11.5, color: msg.startsWith("追加しました") ? "#0891b2" : "#dc2626" }}>{msg}</div>}
+        <div style={{ marginTop: 8, fontSize: 10.5, color: "#94a3b8", lineHeight: 1.7 }}>
+          ・アカウントIDは各媒体の管理画面に表示される数字。Yahoo!は検索とディスプレイで別IDなので、それぞれ追加してください。<br />
+          ・REPORT GLASS識別子は、REPORT GLASSの社別URLに入っている英字（例: tenjikai）。空欄ならコンソールにだけ出ます。<br />
+          ・取得用のユーザー（Yahoo!はMCC配下、Microsoftは promo@sc-scc.com）にそのアカウントの閲覧権限が必要です。
+        </div>
+        {list.length > 0 && (
+          <div style={{ marginTop: 12, border: "1px solid #eaeeec", borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.9fr 0.9fr 50px", gap: 8, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+              <span>クライアント</span><span>媒体</span><span>アカウントID</span><span>顧客ID</span><span>識別子</span><span>追加</span><span />
+            </div>
+            {list.map((x, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.9fr 0.9fr 50px", gap: 8, padding: "7px 12px", borderTop: "1px solid #f5f7f6", fontSize: 11.5, alignItems: "center" }}>
+                <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.client}</span>
+                <span>{label(x.media)}</span>
+                <span style={{ fontFamily: "monospace" }}>{x.accountId}</span>
+                <span style={{ fontFamily: "monospace", color: "#64748b" }}>{x.customerId || "—"}</span>
+                <span style={{ color: "#64748b" }}>{x.slug || "—"}</span>
+                <span style={{ fontSize: 10.5, color: "#94a3b8" }}>{x.addedAt}{x.addedBy ? ` ${x.addedBy}` : ""}</span>
+                <button onClick={() => remove(i)} style={{ fontSize: 11, color: "#dc2626", background: "none", border: "none", cursor: "pointer" }}>外す</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

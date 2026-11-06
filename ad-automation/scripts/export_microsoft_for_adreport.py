@@ -78,6 +78,9 @@ def _build_payload(slug, accs, ym, start, end):
 
     for a in accs:
         acct = str(a["accountId"])
+        # 顧客IDはアカウントごと（コンソールから追加した社は別顧客のことがある）。無ければ .env の既定
+        if a.get("customerId"):
+            os.environ["MS_ADS_CUSTOMER_ID"] = str(a["customerId"])
 
         def safe(fn, *args):
             try:
@@ -233,8 +236,9 @@ def main() -> int:
     if not cfg_path.exists():
         print("clients/microsoft_accounts.json が無い（アカウント対応表を用意）。")
         return 2
-    entries = [e for e in json.loads(cfg_path.read_text(encoding="utf-8"))
-               if isinstance(e, dict) and e.get("slug") and e.get("accountId") and not str(e.get("accountId")).startswith("<")]
+    from media_accounts import load as load_media_accounts  # ファイル＋コンソール追加分
+    entries = [e for e in load_media_accounts("microsoft")
+               if e.get("slug") and e.get("accountId") and not str(e.get("accountId")).startswith("<")]
     if not entries and not sample:
         print("slug付きのMicrosoftアカウントが未設定です（microsoft_accounts.json に slug/accountId を記入）。")
         print("（疎通確認だけなら --sample でサンプルJSONを書き出せます）")

@@ -210,13 +210,13 @@ def pull_yahoo(bench_cfg, lm_days, start_id):
         print("fetch_yahoo_insights 読込不可のためYahooはスキップ"); return [], []
     if not yahoo_enabled():
         print("Yahoo接続情報が未設定のためYahooはスキップ"); return [], []
-    cfg_path = Path("clients/yahoo_accounts.json")
-    if not cfg_path.exists():
-        print("clients/yahoo_accounts.json が無いためYahooはスキップ（アカウント対応表を用意）"); return [], []
     try:
-        entries = json.loads(cfg_path.read_text(encoding="utf-8"))
+        from media_accounts import load as load_media_accounts  # ファイル＋コンソール追加分
+        entries = load_media_accounts("yahoo")
     except Exception as e:
-        print("yahoo_accounts.json 読み込み失敗:", e); return [], []
+        print("yahoo_accounts 読み込み失敗:", e); return [], []
+    if not entries:
+        print("Yahooアカウントが未設定のためYahooはスキップ"); return [], []
 
     import datetime as _dt
     today = _dt.date.today()

@@ -32,7 +32,7 @@ function jsonRes(obj, status) {
 
 // 共有ストレージAPI（目標設定・アラート対応・承認・契約をスタッフ間で同期）。KV(STATE)に保存。認証の内側でのみ動く。
 // 2026-07-30: KV名前空間 adops-state を STATE としてバインド済み（全スタッフ共有ON）。
-const SECTIONS = ["targets", "targetsHistory", "alertOps", "approvals", "budgets"];
+const SECTIONS = ["targets", "targetsHistory", "alertOps", "approvals", "budgets", "mediaAccounts"];
 async function handleState(request, env, url) {
   const kv = env.STATE;
   if (!kv) return jsonRes({ error: "kv_unbound" }); // KV未バインド時は空扱い→画面はlocalStorageにフォールバック

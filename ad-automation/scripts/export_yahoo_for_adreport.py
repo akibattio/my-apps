@@ -184,11 +184,8 @@ def main() -> int:
     out_dir = Path(os.environ.get("AD_REPORT_DIR", str(DEFAULT_DIR)))
     Y.load_env()
 
-    cfg_path = PROJ / "clients" / "yahoo_accounts.json"
-    if not cfg_path.exists():
-        print("clients/yahoo_accounts.json が無い（アカウント対応表を用意）。例: clients/yahoo_accounts.example.json")
-        return 2
-    entries = [e for e in json.loads(cfg_path.read_text(encoding="utf-8")) if isinstance(e, dict) and e.get("slug") and e.get("accountId")]
+    from media_accounts import load as load_media_accounts  # ファイル＋コンソール追加分
+    entries = [e for e in load_media_accounts("yahoo") if e.get("slug") and e.get("accountId")]
     if not entries:
         print("slug付きのYahooアカウントが未設定です（yahoo_accounts.json に slug/accountId を記入）。")
         return 2
