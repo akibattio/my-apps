@@ -42,6 +42,17 @@ mkdir -p logs
   /usr/bin/python3 scripts/monitor.py
   # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
   cp data/daily.json console/daily.json 2>/dev/null || true
+  # 本番コンソール(sofcom-adops.pages.dev)へ反映。認証情報は .env の CLOUDFLARE_API_TOKEN/ACCOUNT_ID（wranglerが読む）
+  # launchd はPATHが最小なので node/npx は絶対パスで呼ぶ
+  NODE_BIN="/Users/som-013/.nvm/versions/node/v24.15.0/bin"
+  deploy_out=$(PATH="$NODE_BIN:$PATH" "$NODE_BIN/npx" -y wrangler@4 pages deploy console --project-name sofcom-adops \
+       --branch main --commit-hash "$(git rev-parse --short HEAD)" --commit-dirty=true 2>&1)
+  if echo "$deploy_out" | grep -q "Deployment complete"; then
+    echo "本番コンソールへ反映しました"
+  else
+    echo "!! 本番コンソールへの反映に失敗（手元のデータは更新済み）"
+    echo "$deploy_out" | grep -E "ERROR|✘" | head -3
+  fi
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh done (exit $?) ==="
   echo ""
 } >> logs/refresh.log 2>&1
