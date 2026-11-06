@@ -214,6 +214,7 @@ export default function AdOpsConsole() {
   const [monthly, setMonthly] = useState(null);
   const [keywords, setKeywords] = useState(null);
   const [breakdowns, setBreakdowns] = useState(null);
+  const [creatives, setCreatives] = useState(null);
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -245,11 +246,16 @@ export default function AdOpsConsole() {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && j.byAccount) setBreakdowns(j); })
       .catch(() => {});
+    fetch("./creatives_weekly.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.byAccount) setCreatives(j); })
+      .catch(() => {});
   }, []);
   const auditMap = useMemo(() => (audit && audit.byAccount) || {}, [audit]);
   const monthlyMap = useMemo(() => (monthly && monthly.byAccount) || {}, [monthly]);
   const keywordMap = useMemo(() => (keywords && keywords.byAccount) || {}, [keywords]);
   const breakdownMap = useMemo(() => (breakdowns && breakdowns.byAccount) || {}, [breakdowns]);
+  const creativeMap = useMemo(() => (creatives && creatives.byAccount) || {}, [creatives]);
   const monthlyGen = monthly && monthly.generated;
   // 日次時系列を client|media で引けるマップに（{days, byType}。Googleのみ・Metaは空）
   const dailyMap = useMemo(() => {
@@ -729,6 +735,7 @@ export default function AdOpsConsole() {
                       )}
                       {((monthlyMap[`${c.client}|${c.media}`] || []).length > 0) && <MonthlyTrend series={monthlyMap[`${c.client}|${c.media}`]} generated={monthlyGen} target={c.target || (c.bench && c.bench.targetCpa)} bench={c.bench} />}
                       {auditMap[`${c.client}|${c.media}`] && <AuditReport a={auditMap[`${c.client}|${c.media}`]} />}
+                      {(creativeMap[`${c.client}|${c.media}`] || []).length > 0 && <CreativeWeekly rows={creativeMap[`${c.client}|${c.media}`]} weeks={creatives.weeks} media={c.media} generated={creatives.generated} />}
                     </div>
                   );
                 })}
@@ -1611,6 +1618,101 @@ function StatCell({ label, value, d, dir, bad }) {
 function Empty({ text }) { return <div style={{ background: "#fff", border: "1px dashed #d7e0db", borderRadius: 10, padding: "18px 14px", fontSize: 12.5, color: "#94a3b8", textAlign: "center" }}>{text}</div>; }
 
 // クライアントレポート用 内訳テーブル（項目×表示/クリック/CTR/CPC/費用/CV/CVR/CPA＋総計）。
+// クリエイティブ（広告）ごとの週次推移。修正依頼 2026-10-26「クリック率などを週単位で」。
+// 行=広告（期間費用上位）、列=週（月曜始まり・最後は今週途中）。色はその広告自身の期間平均との比較（CTR/CV/表示/クリックは上=緑、費用は色なし）。
+function CreativeWeekly({ rows, weeks, media, generated }) {
+  const isMeta = media === "meta";
+  const METRICS = [
+    { k: "ctr", label: isMeta ? "CTR(リンク)" : "CTR" },
+    { k: "clk", label: isMeta ? "リンククリック" : "クリック" },
+    { k: "imp", label: "表示" },
+    { k: "cost", label: "費用" },
+    { k: "cv", label: "CV" },
+  ];
+  const [mk, setMk] = useState("ctr");
+  const [open, setOpen] = useState(false);
+  const ws = weeks || [];
+  const clkOf = (v) => (isMeta ? v.lclk : v.clk);
+  const MIN_IMP = 100;
+  const val = (v) => {
+    if (!v) return null;
+    if (mk === "ctr") return v.imp ? clkOf(v) / v.imp * 100 : null;
+    if (mk === "clk") return clkOf(v);
+    return v[mk];
+  };
+  const fmt = (x) => (x == null ? "—" : mk === "ctr" ? x.toFixed(2) + "%" : mk === "cost" ? yen(Math.round(x)) : mk === "cv" ? (Math.round(x * 10) / 10).toString() : Math.round(x).toLocaleString("ja-JP"));
+  // 期間合計（CTRは合計クリック÷合計表示）
+  const total = (r) => {
+    const t = ws.reduce((a, w) => { const v = r.w[w.start]; return v ? { imp: a.imp + v.imp, clk: a.clk + v.clk, lclk: a.lclk + v.lclk, cost: a.cost + v.cost, cv: a.cv + v.cv } : a; }, { imp: 0, clk: 0, lclk: 0, cost: 0, cv: 0 });
+    return val(t);
+  };
+  // 傾向：直近の完了週 vs その前3週の平均
+  const trend = (r) => {
+    const done = ws.filter((w) => !w.partial);
+    if (done.length < 4) return null;
+    const ok = (w) => !(mk === "ctr" && (r.w[w.start] || {}).imp < MIN_IMP);
+    const lw = done[done.length - 1];
+    const last = ok(lw) ? val(r.w[lw.start]) : null;
+    const prev = done.slice(-4, -1).filter(ok).map((w) => val(r.w[w.start])).filter((x) => x != null);
+    if (last == null || !prev.length) return null;
+    const avg = prev.reduce((a, b) => a + b, 0) / prev.length;
+    return avg ? Math.round((last / avg - 1) * 100) : null;
+  };
+  const shown = open ? rows : rows.slice(0, 8);
+  const tmpl = `minmax(190px,2.2fr) repeat(${ws.length},minmax(58px,0.7fr)) minmax(62px,0.75fr) minmax(52px,0.6fr)`;
+  const hd = { display: "grid", gridTemplateColumns: tmpl, gap: 4, padding: "7px 12px", minWidth: 240 + ws.length * 62 + 120 };
+  const md = (s) => +s.slice(5, 7) + "/" + +s.slice(8, 10);
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0e3a46" }}>クリエイティブの週次推移（費用上位{rows.length}本）</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {METRICS.map((m) => (
+            <button key={m.k} onClick={() => setMk(m.k)} style={{ padding: "3px 9px", fontSize: 11, borderRadius: 6, cursor: "pointer", border: "1px solid " + (mk === m.k ? "#0891b2" : "#d7e0db"), background: mk === m.k ? "#0891b2" : "#fff", color: mk === m.k ? "#fff" : "#475569", fontWeight: 600 }}>{m.label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflowX: "auto", overflowY: "hidden" }}>
+        <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+          <span>広告</span>
+          {ws.map((w) => <span key={w.start} style={{ textAlign: "right" }} title={`${w.start}〜${w.end}`}>{md(w.start)}〜{w.partial ? "（途中）" : ""}</span>)}
+          <span style={{ textAlign: "right" }}>期間計</span><span style={{ textAlign: "right" }}>傾向</span>
+        </div>
+        {shown.map((r) => {
+          const vals = ws.map((w) => val(r.w[w.start]));
+          const nums = vals.filter((x, i) => x != null && x > 0 && !(mk === "ctr" && (r.w[ws[i].start] || {}).imp < MIN_IMP));
+          const avg = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
+          const tr = trend(r);
+          return (
+            <div key={r.id} style={{ ...hd, borderTop: "1px solid #f5f7f6", fontSize: 11.5, alignItems: "center" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                {r.thumb && <img src={r.thumb} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 4, flex: "none", background: "#f1f5f4" }} />}
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 600 }} title={r.name}>{r.name}</span>
+                  <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: "#94a3b8" }} title={r.sub}>{r.sub}</span>
+                </span>
+              </span>
+              {vals.map((x, i) => {
+                const v = r.w[ws[i].start];
+                const thin = mk === "ctr" && v && v.imp < MIN_IMP; // 表示が少ない週のCTRはブレが大きいので色を付けない
+                const rel = x != null && avg ? x / avg - 1 : 0;
+                const tint = mk === "cost" || thin || x == null || Math.abs(rel) < 0.1 ? "transparent" : rel > 0 ? `rgba(8,145,178,${Math.min(0.28, Math.abs(rel) * 0.4)})` : `rgba(220,38,38,${Math.min(0.22, Math.abs(rel) * 0.35)})`;
+                return <span key={i} title={v ? `表示 ${v.imp.toLocaleString("ja-JP")} / クリック ${clkOf(v).toLocaleString("ja-JP")} / 費用 ${yen(v.cost)} / CV ${v.cv}` : ""} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", background: tint, borderRadius: 4, padding: "2px 4px", color: x == null || thin ? "#cbd5e1" : ws[i].partial ? "#64748b" : "#1f2937" }}>{fmt(x)}</span>;
+              })}
+              <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{fmt(total(r))}</span>
+              <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: tr == null ? "#cbd5e1" : mk === "cost" ? "#64748b" : tr >= 0 ? "#0891b2" : "#dc2626" }}>{tr == null ? "—" : (tr > 0 ? "▲" : tr < 0 ? "▼" : "") + Math.abs(tr) + "%"}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 5 }}>
+        <div style={{ fontSize: 10.5, color: "#94a3b8" }}>週は月曜始まり。色はその広告の期間平均より上（青）／下（赤）。CTRは表示100未満の週を薄字（ブレが大きいため比較から除外）。セルにカーソルで内訳。傾向＝直近の完了週 vs その前3週の平均。{isMeta ? "MetaのCTRはリンククリック基準。" : ""}{generated ? ` 取得 ${generated}` : ""}</div>
+        {rows.length > 8 && <button onClick={() => setOpen(!open)} style={{ fontSize: 11, color: "#0891b2", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>{open ? "上位8本に戻す" : `すべて表示（${rows.length}本）`}</button>}
+      </div>
+    </div>
+  );
+}
+
 function BreakdownTable({ title, rows, col }) {
   if (!rows || !rows.length) return null;
   const t = rows.reduce((a, r) => ({ imp: a.imp + r.imp, clk: a.clk + r.clk, cost: a.cost + r.cost, cv: a.cv + r.cv }), { imp: 0, clk: 0, cost: 0, cv: 0 });

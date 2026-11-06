@@ -399,6 +399,9 @@ def main():
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {google_n} / Yahoo {yahoo_n}） / 提案{len(proposals)}件")
     for a in accounts:
+        if "spend" not in a:  # 取得失敗の行（数値なし）。一覧表示だけ飛ばす
+            print(f"  [{a.get('media', '?'):6}] {str(a.get('client', ''))[:20]:22} 取得失敗")
+            continue
         m7, ml = a["metrics"]["d7"], a["metrics"]["lm"]
         print(f"  [{a['media']:6}] {a['client'][:20]:22} 日予算¥{a['dailyBudget']:>6,}/日 | 30日:¥{a['spend']:>7,} CV{a['cv']:>4} | 7日:¥{m7['spend']:>7,} | 先月:¥{ml['spend']:>7,}")
 

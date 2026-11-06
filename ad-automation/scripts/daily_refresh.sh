@@ -7,6 +7,18 @@ cd "$PROJ" || { echo "cd failed"; exit 1; }
 mkdir -p logs
 {
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh start ==="
+  # スリープ復帰直後はネット未接続のまま走り、全媒体が名前解決エラーで失敗する（2026-10末〜頻発）。
+  # 繋がるまで最大10分待つ。繋がらなければ中断して、手元の data.json（前回値）を壊さない。
+  net_ok=0
+  for i in $(seq 1 60); do
+    if /usr/bin/python3 -c "import socket; socket.getaddrinfo('googleads.googleapis.com', 443)" 2>/dev/null; then net_ok=1; break; fi
+    sleep 10
+  done
+  if [ "$net_ok" != 1 ]; then
+    echo "!! ネットワークに10分繋がらないため中断（前回データを温存）"
+    echo "=== $(date '+%Y-%m-%d %H:%M:%S') refresh ABORTED ==="
+    exit 1
+  fi
   # 最重要データ取得。ここが失敗したら、古い console/data.json で監査・提案・監視を走らせないよう中断する
   if ! /usr/bin/python3 scripts/build_console_data.py; then
     echo "!! build_console_data.py が失敗。古いデータでの監査・提案・監視を避けるため中断します。"
@@ -17,6 +29,8 @@ mkdir -p logs
   /usr/bin/python3 scripts/fetch_daily_series.py
   # Google検索の診断(IS変動/不要検索クエリ)
   /usr/bin/python3 scripts/fetch_search_diagnostics.py
+  # クリエイティブ別の週次推移(Google/Meta・直近8週＋今週)→ console/creatives_weekly.json
+  /usr/bin/python3 scripts/fetch_creative_weekly.py || true
   # 取得直後に監視チェック（読み取りのみ・外部送信なし＝ログとconsole/data.jsonのalertsへ反映）
   # 通知(--send)は通知先(.env NOTIFY_CHANNEL)を設定してから有効化する
   # 月次時系列(前年同月比/長期トレンド用)→ console/monthly.json
