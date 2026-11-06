@@ -73,6 +73,21 @@ def google_account(ga, cid: str, start: str, end: str) -> list:
     return _top(ads)
 
 
+def _label_duplicates(rows: list) -> None:
+    """広告名が重複して見分けられない行（例: 広告名も広告セット名も「Meta」）は、キャンペーン名を主表示にする。
+    それでも重複するなら広告IDの末尾を添える。"""
+    names = [r["name"] for r in rows]
+    for r in rows:
+        if names.count(r["name"]) > 1:
+            camp, _, adset = r["sub"].partition(" ／ ")
+            r["sub"] = r["name"] if adset in ("", r["name"]) else f"{adset} ／ {r['name']}"
+            r["name"] = camp or r["name"]
+    names = [r["name"] for r in rows]
+    for r in rows:
+        if names.count(r["name"]) > 1:
+            r["name"] = f"{r['name']}（#{r['id'][-4:]}）"
+
+
 def meta_account(act: str, tok: str, start: str, end: str) -> list:
     """level=ad を7日刻みで取得。since を月曜にしているので各バケットは月曜始まりの週になる。"""
     params = {"level": "ad", "time_increment": "7", "limit": "500",
@@ -94,6 +109,7 @@ def meta_account(act: str, tok: str, start: str, end: str) -> list:
             break
         params["after"] = nxt
     rows = _top(ads)
+    _label_duplicates(rows)
     # サムネイル（画面でどの絵か分かるように）。URLは期限付きなので毎回取り直す
     for r in rows:
         c = meta_get(r["id"], {"fields": "creative{thumbnail_url}"}, tok)
