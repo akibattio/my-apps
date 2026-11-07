@@ -4,6 +4,7 @@ import { useActionState, useRef, useState, startTransition } from "react";
 import { submitSell, type ListingState } from "./actions";
 import { resizeImage } from "./resize";
 import { tr, type Lang } from "@/lib/i18n";
+import { normalizeVin, isValidVin } from "./vin";
 
 const MAX_PHOTOS = 20;
 
@@ -45,7 +46,9 @@ export default function SellForm({
   const [localError, setLocalError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [party, setParty] = useState("OWNER");
+  const [party, setParty] = useState("");
+  const [ownerConsent, setOwnerConsent] = useState(false);
+  const [ownerName, setOwnerName] = useState("");
   const [manufacturer, setManufacturer] = useState("");
   const [model, setModel] = useState("");
   const [price, setPrice] = useState("");
@@ -68,8 +71,25 @@ export default function SellForm({
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const isAgent = party === "BROKER" || party === "DEALER";
+    if (!party) {
+      setLocalError(t("sell_party_err"));
+      return;
+    }
+    if (isAgent && !ownerConsent) {
+      setLocalError(t("sell_consent_err"));
+      return;
+    }
+    if (isAgent && !ownerName.trim()) {
+      setLocalError(t("sell_owner_name_err"));
+      return;
+    }
     if (!manufacturer.trim() || !model.trim()) {
       setLocalError(t("form_err_makermodel"));
+      return;
+    }
+    if (!isValidVin(normalizeVin(vin))) {
+      setLocalError(t("sell_vin_err"));
       return;
     }
     if (!name.trim()) {
@@ -81,13 +101,17 @@ export default function SellForm({
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setLocalError(lang === "en" ? "Please enter a valid email (required)." : "メールアドレス（必須）を正しく入力してください。");
+      setLocalError(t("listing_err_email"));
       return;
     }
     setLocalError(null);
     const fd = new FormData();
     fd.set("company", ""); // honeypot（人は空のまま）
     fd.set("partyType", party);
+    if (isAgent) {
+      fd.set("ownerConsent", ownerConsent ? "on" : "");
+      fd.set("ownerName", ownerName);
+    }
     fd.set("manufacturer", manufacturer);
     fd.set("model", model);
     fd.set("price", price);
@@ -110,7 +134,7 @@ export default function SellForm({
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <div>
-        <label className={label}>{t("sell_party")}</label>
+        <label className={label}>{t("sell_party")}{req}</label>
         <div className="flex flex-wrap gap-2">
           {PARTIES.map((p) => (
             <button
@@ -125,6 +149,27 @@ export default function SellForm({
             </button>
           ))}
         </div>
+        {(party === "BROKER" || party === "DEALER") && (
+          <div className="mt-3 space-y-3 rounded-2xl border border-accent/40 bg-accent/[0.05] p-4">
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={ownerConsent}
+                onChange={(e) => setOwnerConsent(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-accent)]"
+              />
+              <span>
+                {t("sell_consent")}
+                <span className="text-red-400"> {t("required")}</span>
+              </span>
+            </label>
+            <div>
+              <label className={label}>{t("sell_owner_name")}{req}</label>
+              <input className={field} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} autoComplete="off" />
+              <p className="mt-1.5 text-xs text-muted">{t("sell_owner_name_note")}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
@@ -140,8 +185,8 @@ export default function SellForm({
         <input className={field} value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="32000000" />
       </div>
       <div>
-        <label className={label}>{t("sell_vin")}</label>
-        <input className={field} value={vin} onChange={(e) => setVin(e.target.value)} placeholder="ZFF79ALA4J0231234" autoCapitalize="characters" />
+        <label className={label}>{t("sell_vin")}{req}</label>
+        <input className={field} value={vin} onChange={(e) => setVin(e.target.value)} placeholder={t("sell_vin_ph")} autoCapitalize="characters" autoComplete="off" />
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">
@@ -170,7 +215,7 @@ export default function SellForm({
             <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form_name_ph")} autoComplete="name" />
           </div>
           <div>
-            <label className={label}>{t("company")}（{t("optional")}）</label>
+            <label className={label}>{t("company")}{t("optional_paren")}</label>
             <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder={t("form_company_ph")} autoComplete="organization" />
           </div>
           <div>

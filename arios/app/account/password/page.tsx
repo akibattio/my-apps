@@ -6,9 +6,12 @@ import LangToggle from "../../LangToggle";
 import { getCurrentUser } from "@/lib/auth";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "新しいパスワードの設定 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("新しいパスワードの設定", "Set a new password");
+}
 
 // 再設定メールのリンク → /auth/callback でセッション確立 → この画面で新パスワードを設定。
 export default async function NewPasswordPage() {

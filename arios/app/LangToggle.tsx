@@ -1,15 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { Lang } from "@/lib/i18n";
 
-// 日本語／英語の手動切替。Cookie に保存して再描画する。
+// 日本語／英語の手動切替。Cookie に保存して再読込（タブ名・下部メニューまで即時に切り替える）。
 export default function LangToggle({ lang }: { lang: Lang }) {
-  const router = useRouter();
   function set(l: Lang) {
     if (l === lang) return;
     document.cookie = `lang=${l};path=/;max-age=31536000;samesite=lax`;
-    router.refresh();
+    window.location.reload();
   }
   const base = "px-2.5 py-1 text-xs rounded-full transition-colors";
   const on = "bg-accent/15 text-accent font-medium";

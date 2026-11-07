@@ -3,9 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import AddHistoryForm from "./AddHistoryForm";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "出来事を追加 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("出来事を追加", "Add an event");
+}
 
 export default async function AddHistoryPage({
   params,

@@ -33,7 +33,7 @@ export default async function InquiryDetailPage({
   const { data: inq } = await supabase
     .from("inquiries")
     .select(
-      "id, kind, manufacturer, model, price, vin, party_type, name, company, contact, contact_method, email, registered_by, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
+      "id, kind, manufacturer, model, price, vin, party_type, owner_consent, owner_name, submit_lang, name, company, contact, contact_method, email, registered_by, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
@@ -86,6 +86,13 @@ export default async function InquiryDetailPage({
     ["会社名", inq.company],
     ["メール", inq.email],
     ["車体番号", inq.vin],
+    ...(inq.party_type === "BROKER" || inq.party_type === "DEALER"
+      ? ([
+          ["本人からの依頼", inq.owner_consent ? "あり（登録時に確認済み）" : "未確認"],
+          ["オーナー本人の名前（非公開）", inq.owner_name],
+        ] as [string, string | null][])
+      : []),
+    ["登録時の言語", inq.submit_lang === "en" ? "英語" : inq.submit_lang === "ja" ? "日本語" : null],
   ];
 
   return (

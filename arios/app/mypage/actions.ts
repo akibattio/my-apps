@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { validateImageFile } from "@/lib/upload";
+import { normalizeVin, isValidVin } from "@/app/listings/vin";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 20;
+const PARTY_TYPES = ["OWNER", "BROKER", "DEALER"];
 
 // 自分の出品に写真を追加する（あとから／マイページから）。本人のみ。
 export async function addListingPhotos(formData: FormData): Promise<void> {
@@ -107,24 +109,92 @@ export async function updateMyListing(formData: FormData): Promise<void> {
   // 本人確認: 認証ユーザーIDで判定（メール文字列では判定しない）
   const { data: row } = await supabase
     .from("inquiries")
-    .select("id, auth_user_id")
+    .select("id, kind, auth_user_id")
     .eq("id", id)
     .maybeSingle();
   if (!row || row.auth_user_id !== user.id) redirect("/mypage");
+  const back = (err: string) => redirect(`/mypage/${id}/edit?err=${err}`);
 
   const manufacturer = String(formData.get("manufacturer") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim();
-  if (!manufacturer || !model) redirect(`/mypage/${id}/edit`);
+  if (!manufacturer || !model) back("form_err_makermodel");
   const priceRaw = String(formData.get("price") ?? "").replace(/[,\s¥円]/g, "").trim();
   const price = priceRaw && /^\d+$/.test(priceRaw) ? Number(priceRaw) : null;
   const message = String(formData.get("message") ?? "").trim() || null;
   const contact = String(formData.get("contact") ?? "").trim() || null;
   const name = String(formData.get("name") ?? "").trim() || null;
 
-  await supabase
+  // 売りたい: 区分・車体番号は必須。仲介・業者はオーナー本人からの依頼確認と本人名（非公開）が必須。
+  let sellFields: Record<string, unknown> = {};
+  if (row.kind === "SELL") {
+    const partyRaw = String(formData.get("partyType") ?? "").trim().toUpperCase();
+    const partyType = PARTY_TYPES.includes(partyRaw) ? partyRaw : null;
+    const vin = normalizeVin(String(formData.get("vin") ?? ""));
+    const isAgent = partyType === "BROKER" || partyType === "DEALER";
+    const ownerConsent = String(formData.get("ownerConsent") ?? "") === "on";
+    const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 100);
+    if (!partyType) back("sell_party_err");
+    if (!isValidVin(vin)) back("sell_vin_err");
+    if (isAgent && !ownerConsent) back("sell_consent_err");
+    if (isAgent && !ownerName) back("sell_owner_name_err");
+    sellFields = {
+      party_type: partyType,
+      vin,
+      owner_consent: isAgent ? ownerConsent : false,
+      owner_name: isAgent ? ownerName : null,
+    };
+  }
+
+  const { error } = await supabase
     .from("inquiries")
-    .update({ manufacturer, model, price, message, contact, name, updated_at: new Date().toISOString() })
+    .update({
+      manufacturer,
+      model,
+      price,
+      message,
+      contact,
+      name,
+      ...sellFields,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id);
+  if (error) {
+    console.error("[mypage] update failed:", error);
+    back("my_save_err");
+  }
 
   redirect("/mypage");
+}
+
+// 自分の登録（売り/買い）を削除する。本人のみ。取引の記録がある登録は運営に残すため削除しない。
+export async function deleteMyListing(formData: FormData): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/mypage");
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) redirect("/mypage");
+
+  const supabase = createAdminClient();
+  const { data: row } = await supabase
+    .from("inquiries")
+    .select("id, auth_user_id, photo_urls")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row || row.auth_user_id !== user.id) redirect("/mypage");
+
+  const { count } = await supabase
+    .from("deals")
+    .select("id", { count: "exact", head: true })
+    .or(`buyer_inquiry_id.eq.${row.id},seller_inquiry_id.eq.${row.id}`);
+  if ((count ?? 0) > 0) redirect(`/mypage/${id}/edit?err=my_delete_blocked`);
+
+  const { error } = await supabase.from("inquiries").delete().eq("id", row.id);
+  if (error) {
+    console.error("[mypage] delete failed:", error);
+    redirect(`/mypage/${id}/edit?err=my_save_err`);
+  }
+  const paths: string[] = row.photo_urls ?? [];
+  if (paths.length > 0) await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
+
+  redirect("/mypage?deleted=1");
 }

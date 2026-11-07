@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Saira } from "next/font/google";
 import "./globals.css";
 import TabBar from "./TabBar";
+import { getLang } from "@/lib/lang";
 
 // ロゴ名（LIFE LINE GARAGE）用のブランドフォント。
 // Saira = モータースポーツ系のシャープなグロテスク。中太＋斜体でかっこよく。
@@ -13,8 +14,19 @@ const brandFont = Saira({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "LIFE LINE GARAGE — 一台ごとの歴史を100年残す",
+// タブ名はトップ等で表示言語に合わせる（英語なら英語）。
+export async function generateMetadata(): Promise<Metadata> {
+  const lang = await getLang();
+  return {
+    ...baseMetadata,
+    title:
+      lang === "en"
+        ? "LIFE LINE GARAGE — Preserving every car's history for 100 years"
+        : "LIFE LINE GARAGE — 一台ごとの歴史を100年残す",
+  };
+}
+
+const baseMetadata: Metadata = {
   description:
     "写真を撮るだけで、その車の消えない履歴書ができる。一台の車の人生を一本の時間軸で記録する Vehicle Timeline。History is never deleted.",
   manifest: "/manifest.webmanifest",

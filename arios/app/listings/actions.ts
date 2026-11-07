@@ -2,12 +2,17 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentAdmin, getCurrentUser } from "@/lib/auth";
 import { rateLimitDb, clientIp } from "@/lib/ratelimit";
 import { validateImageFile } from "@/lib/upload";
 import { sellerOrder } from "./order";
 import { matchKey } from "@/app/admin/matching/key";
+import { getLang } from "@/lib/lang";
+import { tr } from "@/lib/i18n";
+import { notifyNewListing } from "@/lib/notify";
+import { normalizeVin, isValidVin } from "./vin";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 20;
@@ -18,8 +23,10 @@ export type ListingState = { error?: string };
 // 公開フォームからの送信（買いたい/売りたい）。認証不要・スパム対策あり。
 async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<ListingState> {
   // 認証必須（会員のみ登録可）。所有権は auth_user_id で判定する。
+  const lang = await getLang();
+  const t = tr(lang);
   const user = await getCurrentUser();
-  if (!user) return { error: "ログインが必要です。" };
+  if (!user) return { error: t("listing_err_login") };
 
   // ハニーポット（botが埋める隠しフィールド）→ 成功したふりで無視
   if (String(formData.get("company") ?? "").trim()) {
@@ -33,24 +40,22 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
   const rlIp = await rateLimitDb(`listing:ip:${ip}`, 20, 60_000);
   const rlDay = await rateLimitDb(`listing:day:user:${user.id}`, 60, 24 * 60 * 60_000);
   if (!rlUser.ok || !rlIp.ok || !rlDay.ok) {
-    return { error: "送信が集中しています。少し時間をおいてお試しください。" };
+    return { error: t("signup_err_rate") };
   }
 
   const manufacturer = String(formData.get("manufacturer") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim();
   if (!manufacturer || !model) {
-    return { error: "メーカーと車種（必須）を入力してください。" };
+    return { error: t("form_err_makermodel") };
   }
 
   const priceRaw = String(formData.get("price") ?? "").replace(/[,\s¥円]/g, "").trim();
   const price = priceRaw && /^\d+$/.test(priceRaw) ? Number(priceRaw) : null;
   const partyRaw = String(formData.get("partyType") ?? "").trim().toUpperCase();
-  const partyType = PARTY_TYPES.includes(partyRaw)
-    ? partyRaw
-    : kind === "SELL"
-      ? "OWNER"
-      : null;
-  const vin = String(formData.get("vin") ?? "").trim();
+  const partyType = PARTY_TYPES.includes(partyRaw) ? partyRaw : null;
+  const vin = normalizeVin(String(formData.get("vin") ?? ""));
+  const ownerConsent = String(formData.get("ownerConsent") ?? "") === "on";
+  const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 100);
   const name = String(formData.get("name") ?? "").trim();
   const company = String(formData.get("company_name") ?? "").trim();
   const contact = String(formData.get("contact") ?? "").trim();
@@ -63,9 +68,18 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
   const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : null;
 
   // 必須項目: 名前・連絡先(電話/LINE)・メール
-  if (!name) return { error: "お名前（必須）を入力してください。" };
-  if (!contact) return { error: "連絡先（電話番号 または LINE ID・必須）を入力してください。" };
-  if (!email) return { error: "メールアドレス（必須）を正しく入力してください。" };
+  if (!name) return { error: t("signup_err_name") };
+  if (!contact) return { error: t("signup_err_contact") };
+  if (!email) return { error: t("listing_err_email") };
+
+  // 売りたい側のゲート: 区分と車体番号は必須。仲介・業者はオーナー本人からの依頼確認と本人名（非公開）が必須。
+  const isAgent = partyType === "BROKER" || partyType === "DEALER";
+  if (kind === "SELL") {
+    if (!partyType) return { error: t("sell_party_err") };
+    if (!isValidVin(vin)) return { error: t("sell_vin_err") };
+    if (isAgent && !ownerConsent) return { error: t("sell_consent_err") };
+    if (isAgent && !ownerName) return { error: t("sell_owner_name_err") };
+  }
 
   const photos =
     kind === "SELL"
@@ -74,7 +88,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
           .filter((f): f is File => f instanceof File && f.size > 0)
       : [];
   if (photos.length > MAX_PHOTOS) {
-    return { error: `写真は最大${MAX_PHOTOS}枚までです。` };
+    return { error: t("listing_err_photos") };
   }
 
   const supabase = createAdminClient();
@@ -89,6 +103,9 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         price,
         party_type: partyType,
         vin: vin || null,
+        owner_consent: kind === "SELL" && isAgent ? ownerConsent : false,
+        owner_name: kind === "SELL" && isAgent ? ownerName : null,
+        submit_lang: lang,
         name: name || null,
         contact: contact || null,
         contact_method: contactMethod || null,
@@ -105,7 +122,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
       .single();
     if (error || !data) {
       console.error("[listing] insert failed:", error);
-      return { error: "送信に失敗しました。時間をおいてお試しください。" };
+      return { error: t("listing_err_failed") };
     }
     id = data.id as string;
 
@@ -141,8 +158,31 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
     }
   } catch (e) {
     console.error("[listing] unexpected:", e);
-    return { error: "送信に失敗しました。通信環境をご確認ください。" };
+    return { error: t("listing_err_failed") };
   }
+
+  // 通知メール（運営への新着・マッチ通知＋会員への受付）。画面の応答を待たせないよう送信は後回し。
+  const photoCount = photos.length;
+  after(() =>
+    notifyNewListing({
+      id,
+      kind,
+      manufacturer,
+      model,
+      price,
+      partyType: kind === "SELL" ? partyType : null,
+      vin: vin || null,
+      ownerName: kind === "SELL" && isAgent ? ownerName : null,
+      name,
+      company: company || null,
+      contactMethod: contactMethod || null,
+      contact,
+      email,
+      message: message || null,
+      photoCount,
+      lang,
+    })
+  );
 
   redirect(`/submitted?kind=${kind}`);
 }

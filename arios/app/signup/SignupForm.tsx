@@ -144,7 +144,7 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form_name_ph")} autoComplete="name" className={field} />
       </div>
       <div>
-        <label className={labelC}>{t("company")}（{t("optional")}）</label>
+        <label className={labelC}>{t("company")}{t("optional_paren")}</label>
         <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder={t("form_company_ph")} autoComplete="organization" className={field} />
       </div>
       <div>

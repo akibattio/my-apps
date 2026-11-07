@@ -8,7 +8,24 @@ import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 
 // Top（公開）。未ログイン=会員登録/ログイン。ログイン後=マッチ通知＋売りたい/買いたい/マイページ。
+// 打ち出しは「一台ごとの歴史を、未来へ繋ぐ」（鈴木さん A案 2026-11-07）。売買はその中で生まれるもの。
 export const dynamic = "force-dynamic";
+
+// メインキャッチ＋サブコピー（未ログイン/ログイン後で共通）。
+function Hero({ t, compact = false }: { t: (k: string) => string; compact?: boolean }) {
+  return (
+    <>
+      <h1 className={`${compact ? "mt-6 text-xl" : "mt-8 text-2xl"} leading-snug font-semibold`}>
+        {t("top_hero1")}
+        <br />
+        {t("top_hero2")}
+      </h1>
+      <p className="mt-4 text-left text-[13px] leading-relaxed whitespace-pre-line text-muted">
+        {t("top_sub")}
+      </p>
+    </>
+  );
+}
 
 const key = (mk: string | null, md: string | null) =>
   (mk ?? "").trim().toLowerCase() + "||" + (md ?? "").trim().toLowerCase();
@@ -29,12 +46,8 @@ export default async function Home() {
           <div className="flex justify-center">
             <Wordmark />
           </div>
-          <h1 className="mt-8 text-2xl leading-snug font-semibold">
-            {t("top_hero1")}
-            <br />
-            {t("top_hero2")}
-          </h1>
-          <p className="mt-4 text-sm leading-relaxed text-muted">{t("top_lead_guest")}</p>
+          <Hero t={t} />
+          <p className="mt-5 text-xs text-muted">{t("top_lead_guest")}</p>
         </header>
 
         <div className="mt-8 space-y-3">
@@ -52,7 +65,9 @@ export default async function Home() {
           </Link>
         </div>
 
-        <p className="mt-10 text-center">
+        <p className="mt-10 text-center text-xs text-muted">{t("top_footer")}</p>
+
+        <p className="mt-6 text-center">
           <Link
             href="/admin-login"
             className="text-[11px] text-muted/70 underline-offset-4 hover:underline"
@@ -92,6 +107,7 @@ export default async function Home() {
       ),
       color: "text-accent",
       title: t("top_sell_title"),
+      lead: t("top_sell_lead"),
       body: t("top_sell_body"),
       accent: "border-accent/40 bg-accent/[0.06] hover:border-accent",
     },
@@ -103,6 +119,7 @@ export default async function Home() {
       ),
       color: "text-sky-400",
       title: t("top_buy_title"),
+      lead: t("top_buy_lead"),
       body: t("top_buy_body"),
       accent: "border-sky-400/40 bg-sky-400/[0.06] hover:border-sky-400",
     },
@@ -116,6 +133,7 @@ export default async function Home() {
       ),
       color: "text-emerald-400",
       title: t("top_mypage_title"),
+      lead: "",
       body: t("top_mypage_body"),
       accent: "border-border bg-card hover:border-primary",
     },
@@ -130,6 +148,7 @@ export default async function Home() {
         <div className="flex justify-center">
           <Wordmark />
         </div>
+        <Hero t={t} compact />
       </header>
 
       {matchedCount > 0 && (
@@ -157,7 +176,8 @@ export default async function Home() {
             <span className={`shrink-0 ${e.color}`}>{e.icon}</span>
             <span className="min-w-0">
               <span className="block text-lg font-semibold">{e.title}</span>
-              <span className="mt-0.5 block text-sm text-muted">{e.body}</span>
+              {e.lead && <span className="mt-0.5 block text-sm font-medium text-foreground/90">{e.lead}</span>}
+              <span className="mt-1 block text-xs leading-relaxed text-muted">{e.body}</span>
             </span>
             <span className="ml-auto text-xl text-muted">›</span>
           </Link>

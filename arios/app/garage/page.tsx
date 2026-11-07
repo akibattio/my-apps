@@ -2,9 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureOwner, isAdminEmail } from "@/lib/auth";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マイガレージ — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("マイガレージ", "My Garage");
+}
 
 export default async function GaragePage() {
   const owner = await ensureOwner();

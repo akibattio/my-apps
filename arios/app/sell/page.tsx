@@ -6,12 +6,15 @@ import SellForm from "../listings/SellForm";
 import { getCurrentUser } from "@/lib/auth";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = {
-  title: "車を売りたい — LIFE LINE GARAGE",
-  description: "お車の情報をご登録ください。ARIOSが買い手をお探しします。",
-};
+export async function generateMetadata() {
+  return pageTitle("車を売りたい", "Sell your car", {
+    ja: "お車の情報をご登録ください。ARIOSが買い手をお探しします。",
+    en: "Register your car and we'll find a buyer.",
+  });
+}
 
 export default async function SellPage() {
   const user = await getCurrentUser();

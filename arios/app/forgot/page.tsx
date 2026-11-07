@@ -6,9 +6,12 @@ import LangToggle from "../LangToggle";
 import { getCurrentUser } from "@/lib/auth";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "パスワードの再設定 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("パスワードの再設定", "Reset password");
+}
 
 export default async function ForgotPage() {
   const user = await getCurrentUser();

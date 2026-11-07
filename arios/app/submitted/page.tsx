@@ -3,9 +3,12 @@ import Wordmark from "../Wordmark";
 import { getCurrentUser } from "@/lib/auth";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "送信ありがとうございます — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("送信ありがとうございます", "Thank you");
+}
 
 export default async function SubmittedPage({
   searchParams,

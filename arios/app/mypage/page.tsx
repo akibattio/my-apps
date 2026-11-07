@@ -8,9 +8,12 @@ import { DEAL_STATUS_STYLE } from "@/app/admin/deals/constants";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 import LangToggle from "../LangToggle";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マイページ — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("マイページ", "My Page");
+}
 
 type Row = {
   id: string;
@@ -30,7 +33,12 @@ const yen = (n: number | null, noPrice: string) =>
 const key = (mk: string | null, md: string | null) =>
   (mk ?? "").trim().toLowerCase() + "||" + (md ?? "").trim().toLowerCase();
 
-export default async function MyPage() {
+export default async function MyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>;
+}) {
+  const { deleted } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/mypage");
   const lang = await getLang();
@@ -170,6 +178,10 @@ export default async function MyPage() {
           </button>
         </form>
       </header>
+
+      {deleted && (
+        <p className="mb-4 rounded-xl border border-border bg-card p-3 text-sm text-muted">{t("my_deleted")}</p>
+      )}
 
       {/* マッチング状況（常に一番上に表示） */}
       {matched.length > 0 ? (

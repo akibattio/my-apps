@@ -4,9 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, ensureOwner, isAdminEmail } from "@/lib/auth";
 import { signOut } from "@/app/auth/actions";
 import AccountForm from "./AccountForm";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "マイページ — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("マイページ", "My Page");
+}
 
 export default async function AccountPage() {
   const user = await getCurrentUser();

@@ -64,7 +64,7 @@ export default function ProfileForm({
         <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("form_name_ph")} />
       </div>
       <div>
-        <label className={label}>{t("company")}（{t("optional")}）</label>
+        <label className={label}>{t("company")}{t("optional_paren")}</label>
         <input className={field} value={company} onChange={(e) => setCompany(e.target.value)} placeholder={t("form_company_ph")} />
       </div>
       <div>

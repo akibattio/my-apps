@@ -4,13 +4,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { updateMyListing } from "../../actions";
 import ListingPhotos from "./ListingPhotos";
+import SellGateFields from "./SellGateFields";
+import DeleteListing from "./DeleteListing";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { pageTitle } from "@/lib/meta";
 
 const BUCKET = "inquiry-photos";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "情報を編集 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("情報を編集", "Edit listing");
+}
 
 type Row = {
   id: string;
@@ -21,16 +26,34 @@ type Row = {
   message: string | null;
   contact: string | null;
   name: string | null;
+  party_type: string | null;
+  vin: string | null;
+  owner_consent: boolean | null;
+  owner_name: string | null;
   auth_user_id: string | null;
   photo_urls: string[] | null;
 };
 
+// 保存・削除でエラーになったときに表示する文言（キーを限定して受け付ける）。
+const ERR_KEYS = new Set([
+  "form_err_makermodel",
+  "sell_party_err",
+  "sell_vin_err",
+  "sell_consent_err",
+  "sell_owner_name_err",
+  "my_delete_blocked",
+  "my_save_err",
+]);
+
 export default async function EditMyListing({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ err?: string }>;
 }) {
   const { id } = await params;
+  const { err } = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/mypage/${id}/edit`);
   const lang = await getLang();
@@ -39,7 +62,9 @@ export default async function EditMyListing({
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("inquiries")
-    .select("id, kind, manufacturer, model, price, message, contact, name, auth_user_id, photo_urls")
+    .select(
+      "id, kind, manufacturer, model, price, message, contact, name, party_type, vin, owner_consent, owner_name, auth_user_id, photo_urls"
+    )
     .eq("id", id)
     .maybeSingle();
   if (!data) notFound();
@@ -71,8 +96,21 @@ export default async function EditMyListing({
         </p>
       </header>
 
+      {err && ERR_KEYS.has(err) && (
+        <p className="mb-5 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{t(err)}</p>
+      )}
+
       <form action={updateMyListing} className="space-y-5">
         <input type="hidden" name="id" value={r.id} />
+        {r.kind === "SELL" && (
+          <SellGateFields
+            lang={lang}
+            partyType={r.party_type}
+            vin={r.vin}
+            ownerConsent={!!r.owner_consent}
+            ownerName={r.owner_name}
+          />
+        )}
         <div>
           <label className={label}>{t("form_maker")}<span className="text-red-400"> {t("required")}</span></label>
           <input className={field} name="manufacturer" defaultValue={r.manufacturer ?? ""} placeholder={t("form_maker_ph")} />
@@ -122,6 +160,10 @@ export default async function EditMyListing({
           <ListingPhotos id={r.id} photos={photos} lang={lang} />
         </section>
       )}
+
+      <section className="mt-12 border-t border-border pt-6">
+        <DeleteListing id={r.id} lang={lang} />
+      </section>
     </main>
   );
 }

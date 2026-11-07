@@ -4,9 +4,12 @@ import { getCurrentUser } from "@/lib/auth";
 import ProfileForm from "./ProfileForm";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "登録情報の編集 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("登録情報の編集", "Edit profile");
+}
 
 export default async function ProfilePage() {
   const user = await getCurrentUser();

@@ -6,12 +6,15 @@ import BuyForm from "../listings/BuyForm";
 import { getCurrentUser } from "@/lib/auth";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = {
-  title: "車を買いたい — LIFE LINE GARAGE",
-  description: "お探しの車をご登録ください。ARIOSが売り手をお探しします。",
-};
+export async function generateMetadata() {
+  return pageTitle("車を買いたい", "Find a car", {
+    ja: "お探しの車をご登録ください。ARIOSが売り手をお探しします。",
+    en: "Register the car you want and we'll find it for you.",
+  });
+}
 
 export default async function BuyPage() {
   const user = await getCurrentUser();

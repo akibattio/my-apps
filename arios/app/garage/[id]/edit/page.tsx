@@ -3,9 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import EditVehicleForm from "./EditVehicleForm";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "登録内容を編集 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("登録内容を編集", "Edit car");
+}
 
 export default async function EditVehiclePage({
   params,

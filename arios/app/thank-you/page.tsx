@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { pageTitle } from "@/lib/meta";
 
-export const metadata = { title: "登録ありがとうございます — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("登録ありがとうございます", "Thank you for registering");
+}
 
 // Thank You。登録直後に表示し、作った車の Timeline への導線を出す。
 export default async function ThankYouPage({

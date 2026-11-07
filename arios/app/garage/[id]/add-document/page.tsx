@@ -3,9 +3,12 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import AddDocumentForm from "./AddDocumentForm";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "書類を追加 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("書類を追加", "Add a document");
+}
 
 export default async function AddDocumentPage({
   params,

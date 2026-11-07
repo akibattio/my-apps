@@ -2,9 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import RegisterForm from "./RegisterForm";
 import { getCurrentUser } from "@/lib/auth";
+import { pageTitle } from "@/lib/meta";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "愛車を登録 — LIFE LINE GARAGE" };
+export async function generateMetadata() {
+  return pageTitle("愛車を登録", "Register your car");
+}
 
 // AI下書きを含む写真登録は社内(ログイン)のみ。AIを外部に出さない。
 export default async function RegisterPage() {

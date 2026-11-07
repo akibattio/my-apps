@@ -44,8 +44,8 @@ export const CHANNEL_LABEL: Record<string, string> = {
 
 export const PARTY_LABEL: Record<string, string> = {
   OWNER: "オーナー",
-  BROKER: "ブローカー",
-  DEALER: "ディーラー",
+  BROKER: "仲介",
+  DEALER: "業者",
 };
 
 export const SOURCE_LABEL: Record<string, string> = {
