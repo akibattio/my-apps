@@ -402,8 +402,10 @@ def main():
         if "spend" not in a:  # 取得失敗の行（数値なし）。一覧表示だけ飛ばす
             print(f"  [{a.get('media', '?'):6}] {str(a.get('client', ''))[:20]:22} 取得失敗")
             continue
-        m7, ml = a["metrics"]["d7"], a["metrics"]["lm"]
-        print(f"  [{a['media']:6}] {a['client'][:20]:22} 日予算¥{a['dailyBudget']:>6,}/日 | 30日:¥{a['spend']:>7,} CV{a['cv']:>4} | 7日:¥{m7['spend']:>7,} | 先月:¥{ml['spend']:>7,}")
+        # ログ表示だけなので、欠けた数字（取得失敗の期間など）は0で出す。ここで止めない
+        mt = a.get("metrics") or {}
+        m7, ml = mt.get("d7") or {}, mt.get("lm") or {}
+        print(f"  [{a['media']:6}] {a['client'][:20]:22} 日予算¥{a.get('dailyBudget') or 0:>6,}/日 | 30日:¥{a['spend']:>7,} CV{a.get('cv', 0):>4} | 7日:¥{m7.get('spend', 0):>7,} | 先月:¥{ml.get('spend', 0):>7,}")
 
 
 if __name__ == "__main__":

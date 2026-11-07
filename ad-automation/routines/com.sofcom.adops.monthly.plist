@@ -7,6 +7,9 @@
 
   <key>ProgramArguments</key>
   <array>
+    <!-- 取得中にMacがスリープしてネットが切れ、途中で失敗していたため、実行中だけスリープを止める -->
+    <string>/usr/bin/caffeinate</string>
+    <string>-i</string>
     <string>/bin/bash</string>
     <string>/Users/som-013/dev/ad-automation/scripts/monthly_adreport_export.sh</string>
   </array>
