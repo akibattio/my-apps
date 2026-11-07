@@ -27,6 +27,9 @@ mkdir -p logs
   fi
   # 日次時系列(過去35日)を取得＝急変検知(インプ急停止/消化大幅増減/CPC高騰)のベースライン
   /usr/bin/python3 scripts/fetch_daily_series.py
+  # 過去13か月の日次を蓄積（コンソールの「期間集計」＝任意の開始日〜終了日の集計用）→ console/history.json
+  # 初回・新規口座は13か月分、以降は直近40日だけ取り直して上書き。失敗した口座は前回までの蓄積を維持。
+  /usr/bin/python3 scripts/fetch_daily_history.py || true
   # Google検索の診断(IS変動/不要検索クエリ)
   /usr/bin/python3 scripts/fetch_search_diagnostics.py
   # クリエイティブ別の週次推移(Google/Meta・直近8週＋今週)→ console/creatives_weekly.json

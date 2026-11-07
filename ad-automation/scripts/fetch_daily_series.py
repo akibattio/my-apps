@@ -92,20 +92,22 @@ def sum_action(actions, types):
 def meta_daily(acc, tok, start, end):
     params = {"level": "account", "time_increment": 1,
               "time_range": json.dumps({"since": start, "until": end}),
-              "fields": "spend,impressions,clicks,actions", "limit": "100", "access_token": tok}
+              "fields": "spend,impressions,clicks,actions", "limit": "500", "access_token": tok}
     url = f"{META_BASE}/{acc}/insights?" + urllib.parse.urlencode(params)
-    try:
-        with urllib.request.urlopen(url, timeout=60) as r:
-            data = json.loads(r.read())
-    except Exception as e:
-        return {"__error__": str(e)[:80]}
     rows = []
-    for row in data.get("data", []):
-        rows.append({"date": row.get("date_start"),
-                     "imp": int(float(row.get("impressions", 0) or 0)),
-                     "clk": int(float(row.get("clicks", 0) or 0)),
-                     "cost": round(float(row.get("spend", 0) or 0)),
-                     "cv": int(sum_action(row.get("actions"), CV_ACTIONS))})
+    while url:  # 長期間（13か月≒400日）でも全日分を取れるようページ送りする
+        try:
+            with urllib.request.urlopen(url, timeout=60) as r:
+                data = json.loads(r.read())
+        except Exception as e:
+            return {"__error__": str(e)[:80]}
+        for row in data.get("data", []):
+            rows.append({"date": row.get("date_start"),
+                         "imp": int(float(row.get("impressions", 0) or 0)),
+                         "clk": int(float(row.get("clicks", 0) or 0)),
+                         "cost": round(float(row.get("spend", 0) or 0)),
+                         "cv": int(sum_action(row.get("actions"), CV_ACTIONS))})
+        url = (data.get("paging") or {}).get("next")
     return rows
 
 

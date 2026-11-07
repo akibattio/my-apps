@@ -37,6 +37,8 @@ console/audit.json
 console/monthly.json
 console/keywords.json
 console/breakdowns.json
+console/history.json
+console/creatives_weekly.json
 
 # 実行ログ
 logs/

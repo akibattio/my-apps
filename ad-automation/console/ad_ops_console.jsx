@@ -220,6 +220,7 @@ export default function AdOpsConsole() {
   const [keywords, setKeywords] = useState(null);
   const [breakdowns, setBreakdowns] = useState(null);
   const [creatives, setCreatives] = useState(null);
+  const [periodData, setPeriodData] = useState(null); // 過去13か月の日次（期間集計用・history.json）
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -254,6 +255,10 @@ export default function AdOpsConsole() {
     fetch("./creatives_weekly.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && j.byAccount) setCreatives(j); })
+      .catch(() => {});
+    fetch("./history.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && Array.isArray(j.accounts)) setPeriodData(j); })
       .catch(() => {});
   }, []);
   const auditMap = useMemo(() => (audit && audit.byAccount) || {}, [audit]);
@@ -710,6 +715,7 @@ export default function AdOpsConsole() {
               </div>
 
               {clientTab === "seika" && (<>
+              <div className="no-print"><PeriodSummary key={cl.client} history={periodData} client={cl.client} /></div>
               <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="媒体別の成果" note="この社の各アカウントの成果。手法別（検索/PMax等）・月次推移も表示。接続/トークンは『アカウント管理』タブへ。" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
                 {cl.accts.map((c) => {
@@ -925,6 +931,11 @@ export default function AdOpsConsole() {
           );
           return (
             <>
+              {/* 期間集計（全クライアント／各社を切り替え・任意の開始日〜終了日） */}
+              <div className="no-print">
+                <PeriodSummary history={periodData} onClient={goClient}
+                  clientOptions={periodData ? [...new Set(periodData.accounts.map((a) => a.client))].sort() : null} />
+              </div>
               <div className="no-print" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12.5, color: "#64748b" }}>クライアント</span>
                 <select value={rc} onChange={(e) => { setReportClient(e.target.value); setReportMonth(""); }} style={{ ...sel, minWidth: 200 }}>
@@ -1573,6 +1584,221 @@ function ClientBudgetCard({ cl, bud, monthlyMap, asOfDate }) {
   );
 }
 
+// ===== 期間集計（任意の開始日〜終了日で集計・過去13か月）=====
+// 修正依頼 2026-11-06（今井）「任意で設定した日付や期間で数値が集計できるように」。データは history.json（毎朝 fetch_daily_history.py が更新）。
+// 日付は "YYYY-MM-DD" 文字列のまま UTC で計算（端末のタイムゾーンでずれないように）。
+const _D = (s) => new Date(s + "T00:00:00Z");
+const _S = (d) => d.toISOString().slice(0, 10);
+const addDays = (s, n) => _S(new Date(_D(s).getTime() + n * 864e5));
+const daysBetween = (s, e) => Math.round((_D(e) - _D(s)) / 864e5) + 1;
+const monthStart = (s, back = 0) => { const d = _D(s); return _S(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - back, 1))); };
+const monthEnd = (s, back = 0) => { const d = _D(s); return _S(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - back + 1, 0))); };
+const yearAgo = (s) => { const d = _D(s); return _S(new Date(Date.UTC(d.getUTCFullYear() - 1, d.getUTCMonth(), d.getUTCDate()))); };
+const zeroT = () => ({ cost: 0, imp: 0, clk: 0, cv: 0 });
+const addT = (a, b) => ({ cost: a.cost + b.cost, imp: a.imp + b.imp, clk: a.clk + b.clk, cv: a.cv + b.cv });
+const deriveT = (t) => ({ ...t, ctr: t.imp ? (t.clk / t.imp) * 100 : null, cpc: t.clk ? t.cost / t.clk : null,
+  cvr: t.clk ? (t.cv / t.clk) * 100 : null, cpa: t.cv ? t.cost / t.cv : null });
+function sumRows(d, s, e) { // d は日付昇順の [日付, 費用, 表示, クリック, CV]
+  const t = zeroT();
+  for (const r of d || []) { if (r[0] < s) continue; if (r[0] > e) break; t.cost += r[1]; t.imp += r[2]; t.clk += r[3]; t.cv += r[4]; }
+  return t;
+}
+function periodPresets(from, last) {
+  return [
+    { id: "thisMonth", label: "今月", s: monthStart(last), e: last },
+    { id: "lastMonth", label: "先月", s: monthStart(last, 1), e: monthEnd(last, 1) },
+    { id: "d7", label: "直近7日", s: addDays(last, -6), e: last },
+    { id: "d30", label: "直近30日", s: addDays(last, -29), e: last },
+    { id: "m3", label: "過去3か月", s: monthStart(last, 3), e: monthEnd(last, 1) },
+    { id: "ytd", label: "今年", s: last.slice(0, 4) + "-01-01", e: last },
+    { id: "all", label: "13か月すべて", s: from, e: last },
+  ].map((p) => ({ ...p, s: p.s < from ? from : p.s, e: p.e > last ? last : p.e }));
+}
+const fmtPct = (v) => (v == null ? "—" : v.toFixed(2) + "%");
+const fmtCv = (v) => (Math.round(v * 10) / 10).toLocaleString("ja-JP");
+const PERIOD_COLS = [ // good: 1=増えると良い / -1=減ると良い / 0=中立（費用）
+  { k: "cost", label: "費用", f: (x) => yen(Math.round(x.cost)), good: 0 },
+  { k: "imp", label: "表示回数", f: (x) => num(x.imp), good: 1 },
+  { k: "clk", label: "クリック", f: (x) => num(x.clk), good: 1 },
+  { k: "ctr", label: "CTR", f: (x) => fmtPct(x.ctr), good: 1 },
+  { k: "cpc", label: "CPC", f: (x) => (x.cpc == null ? "—" : yen(Math.round(x.cpc))), good: -1 },
+  { k: "cv", label: "CV", f: (x) => fmtCv(x.cv), good: 1 },
+  { k: "cvr", label: "CVR", f: (x) => fmtPct(x.cvr), good: 1 },
+  { k: "cpa", label: "CPA", f: (x) => (x.cpa == null ? "—" : yen(Math.round(x.cpa))), good: -1 },
+];
+
+// client を渡すとその社の口座（媒体）別、clientOptions を渡すと「全クライアント／各社」を切り替えて集計。
+function PeriodSummary({ history, client, clientOptions, onClient }) {
+  const from = history && history.from, to = history && history.to;
+  const last = from && to ? (to > from ? addDays(to, -1) : to) : ""; // 既定は昨日まで（当日は取得時点の途中値のため）
+  const presets = useMemo(() => (from && last ? periodPresets(from, last) : []), [from, last]);
+  const [range, setRange] = useState(null);
+  const [cmp, setCmp] = useState("prev");
+  const [scope, setScope] = useState("");
+  const box = { background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)" };
+  if (!history) {
+    return <div style={{ ...box, padding: "14px 16px", fontSize: 12.5, color: "#94a3b8", marginBottom: 22 }}>期間集計のデータ（過去13か月の日次）はまだありません。翌朝の自動取得後に表示されます。</div>;
+  }
+  const r = range || presets.find((p) => p.id === "thisMonth") || { id: "all", s: from, e: last };
+  const target = client || scope;
+  const accs = history.accounts.filter((a) => !target || a.client === target);
+  const n = daysBetween(r.s, r.e);
+  let cs = null, ce = null;
+  if (cmp === "prev") { ce = addDays(r.s, -1); cs = addDays(ce, -(n - 1)); }
+  if (cmp === "yoy") { cs = yearAgo(r.s); ce = yearAgo(r.e); }
+  const cmpOk = !!cs && cs >= from;
+
+  const groups = {};
+  for (const a of accs) {
+    const key = target ? `${a.media}|${a.acct}` : a.client;
+    const g = groups[key] || (groups[key] = { key, client: a.client, acct: a.acct, medias: [], cur: zeroT(), prev: zeroT(), err: false });
+    if (!g.medias.includes(a.media)) g.medias.push(a.media);
+    g.cur = addT(g.cur, sumRows(a.d, r.s, r.e));
+    if (cmpOk) g.prev = addT(g.prev, sumRows(a.d, cs, ce));
+    if (a.error) g.err = true;
+  }
+  const all = Object.values(groups);
+  const rows = all.filter((g) => g.cur.cost || g.cur.imp || g.prev.cost || g.prev.imp).sort((x, y) => y.cur.cost - x.cur.cost);
+  const idle = all.length - rows.length;
+  const tot = rows.reduce((t, g) => ({ cur: addT(t.cur, g.cur), prev: addT(t.prev, g.prev) }), { cur: zeroT(), prev: zeroT() });
+  const T = deriveT(tot.cur), P = deriveT(tot.prev);
+  const errs = all.filter((g) => g.err);
+
+  // 日別の費用（グラフ用）
+  const dayMap = {};
+  for (const a of accs) for (const x of a.d) { if (x[0] < r.s || x[0] > r.e) continue; dayMap[x[0]] = (dayMap[x[0]] || 0) + x[1]; }
+  const days = []; for (let i = 0; i < n && i < 800; i++) { const d = addDays(r.s, i); days.push([d, dayMap[d] || 0]); }
+  const maxDay = Math.max(1, ...days.map((x) => x[1]));
+
+  const Delta = ({ a, b, good }) => {
+    if (!cmpOk || a == null || b == null || !b) return <span style={{ color: "#cbd5e1" }}>—</span>;
+    const p = ((a - b) / b) * 100;
+    if (Math.abs(p) < 0.05) return <span style={{ color: "#94a3b8" }}>±0%</span>;
+    const up = p > 0;
+    const col = good === 0 ? "#64748b" : (up ? good > 0 : good < 0) ? "#0891b2" : "#dc2626";
+    return <span style={{ color: col }}>{up ? "▲" : "▼"}{Math.abs(p).toFixed(1)}%</span>;
+  };
+  const setS = (v) => { if (!v) return; setRange({ id: "custom", s: v, e: v > r.e ? v : r.e }); };
+  const setE = (v) => { if (!v) return; setRange({ id: "custom", s: v < r.s ? v : r.s, e: v }); };
+  const nameOf = (g) => (target ? `${platformLabel(g.medias[0])}（${g.acct}）` : g.client);
+  const downloadCsv = () => {
+    const head = ["名前", "媒体", ...PERIOD_COLS.map((c) => c.label), ...(cmpOk ? ["比較_費用", "比較_CV", "比較_CPA"] : [])];
+    const vals = (t) => { const x = deriveT(t); return [Math.round(x.cost), x.imp, x.clk, x.ctr == null ? "" : x.ctr.toFixed(2) + "%", x.cpc == null ? "" : Math.round(x.cpc), Math.round(x.cv * 10) / 10, x.cvr == null ? "" : x.cvr.toFixed(2) + "%", x.cpa == null ? "" : Math.round(x.cpa)]; };
+    const cmpVals = (t) => { const x = deriveT(t); return cmpOk ? [Math.round(x.cost), Math.round(x.cv * 10) / 10, x.cpa == null ? "" : Math.round(x.cpa)] : []; };
+    const body = [head, ...rows.map((g) => [nameOf(g), g.medias.map(platformLabel).join("/"), ...vals(g.cur), ...cmpVals(g.prev)]),
+      ["合計", "", ...vals(tot.cur), ...cmpVals(tot.prev)]];
+    const text = "﻿" + `集計期間,${r.s}〜${r.e}` + (cmpOk ? `,比較期間,${cs}〜${ce}` : "") + "\r\n" + body.map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+    const el = document.createElement("a"); el.href = url; el.download = `期間集計_${target || "全クライアント"}_${r.s}_${r.e}.csv`; el.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const inp = { padding: "6px 9px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff", color: "#0f172a" };
+  const tmpl = "minmax(170px,1.7fr) repeat(8, minmax(78px,1fr))";
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <SectionTitle icon={<span style={{ fontSize: 15 }}>📅</span>} title={target && !client ? `期間集計（${target}）` : "期間集計"}
+        note={`開始日〜終了日を指定して集計（データ範囲 ${from}〜${to}・毎朝更新）。当日分は取得時点までの途中値です。`} />
+      <div style={{ ...box, padding: "14px 16px" }}>
+        {/* 期間の指定 */}
+        <div className="no-print" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          {clientOptions && (
+            <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ ...inp, minWidth: 190 }}>
+              <option value="">全クライアント</option>
+              {clientOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+          <input type="date" value={r.s} min={from} max={to} onChange={(e) => setS(e.target.value)} style={inp} />
+          <span style={{ color: "#94a3b8" }}>〜</span>
+          <input type="date" value={r.e} min={from} max={to} onChange={(e) => setE(e.target.value)} style={inp} />
+          <span style={{ fontSize: 12, color: "#64748b" }}>{n}日間</span>
+          <select value={cmp} onChange={(e) => setCmp(e.target.value)} style={{ ...inp, marginLeft: 6 }}>
+            <option value="prev">比較：前の期間（同じ日数）</option>
+            <option value="yoy">比較：前年同期</option>
+            <option value="none">比較しない</option>
+          </select>
+          <button onClick={downloadCsv} style={{ ...inp, cursor: "pointer", fontWeight: 700, color: "#0e7490", marginLeft: "auto" }}>CSVダウンロード</button>
+        </div>
+        <div className="no-print" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+          {presets.map((p) => {
+            const on = (range ? range.id : "thisMonth") === p.id;
+            return <button key={p.id} onClick={() => setRange(p)} style={{ padding: "4px 11px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: "1px solid " + (on ? "#0891b2" : "#e2e8f0"), background: on ? "#0891b2" : "#fff", color: on ? "#fff" : "#475569" }}>{p.label}</button>;
+          })}
+        </div>
+        <div style={{ fontSize: 11.5, color: "#64748b", marginBottom: 12 }}>
+          集計期間 <b style={{ color: "#0e3a46" }}>{r.s}〜{r.e}</b>
+          {cmp !== "none" && (cmpOk ? <> ／ 比較 {cs}〜{ce}</> : <span style={{ color: "#b45309" }}> ／ 比較期間がデータ範囲（{from}〜）外のため比較なし</span>)}
+        </div>
+
+        {/* 合計KPI */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(118px,1fr))", gap: 10, marginBottom: 14 }}>
+          {PERIOD_COLS.map((c) => (
+            <div key={c.k} style={{ background: "#f8fafb", borderRadius: 10, padding: "9px 11px" }}>
+              <div style={{ fontSize: 11, color: "#94a3b8" }}>{c.label}</div>
+              <div style={{ fontSize: 16.5, fontWeight: 700, color: "#0e3a46", fontVariantNumeric: "tabular-nums" }}>{c.f(T)}</div>
+              <div style={{ fontSize: 10.5, marginTop: 1 }}><Delta a={T[c.k]} b={P[c.k]} good={c.good} /></div>
+            </div>
+          ))}
+        </div>
+
+        {/* 日別の費用 */}
+        {n > 1 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>日別の費用（最大 {yen(Math.round(maxDay))}）</div>
+            <svg viewBox={`0 0 ${days.length} 40`} preserveAspectRatio="none" style={{ width: "100%", height: 56, display: "block", background: "#fbfcfc", borderRadius: 6 }}>
+              {days.map(([d, v], i) => (
+                <rect key={d} x={i + 0.12} width={0.76} y={40 - (v / maxDay) * 38} height={(v / maxDay) * 38} fill="#22a6c4"><title>{`${d} ${yen(Math.round(v))}`}</title></rect>
+              ))}
+            </svg>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#94a3b8", marginTop: 2 }}><span>{r.s}</span><span>{r.e}</span></div>
+          </div>
+        )}
+
+        {/* 明細 */}
+        {rows.length === 0 ? (
+          <div style={{ fontSize: 12.5, color: "#94a3b8", padding: "6px 2px" }}>この期間の実績はありません。</div>
+        ) : (
+          <div style={{ overflowX: "auto", border: "1px solid #eef1f0", borderRadius: 10 }}>
+            <div style={{ minWidth: 880 }}>
+              <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "8px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                <span>{target ? "口座（媒体）" : "クライアント"}</span>
+                {PERIOD_COLS.map((c) => <span key={c.k} style={{ textAlign: "right" }}>{c.label}</span>)}
+              </div>
+              {[...rows, { key: "__total", total: true, cur: tot.cur, prev: tot.prev, medias: [] }].map((g) => {
+                const x = deriveT(g.cur), y = deriveT(g.prev);
+                const click = !g.total && !target && onClient;
+                return (
+                  <div key={g.key} onClick={click ? () => onClient(g.client) : undefined} style={{ display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "8px 12px", alignItems: "start",
+                    borderTop: g.total ? "2px solid #e6ebe8" : "1px solid #f1f5f4", background: g.total ? "#f8faf9" : "#fff", cursor: click ? "pointer" : "default", fontSize: 12.5 }}>
+                    <span style={{ fontWeight: 700, color: "#0e3a46", minWidth: 0 }}>
+                      {g.total ? `合計（${rows.length}${target ? "口座" : "社"}）` : target ? <><MediaPill m={g.medias[0]} /> <span style={{ fontWeight: 500, fontSize: 11.5, color: "#64748b" }}>{g.acct}</span></> : g.client}
+                      {!g.total && !target && <div style={{ marginTop: 2 }}>{g.medias.map((m) => <MediaPill key={m} m={m} />)}</div>}
+                      {g.err && <div style={{ fontSize: 10.5, color: "#b45309", fontWeight: 500 }}>※取得失敗あり（前回までの値）</div>}
+                    </span>
+                    {PERIOD_COLS.map((c) => (
+                      <span key={c.k} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        <div style={{ fontWeight: g.total ? 800 : 600, color: "#0f172a" }}>{c.f(x)}</div>
+                        {cmpOk && <div style={{ fontSize: 10.5 }}><Delta a={x[c.k]} b={y[c.k]} good={c.good} /></div>}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, lineHeight: 1.6 }}>
+          ・比較の色：CV・クリック等は増加＝青／CPA・CPCは減少＝青、悪化は赤。費用は中立（灰）。
+          {idle > 0 && <> ・この期間に実績のない{target ? "口座" : "社"} {idle}件は省略。</>}
+          {errs.length > 0 && <> ・取得に失敗した口座は前回までの蓄積で集計しています。</>}
+          {!target && onClient && <> ・行をクリックで社別ページへ。</>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SectionTitle({ icon, title, note }) {
   return (<div style={{ marginBottom: 10 }}><div style={{ display: "flex", alignItems: "center", gap: 7 }}>{icon}<span style={{ fontSize: 15, fontWeight: 700 }}>{title}</span></div>{note && <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>{note}</div>}</div>);
 }
@@ -1587,8 +1813,9 @@ function MediaPill({ m }) {
     meta: { c: "#4338ca", label: "Meta" },
     yahoo_search: { c: "#d1341f", label: "Yahoo!検索" },
     yahoo_display: { c: "#d1341f", label: "Yahoo!ディスプレイ" },
+    microsoft: { c: "#0078d4", label: "Microsoft" },
   };
-  const s = S[m] || (String(m).indexOf("yahoo") === 0 ? { c: "#d1341f", label: "Yahoo!" } : S.meta);
+  const s = S[m] ||(String(m).indexOf("yahoo") === 0 ? { c: "#d1341f", label: "Yahoo!" } : S.meta);
   return <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 6, margin: "0 3px", background: "#fff", border: `1px solid ${s.c}40`, color: s.c, whiteSpace: "nowrap" }}>{s.label}</span>;
 }
 // 媒体ごとの「◯◯を開く」リンク表記と色（Google/Meta/Yahoo検索/Yahooディスプレイ＋今後追加に対応）
@@ -1598,10 +1825,12 @@ function platformLabel(m) {
   if (m === "yahoo_search") return "Yahoo!検索";
   if (m === "yahoo_display") return "Yahoo!ディスプレイ";
   if (String(m).indexOf("yahoo") === 0) return "Yahoo!広告";
+  if (m === "microsoft") return "Microsoft広告";
   return "媒体管理画面";
 }
 function platformColor(m) {
   if (m === "google") return "#1a56db";
+  if (m === "microsoft") return "#0078d4";
   if (String(m).indexOf("yahoo") === 0) return "#d1341f";
   return "#4338ca"; // Meta・その他
 }
