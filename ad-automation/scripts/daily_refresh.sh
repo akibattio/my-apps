@@ -34,15 +34,23 @@ mkdir -p logs
   /usr/bin/python3 scripts/fetch_search_diagnostics.py
   # クリエイティブ別の週次推移(Google/Meta・直近8週＋今週)→ console/creatives_weekly.json
   /usr/bin/python3 scripts/fetch_creative_weekly.py || true
-  # 取得直後に監視チェック（読み取りのみ・外部送信なし＝ログとconsole/data.jsonのalertsへ反映）
-  # 通知(--send)は通知先(.env NOTIFY_CHANNEL)を設定してから有効化する
   # 月次時系列(前年同月比/長期トレンド用)→ console/monthly.json
   /usr/bin/python3 scripts/fetch_monthly_series.py || true
   # 監査（ads-google観点の機械チェック）→ console/audit.json
   /usr/bin/python3 scripts/build_audits.py || true
   # 提案の下書き生成（承認キュー）→ console/data.json の proposals
   /usr/bin/python3 scripts/build_proposals.py || true
-  /usr/bin/python3 scripts/monitor.py
+  # 監視（読み取りのみ）→ ログと console/data.json の alerts。Google Chat へは1日1回だけ送る
+  # （旧GitHub Actionsの朝8:30送信を引き継ぎ・2026-11-07）。手動の再実行では二重に送らないよう、送れた日を印で残す。
+  # Webhook は .env の GOOGLE_CHAT_WEBHOOK_URL（未設定なら送信スキップ）。
+  notified="logs/.chat_notified_$(date +%F)"
+  if [ -e "$notified" ]; then
+    /usr/bin/python3 scripts/monitor.py
+  else
+    mon_out=$(NOTIFY_CHANNEL=googlechat /usr/bin/python3 scripts/monitor.py --send 2>&1)
+    echo "$mon_out"
+    echo "$mon_out" | grep -q "通知: Google Chat へ送信" && touch "$notified"
+  fi
   # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
   cp data/daily.json console/daily.json 2>/dev/null || true
   # 本番コンソール(sofcom-adops.pages.dev)へ反映。認証情報は .env の CLOUDFLARE_API_TOKEN/ACCOUNT_ID（wranglerが読む）

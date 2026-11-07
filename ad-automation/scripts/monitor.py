@@ -256,7 +256,9 @@ def notify(msg: str) -> str:
         return "通知先未設定（送信スキップ）"
     try:
         if ch == "googlechat":
-            url = os.environ["GOOGLE_CHAT_WEBHOOK_URL"].strip()
+            url = os.environ.get("GOOGLE_CHAT_WEBHOOK_URL", "").strip()
+            if not url:
+                return "Google Chat の Webhook 未設定（.env の GOOGLE_CHAT_WEBHOOK_URL・送信スキップ）"
             req = urllib.request.Request(url, data=json.dumps({"text": msg}).encode("utf-8"),
                                          headers={"Content-Type": "application/json"})
             urllib.request.urlopen(req, timeout=20)
