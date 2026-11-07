@@ -12,12 +12,13 @@
   microsoft … [{client, accountId, customerId, slug}]
 """
 from __future__ import annotations
-import os, json, subprocess
+import os, json, shutil, subprocess
 from pathlib import Path
 
 PROJ = Path(__file__).resolve().parent.parent
 KV_NAMESPACE_ID = "3248fc5bc14f4f3a807bc4b17a2a7376"  # adops-state（コンソールの _worker.js が STATE で使う）
-NPX = "/Users/som-013/.nvm/versions/node/v24.15.0/bin/npx"
+# launchd は PATH が最小なので Mac では絶対パスにフォールバック。GitHub Actions では PATH 上の npx を使う。
+NPX = shutil.which("npx") or "/Users/som-013/.nvm/versions/node/v24.15.0/bin/npx"
 FILES = {"yahoo": "yahoo_accounts.json", "microsoft": "microsoft_accounts.json"}
 _kv_cache: list | None = None
 
