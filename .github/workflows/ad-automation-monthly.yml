@@ -18,6 +18,10 @@ on:
         description: "report-glass へ commit/push する（オフなら差分の確認だけ）"
         type: boolean
         default: false
+      overwrite:
+        description: "既にある月のファイルも上書きする（手で補ったCSV分が消えるので通常オフ）"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -87,6 +91,11 @@ jobs:
       - name: report-glass へ commit/push
         working-directory: report-glass
         run: |
+          # 既にあるファイルは戻す＝新しい月だけ追加（例：tenjikai の Microsoft は CSV で補った分を手で維持している）
+          if [ "${{ inputs.overwrite }}" != "true" ]; then
+            git diff --name-only -- pipeline/yahoo pipeline/microsoft | sed 's/^/上書きしない: /'
+            git checkout -- pipeline/yahoo pipeline/microsoft
+          fi
           git add pipeline/yahoo/*-"$MONTH".json pipeline/microsoft/*-"$MONTH".json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "変更なし（push不要）"; exit 0
