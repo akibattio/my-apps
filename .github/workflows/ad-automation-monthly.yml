@@ -1,0 +1,103 @@
+name: ad-automation monthly export
+
+# 毎月の自動受け渡し：Yahoo!・Microsoft広告の「先月分」を取得 → report-glass の pipeline/ に出力 → commit/push。
+# push すると Render が自動デプロイし、起動時に pipeline/yahoo・microsoft を /var/data へ取り込む。
+# 旧：Mac の launchd（com.sofcom.adops.monthly → scripts/monthly_adreport_export.sh）。誰のMacにも依存しないよう移管（2026-11-08）。
+# 読み取りのみ（広告媒体へは書き込まない）。秘密は GitHub Secrets、report-glass への push は書き込み専用の deploy key。
+
+on:
+  schedule:
+    - cron: "0 0 3 * *"  # 毎月3日 09:00 JST（GitHub の schedule は数時間遅れることがある）
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "対象月 YYYY-MM（空なら先月）"
+        type: string
+        default: ""
+      push:
+        description: "report-glass へ commit/push する（オフなら差分の確認だけ）"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ad-automation-monthly
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      YAHOO_ADS_CLIENT_ID: ${{ secrets.YAHOO_ADS_CLIENT_ID }}
+      YAHOO_ADS_CLIENT_SECRET: ${{ secrets.YAHOO_ADS_CLIENT_SECRET }}
+      YAHOO_ADS_REFRESH_TOKEN: ${{ secrets.YAHOO_ADS_REFRESH_TOKEN }}
+      YAHOO_ADS_BASE_ACCOUNT_ID: ${{ secrets.YAHOO_ADS_BASE_ACCOUNT_ID }}
+      YAHOO_ADS_API_VERSION: ${{ secrets.YAHOO_ADS_API_VERSION }}
+      MS_ADS_DEVELOPER_TOKEN: ${{ secrets.MS_ADS_DEVELOPER_TOKEN }}
+      MS_ADS_CUSTOMER_ID: ${{ secrets.MS_ADS_CUSTOMER_ID }}
+      MS_ADS_ACCOUNT_ID: ${{ secrets.MS_ADS_ACCOUNT_ID }}
+      MS_ADS_ENVIRONMENT: ${{ secrets.MS_ADS_ENVIRONMENT }}
+      MS_ADS_GOOGLE_CLIENT_ID: ${{ secrets.MS_ADS_GOOGLE_CLIENT_ID }}
+      MS_ADS_GOOGLE_CLIENT_SECRET: ${{ secrets.MS_ADS_GOOGLE_CLIENT_SECRET }}
+      MS_ADS_GOOGLE_REFRESH_TOKEN: ${{ secrets.MS_ADS_GOOGLE_REFRESH_TOKEN }}
+      MS_ADS_CLIENT_ID: ${{ secrets.MS_ADS_CLIENT_ID }}
+      MS_ADS_CLIENT_SECRET: ${{ secrets.MS_ADS_CLIENT_SECRET }}
+      MS_ADS_REFRESH_TOKEN: ${{ secrets.MS_ADS_REFRESH_TOKEN }}
+      MS_ADS_REDIRECT_URI: ${{ secrets.MS_ADS_REDIRECT_URI }}
+      # 担当者がコンソールで追加した Yahoo!/Microsoft アカウント（KV mediaAccounts）を wrangler で読む
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DO_PUSH: ${{ github.event_name == 'schedule' || inputs.push }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: my-apps
+          sparse-checkout: ad-automation
+
+      - uses: actions/checkout@v4
+        with:
+          repository: akibattio/report-glass
+          ref: master
+          path: report-glass
+          ssh-key: ${{ secrets.REPORT_GLASS_DEPLOY_KEY }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 依存インストール
+        run: pip install -r my-apps/ad-automation/requirements.txt
+
+      - name: 先月分を書き出し（読み取りのみ）
+        working-directory: my-apps/ad-automation
+        run: |
+          MONTH="${{ inputs.month }}"
+          [ -n "$MONTH" ] || MONTH=$(TZ=Asia/Tokyo date -d "$(TZ=Asia/Tokyo date +%Y-%m-01) -1 month" +%Y-%m)
+          echo "MONTH=$MONTH" >> "$GITHUB_ENV"
+          echo "対象月: $MONTH"
+          RG="$GITHUB_WORKSPACE/report-glass"
+          AD_REPORT_DIR="$RG/pipeline/yahoo" python3 scripts/export_yahoo_for_adreport.py "$MONTH" \
+            || echo "!! Yahooエクスポート失敗（続行）"
+          AD_REPORT_DIR="$RG/pipeline/microsoft" python3 scripts/export_microsoft_for_adreport.py "$MONTH" \
+            || echo "!! Microsoftエクスポート失敗（続行）"
+
+      - name: report-glass へ commit/push
+        working-directory: report-glass
+        run: |
+          git add pipeline/yahoo/*-"$MONTH".json pipeline/microsoft/*-"$MONTH".json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "変更なし（push不要）"; exit 0
+          fi
+          git diff --cached --stat
+          git config user.name "ad-automation (GitHub Actions)"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Yahoo/Microsoft ${MONTH} を自動取得（my-apps ad-automation-monthly）" -- pipeline/yahoo pipeline/microsoft
+          if [ "$DO_PUSH" = "true" ]; then
+            git push -q origin master && echo "push 完了 → Render が自動デプロイ"
+          else
+            # 手動の確認実行：書き込み権限だけ確かめて、実際には送らない
+            git push --dry-run origin master && echo "（確認のみ・push していません）"
+          fi
