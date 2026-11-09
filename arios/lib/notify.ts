@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE, PARTY_LABEL } from "@/app/admin/inquiries/constants";
 import type { Lang } from "@/lib/i18n";
+import { carKey } from "@/lib/carname";
 
 // 通知メール（Resend の送信API）。登録・マッチを運営が取りこぼさないためのもの。
 // RESEND_API_KEY が無い環境では何もしない（登録処理は止めない）。
@@ -39,8 +40,6 @@ async function sendMail(to: string[], subject: string, text: string): Promise<vo
   }
 }
 
-// マッチ判定用キー（メーカー×車種、前後空白・大小文字を無視）。
-const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
 
 export type NewListing = {
   id: string;
@@ -67,14 +66,12 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
   const opposite = l.kind === "SELL" ? "BUY" : "SELL";
   const { data: candidates } = await supabase
     .from("inquiries")
-    .select("id, manufacturer, model, price, name, contact_method, contact")
+    .select("id, manufacturer, model")
     .eq("kind", opposite)
     .in("status", STATUS_ACTIVE)
-    .ilike("manufacturer", l.manufacturer.trim())
-    .limit(200);
-  const matches = (candidates ?? []).filter(
-    (r) => norm(r.manufacturer) === norm(l.manufacturer) && norm(r.model) === norm(l.model)
-  );
+    .limit(2000);
+  const target = carKey(l.manufacturer, l.model);
+  const matches = (candidates ?? []).filter((r) => carKey(r.manufacturer, r.model) === target);
 
   const kindJa = l.kind === "SELL" ? "売りたい" : "買いたい";
   const yen = (n: number | null) => (n != null ? "¥" + n.toLocaleString("ja-JP") : "—");

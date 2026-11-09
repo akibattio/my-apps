@@ -16,7 +16,14 @@ export async function generateMetadata() {
   });
 }
 
-export default async function SellPage() {
+export default async function SellPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ maker?: string; model?: string }>;
+}) {
+  // 「登録されている車」一覧から来たときは、メーカー・車種を入れた状態で開く。
+  const q = await searchParams;
+  const prefill = (v?: string) => (typeof v === "string" ? v.slice(0, 80) : undefined);
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/sell");
   const lang = await getLang();
@@ -47,6 +54,8 @@ export default async function SellPage() {
         defaultCompany={m.company ?? undefined}
         defaultContact={m.contact ?? undefined}
         defaultContactMethod={m.contact_method ?? undefined}
+        defaultMaker={prefill(q.maker)}
+        defaultModel={prefill(q.model)}
       />
     </main>
   );

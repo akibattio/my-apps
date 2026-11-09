@@ -5,6 +5,7 @@ import { submitSell, type ListingState } from "./actions";
 import { resizeImage } from "./resize";
 import { tr, type Lang } from "@/lib/i18n";
 import { normalizeVin, isValidVin } from "./vin";
+import MakerOptions, { MAKER_LIST_ID } from "@/app/listings/MakerOptions";
 
 const MAX_PHOTOS = 20;
 
@@ -15,6 +16,8 @@ export default function SellForm({
   defaultCompany,
   defaultContact,
   defaultContactMethod,
+  defaultMaker,
+  defaultModel,
 }: {
   lang?: Lang;
   defaultEmail?: string;
@@ -22,6 +25,8 @@ export default function SellForm({
   defaultCompany?: string;
   defaultContact?: string;
   defaultContactMethod?: string;
+  defaultMaker?: string;
+  defaultModel?: string;
 }) {
   const t = tr(lang);
   const PARTIES = [
@@ -49,8 +54,8 @@ export default function SellForm({
   const [party, setParty] = useState("");
   const [ownerConsent, setOwnerConsent] = useState(false);
   const [ownerName, setOwnerName] = useState("");
-  const [manufacturer, setManufacturer] = useState("");
-  const [model, setModel] = useState("");
+  const [manufacturer, setManufacturer] = useState(defaultMaker ?? "");
+  const [model, setModel] = useState(defaultModel ?? "");
   const [price, setPrice] = useState("");
   const [vin, setVin] = useState("");
   const [contactMethod, setContactMethod] = useState(defaultContactMethod || "PHONE");
@@ -174,7 +179,8 @@ export default function SellForm({
 
       <div>
         <label className={label}>{t("form_maker")}{req}</label>
-        <input className={field} value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t("form_maker_ph")} />
+        <input className={field} value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t("form_maker_ph")} list={MAKER_LIST_ID} autoComplete="off" />
+        <MakerOptions lang={lang} />
       </div>
       <div>
         <label className={label}>{t("form_model")}{req}</label>

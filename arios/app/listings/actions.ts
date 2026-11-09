@@ -13,6 +13,7 @@ import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 import { notifyNewListing } from "@/lib/notify";
 import { normalizeVin, isValidVin } from "./vin";
+import { carKey } from "@/lib/carname";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 20;
@@ -36,9 +37,12 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
   // レート制限（共有ストア=Supabase）。ログインユーザーID＋IP の両方で制限。
   const h = await headers();
   const ip = clientIp(h);
-  const rlUser = await rateLimitDb(`listing:user:${user.id}`, 12, 60_000);
-  const rlIp = await rateLimitDb(`listing:ip:${ip}`, 20, 60_000);
-  const rlDay = await rateLimitDb(`listing:day:user:${user.id}`, 60, 24 * 60 * 60_000);
+  // 3つは独立しているので同時に問い合わせる（待ち時間を短くする）。
+  const [rlUser, rlIp, rlDay] = await Promise.all([
+    rateLimitDb(`listing:user:${user.id}`, 12, 60_000),
+    rateLimitDb(`listing:ip:${ip}`, 20, 60_000),
+    rateLimitDb(`listing:day:user:${user.id}`, 60, 24 * 60 * 60_000),
+  ]);
   if (!rlUser.ok || !rlIp.ok || !rlDay.ok) {
     return { error: t("signup_err_rate") };
   }
@@ -126,14 +130,13 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
     }
     id = data.id as string;
 
-    const paths: string[] = [];
-    for (let i = 0; i < photos.length; i++) {
-      const file = photos[i];
+    // 写真は4枚ずつ同時にアップロードする（1枚ずつ順番だと枚数分だけ待たされる）。並び順は保つ。
+    const uploadOne = async (file: File, i: number): Promise<string | null> => {
       // 実バイトで画像かどうか検証（拡張子/申告MIMEは信用しない）。非画像・過大はスキップ。
       const v = await validateImageFile(file);
       if (!v.ok) {
         console.warn("[listing] rejected upload:", v.reason);
-        continue;
+        return null;
       }
       const path = `inquiries/${id}/${String(i).padStart(2, "0")}-${Date.now()}.${v.ext}`;
       const { error: upErr } = await supabase.storage
@@ -141,10 +144,16 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         .upload(path, file, { contentType: v.contentType });
       if (upErr) {
         console.error("[listing] upload failed:", upErr);
-        continue;
+        return null;
       }
-      paths.push(path);
+      return path;
+    };
+    const results: (string | null)[] = [];
+    for (let i = 0; i < photos.length; i += 4) {
+      const chunk = photos.slice(i, i + 4);
+      results.push(...(await Promise.all(chunk.map((f, j) => uploadOne(f, i + j)))));
     }
+    const paths = results.filter((p): p is string => !!p);
     if (paths.length > 0) {
       const { error: updErr } = await supabase
         .from("inquiries")
@@ -212,14 +221,15 @@ export async function reorderSeller(formData: FormData): Promise<void> {
     .maybeSingle();
   if (!cur) redirect("/admin/matching");
 
-  const { data: sellers } = await supabase
+  // 同じ車（表記ゆれを含めて同じメーカー×車種）の売り手。
+  const { data: allSellers } = await supabase
     .from("inquiries")
-    .select("id, price, priority")
-    .eq("kind", "SELL")
-    .eq("manufacturer", cur.manufacturer)
-    .eq("model", cur.model);
+    .select("id, manufacturer, model, price, priority")
+    .eq("kind", "SELL");
+  const target = carKey(cur.manufacturer, cur.model);
+  const sellers = (allSellers ?? []).filter((s) => carKey(s.manufacturer, s.model) === target);
 
-  const ordered = (sellers ?? []).slice().sort(sellerOrder);
+  const ordered = sellers.slice().sort(sellerOrder);
   const idx = ordered.findIndex((s) => s.id === id);
   const swap = dir === "up" ? idx - 1 : idx + 1;
   if (idx >= 0 && swap >= 0 && swap < ordered.length) {

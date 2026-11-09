@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE } from "@/app/admin/inquiries/constants";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
+import { carKey } from "@/lib/carname";
 
 // Top（公開）。未ログイン=会員登録/ログイン。ログイン後=マッチ通知＋売りたい/買いたい/マイページ。
 // 打ち出しは「一台ごとの歴史を、未来へ繋ぐ」（鈴木さん A案 2026-11-07）。売買はその中で生まれるもの。
@@ -27,8 +28,8 @@ function Hero({ t, compact = false }: { t: (k: string) => string; compact?: bool
   );
 }
 
-const key = (mk: string | null, md: string | null) =>
-  (mk ?? "").trim().toLowerCase() + "||" + (md ?? "").trim().toLowerCase();
+// メーカー×車種のマッチ判定キー（日英の表記ゆれ・空白の違いをそろえる）。
+const key = carKey;
 
 export default async function Home() {
   const lang = await getLang();
@@ -122,6 +123,19 @@ export default async function Home() {
       lead: t("top_buy_lead"),
       body: t("top_buy_body"),
       accent: "border-sky-400/40 bg-sky-400/[0.06] hover:border-sky-400",
+    },
+    {
+      href: "/cars",
+      icon: (
+        <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M10 14h28M10 24h28M10 34h18" />
+        </svg>
+      ),
+      color: "text-muted",
+      title: t("top_cars_title"),
+      lead: t("top_cars_lead"),
+      body: t("top_cars_body"),
+      accent: "border-border bg-card hover:border-primary",
     },
     {
       href: "/mypage",

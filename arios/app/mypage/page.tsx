@@ -9,6 +9,7 @@ import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 import LangToggle from "../LangToggle";
 import { pageTitle } from "@/lib/meta";
+import { carKey } from "@/lib/carname";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -30,8 +31,8 @@ type Row = {
 
 const yen = (n: number | null, noPrice: string) =>
   n == null ? noPrice : "¥" + Number(n).toLocaleString("ja-JP");
-const key = (mk: string | null, md: string | null) =>
-  (mk ?? "").trim().toLowerCase() + "||" + (md ?? "").trim().toLowerCase();
+// メーカー×車種のマッチ判定キー（日英の表記ゆれ・空白の違いをそろえる）。
+const key = carKey;
 
 export default async function MyPage({
   searchParams,

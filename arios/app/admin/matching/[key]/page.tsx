@@ -7,6 +7,7 @@ import { sellerOrder } from "@/app/listings/order";
 import { PARTY_LABEL, STATUS_ACTIVE } from "../../inquiries/constants";
 import { parseMatchKey } from "../key";
 import { gradePairFull, GRADE_LABEL, GRADE_STYLE, GRADE_RANK } from "../score";
+import { carKey } from "@/lib/carname";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング詳細 — LIFE LINE GARAGE" };
@@ -47,13 +48,9 @@ export default async function MatchingDetailPage({
     .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
 
-  const mk = maker.toLowerCase();
-  const md = model.toLowerCase();
-  const rows = ((data ?? []) as Row[]).filter(
-    (r) =>
-      (r.manufacturer ?? "").trim().toLowerCase() === mk &&
-      (r.model ?? "").trim().toLowerCase() === md
-  );
+  // 日英の表記ゆれ（フェラーリ/Ferrari）や空白の違いは同じ車として扱う。
+  const target = carKey(maker, model);
+  const rows = ((data ?? []) as Row[]).filter((r) => carKey(r.manufacturer, r.model) === target);
 
   const buyers = rows.filter((r) => r.kind === "BUY");
   const sellers = rows.filter((r) => r.kind !== "BUY").sort(sellerOrder);

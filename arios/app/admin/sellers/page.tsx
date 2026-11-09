@@ -8,6 +8,7 @@ import {
   REGISTERED_BY_STYLE,
 } from "../inquiries/constants";
 import RowLink from "../RowLink";
+import { carKey } from "@/lib/carname";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "売りたい人 — LIFE LINE GARAGE" };
@@ -45,8 +46,8 @@ export default async function SellersPage() {
 
   // 同じ車（メーカー×車種）が隣り合うよう並べ、その中は安い順（優先順位）に。
   const sorted = rows.slice().sort((a, b) => {
-    const ka = `${(a.manufacturer ?? "").toLowerCase()}|${(a.model ?? "").toLowerCase()}`;
-    const kb = `${(b.manufacturer ?? "").toLowerCase()}|${(b.model ?? "").toLowerCase()}`;
+    const ka = carKey(a.manufacturer, a.model);
+    const kb = carKey(b.manufacturer, b.model);
     if (ka !== kb) return ka < kb ? -1 : 1;
     return sellerOrder(a, b);
   });
@@ -54,7 +55,7 @@ export default async function SellersPage() {
   const carCount = new Set(
     rows
       .filter((r) => (r.manufacturer ?? "").trim() || (r.model ?? "").trim())
-      .map((r) => `${(r.manufacturer ?? "").toLowerCase()}|${(r.model ?? "").toLowerCase()}`)
+      .map((r) => carKey(r.manufacturer, r.model))
   ).size;
 
   const th = "whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-muted";

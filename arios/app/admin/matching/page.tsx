@@ -4,6 +4,7 @@ import { STATUS_ACTIVE } from "../inquiries/constants";
 import RowLink from "../RowLink";
 import { matchKey } from "./key";
 import { bestGradeFull, GRADE_LABEL, GRADE_STYLE } from "./score";
+import { carKey, canonicalMaker } from "@/lib/carname";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング — LIFE LINE GARAGE" };
@@ -33,10 +34,11 @@ export default async function MatchingPage() {
     { maker: string; model: string; buyers: Row[]; sellers: Row[] }
   >();
   for (const r of rows) {
-    const maker = (r.manufacturer ?? "").trim();
+    const maker = canonicalMaker(r.manufacturer);
     const model = (r.model ?? "").trim();
     if (!maker && !model) continue;
-    const key = maker.toLowerCase() + "||" + model.toLowerCase();
+    // 日英の表記ゆれ（フェラーリ/Ferrari）や空白の違いは同じ車としてまとめる。
+    const key = carKey(r.manufacturer, r.model);
     if (!groups.has(key)) groups.set(key, { maker, model, buyers: [], sellers: [] });
     const g = groups.get(key)!;
     if (r.kind === "BUY") g.buyers.push(r);

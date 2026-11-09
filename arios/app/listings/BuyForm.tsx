@@ -3,6 +3,7 @@
 import { useActionState, useState, startTransition } from "react";
 import { submitBuy, type ListingState } from "./actions";
 import { tr, type Lang } from "@/lib/i18n";
+import MakerOptions, { MAKER_LIST_ID } from "@/app/listings/MakerOptions";
 
 export default function BuyForm({
   lang = "ja",
@@ -11,6 +12,8 @@ export default function BuyForm({
   defaultCompany,
   defaultContact,
   defaultContactMethod,
+  defaultMaker,
+  defaultModel,
 }: {
   lang?: Lang;
   defaultEmail?: string;
@@ -18,6 +21,8 @@ export default function BuyForm({
   defaultCompany?: string;
   defaultContact?: string;
   defaultContactMethod?: string;
+  defaultMaker?: string;
+  defaultModel?: string;
 }) {
   const t = tr(lang);
   const en = lang === "en";
@@ -47,8 +52,8 @@ export default function BuyForm({
   const loggedIn = !!defaultEmail;
 
   const [channel, setChannel] = useState("LINE");
-  const [manufacturer, setManufacturer] = useState("");
-  const [model, setModel] = useState("");
+  const [manufacturer, setManufacturer] = useState(defaultMaker ?? "");
+  const [model, setModel] = useState(defaultModel ?? "");
   const [price, setPrice] = useState("");
   const [accidentNG, setAccidentNG] = useState(false);
   const [color, setColor] = useState("");
@@ -133,7 +138,8 @@ export default function BuyForm({
       </div>
       <div>
         <label className={label}>{t("form_maker")}{req}</label>
-        <input className={field} value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t("form_maker_ph")} />
+        <input className={field} value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder={t("form_maker_ph")} list={MAKER_LIST_ID} autoComplete="off" />
+        <MakerOptions lang={lang} />
       </div>
       <div>
         <label className={label}>{t("form_model")}{req}</label>

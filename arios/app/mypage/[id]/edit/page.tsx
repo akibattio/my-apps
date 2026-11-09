@@ -9,6 +9,7 @@ import DeleteListing from "./DeleteListing";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 import { pageTitle } from "@/lib/meta";
+import MakerOptions, { MAKER_LIST_ID } from "@/app/listings/MakerOptions";
 
 const BUCKET = "inquiry-photos";
 
@@ -113,7 +114,8 @@ export default async function EditMyListing({
         )}
         <div>
           <label className={label}>{t("form_maker")}<span className="text-red-400"> {t("required")}</span></label>
-          <input className={field} name="manufacturer" defaultValue={r.manufacturer ?? ""} placeholder={t("form_maker_ph")} />
+          <input className={field} name="manufacturer" defaultValue={r.manufacturer ?? ""} placeholder={t("form_maker_ph")} list={MAKER_LIST_ID} autoComplete="off" />
+          <MakerOptions lang={lang} />
         </div>
         <div>
           <label className={label}>{t("form_model")}<span className="text-red-400"> {t("required")}</span></label>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE } from "./inquiries/constants";
+import { carKey } from "@/lib/carname";
 
 export const dynamic = "force-dynamic";
 
@@ -43,10 +44,8 @@ async function countPotentialMatches(
     if (error) return null;
     const groups = new Map<string, { buy: boolean; sell: boolean }>();
     for (const r of data ?? []) {
-      const maker = (r.manufacturer ?? "").trim().toLowerCase();
-      const model = (r.model ?? "").trim().toLowerCase();
-      if (!maker && !model) continue;
-      const key = maker + "||" + model;
+      if (!(r.manufacturer ?? "").trim() && !(r.model ?? "").trim()) continue;
+      const key = carKey(r.manufacturer, r.model);
       const g = groups.get(key) ?? { buy: false, sell: false };
       if (r.kind === "BUY") g.buy = true;
       else g.sell = true;
