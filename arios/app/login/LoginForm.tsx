@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/nav";
 import { tr, type Lang } from "@/lib/i18n";
+import { useCaptcha, isCaptchaError } from "@/app/Turnstile";
 
 // メール＋パスワードでログイン。
 export default function LoginForm({ lang = "ja" }: { lang?: Lang }) {
@@ -24,16 +25,30 @@ export default function LoginForm({ lang = "ja" }: { lang?: Lang }) {
   const [unconfirmed, setUnconfirmed] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const captcha = useCaptcha();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setResendMsg(null);
     setUnconfirmed(false);
+    if (captcha.missing) {
+      setError(t("signup_captcha_required"));
+      return;
+    }
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken: captcha.token || undefined },
+    });
     if (error) {
       setBusy(false);
+      captcha.reset();
+      if (isCaptchaError(error)) {
+        setError(t("signup_err_captcha"));
+        return;
+      }
       const code = (error as { code?: string }).code ?? "";
       const msg = (error.message ?? "").toLowerCase();
       if (code === "email_not_confirmed" || msg.includes("not confirmed") || msg.includes("confirm")) {
@@ -50,12 +65,20 @@ export default function LoginForm({ lang = "ja" }: { lang?: Lang }) {
 
   async function onResend() {
     setResendMsg(null);
+    if (captcha.missing) {
+      setResendMsg(t("signup_captcha_required"));
+      return;
+    }
     setResending(true);
     await supabase.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/mypage` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/mypage`,
+        captchaToken: captcha.token || undefined,
+      },
     });
+    captcha.reset();
     setResending(false);
     setResendMsg(t("vfy_resent"));
   }
@@ -92,6 +115,7 @@ export default function LoginForm({ lang = "ja" }: { lang?: Lang }) {
           {showPw ? t("login_hide") : t("login_show")}
         </button>
       </div>
+      {captcha.widget}
       <button
         type="submit"
         disabled={busy}

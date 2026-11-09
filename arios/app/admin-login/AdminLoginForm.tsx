@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useCaptcha, isCaptchaError } from "@/app/Turnstile";
 
 // 管理者（ARIOS）専用ログイン。一般ユーザーの /login とは分離。
 export default function AdminLoginForm() {
@@ -13,15 +14,29 @@ export default function AdminLoginForm() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const captcha = useCaptcha();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (captcha.missing) {
+      setError("ロボットでないことの確認を完了してください。");
+      return;
+    }
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken: captcha.token || undefined },
+    });
     if (error) {
       setBusy(false);
-      setError("メールアドレスまたはパスワードが違います。");
+      captcha.reset();
+      setError(
+        isCaptchaError(error)
+          ? "ロボットでないことの確認に失敗しました。もう一度お試しください。"
+          : "メールアドレスまたはパスワードが違います。"
+      );
       return;
     }
     router.push("/admin");
@@ -60,6 +75,7 @@ export default function AdminLoginForm() {
           {showPw ? "隠す" : "表示"}
         </button>
       </div>
+      {captcha.widget}
       <button
         type="submit"
         disabled={busy}

@@ -7,10 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/nav";
 import { tr, type Lang } from "@/lib/i18n";
 import { signUpCustomer } from "./actions";
-import Turnstile from "../Turnstile";
-
-// CAPTCHA サイトキー（設定時のみウィジェットを表示）。ビルド時に焼き込まれる。
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+import { useCaptcha } from "../Turnstile";
 
 // メール＋パスワードで新規登録。
 export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
@@ -29,7 +26,8 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState("");
+  // CAPTCHA（サイトキー設定時のみ表示）。トークンは1回限りなので、使ったら作り直す。
+  const captcha = useCaptcha();
   // 確認メール送信後の画面
   const [sent, setSent] = useState(false);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
@@ -50,7 +48,7 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
       setError(t("signup_err_pw"));
       return;
     }
-    if (TURNSTILE_SITE_KEY && !captchaToken) {
+    if (captcha.missing) {
       setError(t("signup_captcha_required"));
       return;
     }
@@ -60,8 +58,9 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
       email,
       password,
       { name, company, contact, contactMethod },
-      captchaToken || undefined
+      captcha.token || undefined
     );
+    captcha.reset();
     if (res.error === "captcha") {
       setBusy(false);
       setError(t("signup_err_captcha"));
@@ -90,12 +89,20 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
 
   async function onResend() {
     setResendMsg(null);
+    if (captcha.missing) {
+      setResendMsg(t("signup_captcha_required"));
+      return;
+    }
     setResending(true);
     await supabase.auth.resend({
       type: "signup",
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/mypage` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/mypage`,
+        captchaToken: captcha.token || undefined,
+      },
     });
+    captcha.reset();
     setResending(false);
     setResendMsg(t("vfy_resent"));
   }
@@ -116,6 +123,7 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
           <span className="text-foreground">{email}</span> {t("vfy_sent_body")}
         </p>
         <p className="text-xs text-muted">{t("vfy_sent_note")}</p>
+        {captcha.widget}
         <button
           type="button"
           onClick={onResend}
@@ -201,9 +209,7 @@ export default function SignupForm({ lang = "ja" }: { lang?: Lang }) {
           </button>
         </div>
       </div>
-      {TURNSTILE_SITE_KEY && (
-        <Turnstile siteKey={TURNSTILE_SITE_KEY} onToken={setCaptchaToken} />
-      )}
+      {captcha.widget}
       <button
         type="submit"
         disabled={busy}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { tr, type Lang } from "@/lib/i18n";
+import { useCaptcha } from "@/app/Turnstile";
 
 // パスワード再設定メールの送信。送信結果は（メールアドレスの存在を漏らさないため）
 // 常に「送信しました」と表示する。
@@ -12,14 +13,23 @@ export default function ForgotForm({ lang = "ja" }: { lang?: Lang }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const captcha = useCaptcha();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    if (captcha.missing) {
+      setError(t("signup_captcha_required"));
+      return;
+    }
     setBusy(true);
     // 再設定リンクの戻り先。/auth/callback がセッションを確立して新パスワード設定画面へ。
     await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/auth/callback?next=/account/password`,
+      captchaToken: captcha.token || undefined,
     });
+    captcha.reset();
     setBusy(false);
     setSent(true);
   }
@@ -47,6 +57,7 @@ export default function ForgotForm({ lang = "ja" }: { lang?: Lang }) {
         autoComplete="email"
         className={field}
       />
+      {captcha.widget}
       <button
         type="submit"
         disabled={busy}
@@ -54,6 +65,7 @@ export default function ForgotForm({ lang = "ja" }: { lang?: Lang }) {
       >
         {busy ? t("fp_sending") : t("fp_send")}
       </button>
+      {error && <p className="text-sm text-red-400">{error}</p>}
     </form>
   );
 }
