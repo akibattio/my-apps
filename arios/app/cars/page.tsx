@@ -9,6 +9,7 @@ import { carKey, canonicalMaker } from "@/lib/carname";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 import { pageTitle } from "@/lib/meta";
+import { throwIfDbError } from "@/lib/db";
 
 // 会員限定: いま登録されている車を「車名だけ」で見せる（鈴木さん依頼 2026-11-07）。
 // 写真・車体番号・所在地・価格・登録者は出さない。他にも車を持っている会員が
@@ -93,10 +94,11 @@ export default async function CarsPage() {
 
   // 車名（メーカー・車種）だけを取得する。ほかの列は読まない。
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("inquiries")
     .select("kind, manufacturer, model")
     .in("status", STATUS_ACTIVE);
+  throwIfDbError(error, "cars");
   const rows = data ?? [];
   const wanted = group(rows.filter((r) => r.kind === "BUY"));
   const forSale = group(rows.filter((r) => r.kind === "SELL"));

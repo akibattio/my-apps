@@ -5,6 +5,7 @@ import RowLink from "../RowLink";
 import { matchKey } from "./key";
 import { bestGradeFull, GRADE_LABEL, GRADE_STYLE } from "./score";
 import { carKey, canonicalMaker } from "@/lib/carname";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング — LIFE LINE GARAGE" };
@@ -22,11 +23,12 @@ const yen = (n: number | null) => (n == null ? "—" : "¥" + Number(n).toLocale
 
 export default async function MatchingPage() {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("inquiries")
     .select("id, kind, manufacturer, model, price, message")
     .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "admin/matching");
   const rows = (data ?? []) as Row[];
 
   const groups = new Map<

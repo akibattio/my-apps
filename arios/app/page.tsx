@@ -7,6 +7,7 @@ import { STATUS_ACTIVE } from "@/app/admin/inquiries/constants";
 import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 import { carKey } from "@/lib/carname";
+import { throwIfDbError } from "@/lib/db";
 
 // Top（公開）。未ログイン=会員登録/ログイン。ログイン後=マッチ通知＋売りたい/買いたい/マイページ。
 // 打ち出しは「一台ごとの歴史を、未来へ繋ぐ」（鈴木さん A案 2026-11-07）。売買はその中で生まれるもの。
@@ -83,7 +84,7 @@ export default async function Home() {
   // ログイン後: マッチ状況を計算
   const email = (user.email ?? "").toLowerCase();
   const supabase = createAdminClient();
-  const [{ data: mineData }, { data: activeData }] = await Promise.all([
+  const [{ data: mineData, error: mineError }, { data: activeData, error: activeError }] = await Promise.all([
     supabase
       .from("inquiries")
       .select("id, kind, manufacturer, model, status")
@@ -91,6 +92,7 @@ export default async function Home() {
       .in("status", STATUS_ACTIVE),
     supabase.from("inquiries").select("kind, manufacturer, model").in("status", STATUS_ACTIVE),
   ]);
+  throwIfDbError(mineError ?? activeError, "top");
   void email;
   const present = new Set<string>();
   for (const r of activeData ?? []) present.add(`${r.kind}:${key(r.manufacturer, r.model)}`);

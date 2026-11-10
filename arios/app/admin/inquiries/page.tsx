@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_LABEL, KIND_LABEL, STATUS_ACTIVE } from "./constants";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +15,11 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default async function InquiriesPage() {
   const supabase = createAdminClient();
-  const { data: inquiries } = await supabase
+  const { data: inquiries, error } = await supabase
     .from("inquiries")
     .select("id, kind, manufacturer, model, price, name, contact, message, status, created_at")
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "admin/inquiries");
 
   const list = inquiries ?? [];
   const openCount = list.filter((i) => STATUS_ACTIVE.includes(i.status)).length;

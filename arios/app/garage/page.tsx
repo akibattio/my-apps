@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ensureOwner, isAdminEmail } from "@/lib/auth";
 import { pageTitle } from "@/lib/meta";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -15,10 +16,11 @@ export default async function GaragePage() {
 
   // RLS により、自分が所有する車だけが返る
   const supabase = await createClient();
-  const { data: vehicles } = await supabase
+  const { data: vehicles, error } = await supabase
     .from("vehicles")
     .select("id, manufacturer, model, year")
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "garage");
 
   const list = vehicles ?? [];
   const ids = list.map((v) => v.id);

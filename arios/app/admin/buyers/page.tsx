@@ -8,6 +8,7 @@ import {
   REGISTERED_BY_STYLE,
 } from "../inquiries/constants";
 import RowLink from "../RowLink";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "買いたい人 — LIFE LINE GARAGE" };
@@ -41,7 +42,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default async function BuyersPage() {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("inquiries")
     .select(
       "id, manufacturer, model, price, name, company, registered_by, contact, contact_method, channel, message, status, next_action_date, created_at"
@@ -49,6 +50,7 @@ export default async function BuyersPage() {
     .eq("kind", "BUY")
     .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "admin/buyers");
   const list = (data ?? []) as Row[];
 
   const th = "whitespace-nowrap px-3 py-2 text-left text-xs font-medium text-muted";

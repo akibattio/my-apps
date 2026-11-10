@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import RowLink from "../RowLink";
 import { DEAL_STATUS_LABEL, DEAL_STATUS_STYLE } from "./constants";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "取引 — LIFE LINE GARAGE" };
@@ -22,10 +23,11 @@ const md = (d: string | null) =>
 
 export default async function DealsPage() {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("deals")
     .select("id, manufacturer, model, status, agreed_price, contract_date, updated_at")
     .order("updated_at", { ascending: false });
+  throwIfDbError(error, "admin/deals");
   const rows = (data ?? []) as Row[];
 
   const inProgress = rows.filter((r) => r.status === "IN_PROGRESS").length;

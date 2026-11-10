@@ -1,13 +1,15 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOwners() {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("owners")
     .select("id, name, email, owner_type, created_at")
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "admin/owners");
 
   const rows = data ?? [];
 

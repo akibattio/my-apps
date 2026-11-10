@@ -16,6 +16,7 @@ import {
   REGISTERED_BY_LABEL,
   REGISTERED_BY_STYLE,
 } from "../constants";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "依頼の詳細 — LIFE LINE GARAGE" };
@@ -30,13 +31,14 @@ export default async function InquiryDetailPage({
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const { data: inq } = await supabase
+  const { data: inq, error } = await supabase
     .from("inquiries")
     .select(
       "id, kind, manufacturer, model, price, vin, party_type, owner_consent, owner_name, submit_lang, name, company, contact, contact_method, email, registered_by, vehicle_text, message, photo_urls, status, source, vehicle_id, next_action_date, last_contact_at, note, created_at, updated_at"
     )
     .eq("id", id)
     .maybeSingle();
+  throwIfDbError(error, "admin/inquiries/[id]");
 
   if (!inq) notFound();
 

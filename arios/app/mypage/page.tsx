@@ -10,6 +10,7 @@ import { tr } from "@/lib/i18n";
 import LangToggle from "../LangToggle";
 import { pageTitle } from "@/lib/meta";
 import { carKey } from "@/lib/carname";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -52,7 +53,7 @@ export default async function MyPage({
   };
 
   const supabase = createAdminClient();
-  const [{ data: mineData }, { data: activeData }] = await Promise.all([
+  const [{ data: mineData, error: mineError }, { data: activeData, error: activeError }] = await Promise.all([
     supabase
       .from("inquiries")
       .select("id, kind, manufacturer, model, price, status, message, contact, name, created_at")
@@ -60,6 +61,7 @@ export default async function MyPage({
       .order("created_at", { ascending: false }),
     supabase.from("inquiries").select("kind, manufacturer, model").in("status", STATUS_ACTIVE),
   ]);
+  throwIfDbError(mineError ?? activeError, "mypage");
   const mine = (mineData ?? []) as Row[];
 
   const dealByInquiry = new Map<string, string>();

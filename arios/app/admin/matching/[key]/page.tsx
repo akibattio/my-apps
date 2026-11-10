@@ -8,6 +8,7 @@ import { PARTY_LABEL, STATUS_ACTIVE } from "../../inquiries/constants";
 import { parseMatchKey } from "../key";
 import { gradePairFull, GRADE_LABEL, GRADE_STYLE, GRADE_RANK } from "../score";
 import { carKey } from "@/lib/carname";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "マッチング詳細 — LIFE LINE GARAGE" };
@@ -40,13 +41,14 @@ export default async function MatchingDetailPage({
   if (!maker && !model) notFound();
 
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("inquiries")
     .select(
       "id, kind, manufacturer, model, price, priority, party_type, name, contact, contact_method, message, vin"
     )
     .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "admin/matching/[key]");
 
   // 日英の表記ゆれ（フェラーリ/Ferrari）や空白の違いは同じ車として扱う。
   const target = carKey(maker, model);

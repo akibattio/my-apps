@@ -8,6 +8,7 @@ import {
 } from "../constants";
 import { KIND_LABEL } from "../../inquiries/constants";
 import { saveDealContract, setDealStatus, addDealEvent } from "../actions";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "取引の詳細 — LIFE LINE GARAGE" };
@@ -53,13 +54,14 @@ export default async function DealDetailPage({
   const { id } = await params;
   const supabase = createAdminClient();
 
-  const { data: deal } = await supabase
+  const { data: deal, error } = await supabase
     .from("deals")
     .select(
       "id, buyer_inquiry_id, seller_inquiry_id, manufacturer, model, status, agreed_price, contract_date, note, created_at"
     )
     .eq("id", id)
     .maybeSingle();
+  throwIfDbError(error, "admin/deals/[id]");
   if (!deal) notFound();
   const d = deal as Deal;
 
@@ -79,11 +81,12 @@ export default async function DealDetailPage({
   const buyer = parties.find((p) => p.id === d.buyer_inquiry_id);
   const seller = parties.find((p) => p.id === d.seller_inquiry_id);
 
-  const { data: evData } = await supabase
+  const { data: evData, error: evError } = await supabase
     .from("deal_events")
     .select("id, body, created_at")
     .eq("deal_id", id)
     .order("created_at", { ascending: false });
+  throwIfDbError(evError, "admin/deals/[id] events");
   const events = (evData ?? []) as Event[];
 
   const label = "text-xs text-muted";

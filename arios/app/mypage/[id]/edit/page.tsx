@@ -10,6 +10,7 @@ import { getLang } from "@/lib/lang";
 import { tr } from "@/lib/i18n";
 import { pageTitle } from "@/lib/meta";
 import MakerOptions, { MAKER_LIST_ID } from "@/app/listings/MakerOptions";
+import { throwIfDbError } from "@/lib/db";
 
 const BUCKET = "inquiry-photos";
 
@@ -61,13 +62,14 @@ export default async function EditMyListing({
   const t = tr(lang);
 
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("inquiries")
     .select(
       "id, kind, manufacturer, model, price, message, contact, name, party_type, vin, owner_consent, owner_name, auth_user_id, photo_urls"
     )
     .eq("id", id)
     .maybeSingle();
+  throwIfDbError(error, "mypage/[id]/edit");
   if (!data) notFound();
   const r = data as Row;
   // 本人以外（認証ユーザーID不一致）は自分のマイページへ戻す。

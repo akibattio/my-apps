@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,11 @@ function ownerName(owner: Row["owner"]): string {
 
 export default async function AdminVehicles() {
   const admin = createAdminClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("vehicles")
     .select("id, manufacturer, model, year, status, created_at, owner:current_owner_id(name)")
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "admin/vehicles");
 
   const rows = (data ?? []) as Row[];
 

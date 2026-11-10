@@ -9,6 +9,7 @@ import {
 } from "../inquiries/constants";
 import RowLink from "../RowLink";
 import { carKey } from "@/lib/carname";
+import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "売りたい人 — LIFE LINE GARAGE" };
@@ -34,7 +35,7 @@ const methodLabel = (m: string | null) => (m === "LINE" ? "LINE" : m === "PHONE"
 
 export default async function SellersPage() {
   const supabase = createAdminClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("inquiries")
     .select(
       "id, manufacturer, model, price, priority, party_type, name, company, registered_by, contact, contact_method, vin, created_at"
@@ -42,6 +43,7 @@ export default async function SellersPage() {
     .eq("kind", "SELL")
     .in("status", STATUS_ACTIVE)
     .order("created_at", { ascending: false });
+  throwIfDbError(error, "admin/sellers");
   const rows = (data ?? []) as Row[];
 
   // 同じ車（メーカー×車種）が隣り合うよう並べ、その中は安い順（優先順位）に。
