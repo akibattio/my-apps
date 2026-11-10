@@ -13,9 +13,15 @@ export async function generateMetadata() {
   return pageTitle("パスワードの再設定", "Reset password");
 }
 
-export default async function ForgotPage() {
+export default async function ForgotPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ expired?: string }>;
+}) {
+  // ログイン中ならメールを経由せず、そのまま変更画面へ。
   const user = await getCurrentUser();
-  if (user) redirect("/mypage");
+  if (user) redirect("/account/password");
+  const { expired } = await searchParams;
   const lang = await getLang();
   const t = tr(lang);
 
@@ -29,6 +35,12 @@ export default async function ForgotPage() {
         <h1 className="mt-5 text-2xl font-semibold">{t("fp_title")}</h1>
         <p className="mt-2 text-sm text-muted">{t("fp_sub")}</p>
       </header>
+
+      {expired && (
+        <p className="mb-6 rounded-lg border border-amber-700/60 bg-amber-950/30 p-3 text-sm leading-relaxed text-amber-200">
+          {t("fp_expired")}
+        </p>
+      )}
 
       <ForgotForm lang={lang} />
 

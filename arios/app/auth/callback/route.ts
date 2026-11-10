@@ -24,5 +24,13 @@ export async function GET(request: Request) {
     if (!error) return NextResponse.redirect(new URL(next, origin));
   }
 
+  // パスワード再設定リンクが使えなかったとき（期限切れ・別のブラウザで開いた等）。
+  // /login に送るとログイン中の人はマイページへ飛ばされ「戻るだけ」に見えるため、
+  // ログイン中なら変更画面へ、そうでなければ再送画面へ案内する。
+  if (next === "/account/password") {
+    const { data } = await supabase.auth.getUser();
+    return NextResponse.redirect(new URL(data.user ? next : "/forgot?expired=1", origin));
+  }
+
   return NextResponse.redirect(new URL("/login?error=auth", origin));
 }
