@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
+import { setVehiclePublic } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function GarageVehiclePage({
   const supabase = await createClient();
   const { data: vehicle } = await supabase
     .from("vehicles")
-    .select("id, manufacturer, model, year")
+    .select("id, manufacturer, model, year, is_public")
     .eq("id", id)
     .maybeSingle();
 
@@ -115,11 +116,28 @@ export default async function GarageVehiclePage({
         {documentCount ? `（現在 ${documentCount} 件）` : "（車検証・整備記録など）"}
       </Link>
 
-      <p className="mt-6 text-center text-xs text-muted">
-        <Link href={`/passport/${id}`} className="text-accent">
-          公開ページ（パスポート）を見る
-        </Link>
-      </p>
+      <section className="mt-8 rounded-2xl border border-border bg-card p-5 text-sm">
+        <p className="font-medium">公開ページ（パスポート）</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          {vehicle.is_public
+            ? "公開中です。リンクを知っている人は、この車の公開の記録と写真を見られます。車体番号・持ち主・非公開の記録は出ません。"
+            : "非公開です。記録はあなたと運営だけが見られます。"}
+        </p>
+        <div className="mt-3 flex items-center gap-4">
+          <form action={setVehiclePublic}>
+            <input type="hidden" name="vehicleId" value={id} />
+            <input type="hidden" name="public" value={vehicle.is_public ? "0" : "1"} />
+            <button className="rounded-full border border-border px-4 py-2 text-xs hover:border-accent hover:text-accent">
+              {vehicle.is_public ? "非公開にする" : "公開する"}
+            </button>
+          </form>
+          {vehicle.is_public && (
+            <Link href={`/passport/${id}`} className="text-xs text-accent">
+              公開ページを見る
+            </Link>
+          )}
+        </div>
+      </section>
     </main>
   );
 }

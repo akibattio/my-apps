@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { validateImageFile } from "@/lib/upload";
 import { normalizeVin, isValidVin } from "@/app/listings/vin";
+import { linkListingToVehicle } from "@/lib/vehicles";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 20;
@@ -109,7 +111,7 @@ export async function updateMyListing(formData: FormData): Promise<void> {
   // 本人確認: 認証ユーザーIDで判定（メール文字列では判定しない）
   const { data: row } = await supabase
     .from("inquiries")
-    .select("id, kind, auth_user_id")
+    .select("id, kind, auth_user_id, vin, party_type, vehicle_id")
     .eq("id", id)
     .maybeSingle();
   if (!row || row.auth_user_id !== user.id) redirect("/mypage");
@@ -161,6 +163,26 @@ export async function updateMyListing(formData: FormData): Promise<void> {
   if (error) {
     console.error("[mypage] update failed:", error);
     back("my_save_err");
+  }
+
+  // 車体番号か区分が変わったら、車の記録につなぎ直す（前の記録の経緯は運営用に残る）。
+  if (
+    row.kind === "SELL" &&
+    (!row.vehicle_id ||
+      normalizeVin(row.vin ?? "") !== sellFields.vin ||
+      row.party_type !== sellFields.party_type)
+  ) {
+    after(() =>
+      linkListingToVehicle({
+        id,
+        vin: sellFields.vin as string,
+        manufacturer,
+        model,
+        partyType: sellFields.party_type as string,
+        authUserId: user.id,
+        email: user.email ?? null,
+      })
+    );
   }
 
   redirect("/mypage");

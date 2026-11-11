@@ -25,10 +25,13 @@ const BUCKET = "inquiry-photos";
 
 export default async function InquiryDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ vehicle_err?: string }>;
 }) {
   const { id } = await params;
+  const { vehicle_err } = await searchParams;
   const supabase = createAdminClient();
 
   const { data: inq, error } = await supabase
@@ -300,23 +303,28 @@ export default async function InquiryDetailPage({
         <p className="mb-3 text-sm text-muted">車両との連携</p>
         {linkedVehicle ? (
           <Link
-            href={`/garage/${linkedVehicle.id}`}
+            href={`/admin/vehicles/${linkedVehicle.id}`}
             className="flex items-center justify-between rounded-xl border border-border p-3"
           >
-            <span className="text-sm">🚗 {linkedVehicle.name} の記録を見る</span>
+            <span className="text-sm">🚗 {linkedVehicle.name} の車の記録を見る</span>
             <span className="text-muted">›</span>
           </Link>
         ) : (
           <form action={linkInquiryToVehicle}>
+            {vehicle_err && (
+              <p className="mb-3 text-sm text-red-400">
+                つなげませんでした。車体番号が空か、正しい形式ではない可能性があります。
+              </p>
+            )}
             <input type="hidden" name="id" value={inq.id} />
             <button
               type="submit"
               className="w-full rounded-full bg-primary px-6 py-3 font-semibold text-black"
             >
-              この依頼を車両として登録する
+              車体番号で車の記録につなぐ
             </button>
             <p className="mt-2 text-xs text-muted">
-              依頼の写真・内容を引き継いで車両の記録を作成します（あとから編集・整備履歴の追加ができます）。
+              売りたい登録はふつう自動でつながります。つながっていないとき（古い登録など）に押してください。写真は公開されません。
             </p>
           </form>
         )}

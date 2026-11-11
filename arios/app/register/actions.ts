@@ -54,6 +54,7 @@ export async function registerVehicle(
         model: model || null,
         year,
         status: "REGISTERED",
+        source: "MEMBER",
         current_owner_id: owner?.ownerId ?? null,
       })
       .select("id")

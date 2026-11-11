@@ -9,6 +9,7 @@ const TABS = [
   { href: "/admin/sellers", label: "売りたい" },
   { href: "/admin/matching", label: "マッチング" },
   { href: "/admin/deals", label: "取引" },
+  { href: "/admin/vehicles", label: "車両" },
   { href: "/account", label: "マイページ" },
 ];
 

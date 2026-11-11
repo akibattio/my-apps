@@ -18,31 +18,40 @@ export async function ensureOwner(): Promise<
 > {
   const user = await getCurrentUser();
   if (!user) return null;
+  const ownerId = await ownerIdForUser(user.id, user.email ?? null);
+  if (!ownerId) return null;
+  return { userId: user.id, ownerId, email: user.email ?? null };
+}
 
+// ユーザーIDから Owner を引く（無ければ作る）。ログイン中の本人以外（売りたい登録の登録者など）にも使う。
+export async function ownerIdForUser(userId: string, email: string | null): Promise<string | null> {
   const admin = createAdminClient();
   const { data: existing } = await admin
     .from("owners")
     .select("id")
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", userId)
     .maybeSingle();
-
-  if (existing) {
-    return { userId: user.id, ownerId: existing.id as string, email: user.email ?? null };
-  }
+  if (existing) return existing.id as string;
 
   const { data: created, error } = await admin
     .from("owners")
     .insert({
-      auth_user_id: user.id,
-      name: user.email ?? "オーナー",
-      email: user.email ?? null,
+      auth_user_id: userId,
+      name: email ?? "オーナー",
+      email,
       owner_type: "PRIVATE_OWNER",
     })
     .select("id")
     .single();
+  if (!error && created) return created.id as string;
 
-  if (error || !created) return null;
-  return { userId: user.id, ownerId: created.id as string, email: user.email ?? null };
+  // 同時に作られた場合（一意制約）はもう一度引く
+  const { data: again } = await admin
+    .from("owners")
+    .select("id")
+    .eq("auth_user_id", userId)
+    .maybeSingle();
+  return (again?.id as string | undefined) ?? null;
 }
 
 // ---- 管理者判定 ----

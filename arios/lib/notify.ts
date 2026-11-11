@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE, PARTY_LABEL } from "@/app/admin/inquiries/constants";
 import type { Lang } from "@/lib/i18n";
 import { carKey } from "@/lib/carname";
+import type { VehicleLink } from "@/lib/vehicles";
 
 // 通知メール（Resend の送信API）。登録・マッチを運営が取りこぼさないためのもの。
 // RESEND_API_KEY が無い環境では何もしない（登録処理は止めない）。
@@ -58,6 +59,7 @@ export type NewListing = {
   message: string | null;
   photoCount: number;
   lang: Lang;
+  vehicle?: VehicleLink | null;
 };
 
 // 新規登録の後に呼ぶ: 運営への新着通知・マッチ通知、会員への受付メール。
@@ -100,6 +102,21 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
     "",
     `詳細: ${site}/admin/inquiries/${l.id}`,
   ];
+  if (l.vehicle) {
+    lines.push(
+      "",
+      l.vehicle.created
+        ? "車の記録: この車体番号で新しく作りました。"
+        : "車の記録: この車体番号の記録がすでにあり、そこにつなぎました。",
+      ...(l.vehicle.otherListings > 0
+        ? [`★ 同じ車体番号の売りたい登録がほかに${l.vehicle.otherListings}件あります（重複・仲介の重なりを確認してください）。`]
+        : []),
+      ...(l.vehicle.ownerConflict
+        ? ["⚠ この車体番号は別の会員の車として登録済みです。持ち主の確認待ちにしました（管理画面の車両で判断してください）。"]
+        : []),
+      `車の記録: ${site}/admin/vehicles/${l.vehicle.vehicleId}`
+    );
+  }
   if (matches.length > 0) {
     lines.push(
       "",
@@ -111,7 +128,7 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
   const admins = adminRecipients();
   await sendMail(
     admins,
-    `${matches.length > 0 ? "【マッチ】" : "【新着】"}${kindJa}: ${l.manufacturer} ${l.model}`,
+    `${matches.length > 0 ? "【マッチ】" : "【新着】"}${l.vehicle?.ownerConflict ? "【持ち主確認】" : ""}${kindJa}: ${l.manufacturer} ${l.model}`,
     lines.join("\n")
   );
 

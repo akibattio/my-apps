@@ -14,6 +14,7 @@ import { tr } from "@/lib/i18n";
 import { notifyNewListing } from "@/lib/notify";
 import { normalizeVin, isValidVin } from "./vin";
 import { carKey } from "@/lib/carname";
+import { linkListingToVehicle } from "@/lib/vehicles";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 20;
@@ -170,10 +171,23 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
     return { error: t("listing_err_failed") };
   }
 
-  // 通知メール（運営への新着・マッチ通知＋会員への受付）。画面の応答を待たせないよう送信は後回し。
+  // 車体番号で車の記録につなぎ、通知メール（運営への新着・マッチ通知＋会員への受付）を送る。
+  // 画面の応答を待たせないよう、どちらも応答の後に行う。
   const photoCount = photos.length;
-  after(() =>
-    notifyNewListing({
+  after(async () => {
+    const vehicle =
+      kind === "SELL"
+        ? await linkListingToVehicle({
+            id,
+            vin,
+            manufacturer,
+            model,
+            partyType,
+            authUserId: user.id,
+            email: user.email ?? email,
+          })
+        : null;
+    await notifyNewListing({
       id,
       kind,
       manufacturer,
@@ -190,8 +204,9 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
       message: message || null,
       photoCount,
       lang,
-    })
-  );
+      vehicle,
+    });
+  });
 
   redirect(`/submitted?kind=${kind}`);
 }

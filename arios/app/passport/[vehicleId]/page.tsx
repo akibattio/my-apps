@@ -6,7 +6,7 @@ import { computeTrust } from "@/lib/trust";
 export const dynamic = "force-dynamic";
 
 // Vehicle Passport（公開 Timeline）。この車の人生を時間軸で見せる。
-// Step 1 では読み取り専用でサーバー側に描画する。RLS対応の公開ポリシーは後で入れる。
+// 持ち主が「公開する」を選んだ車だけ表示する。出すのは公開の記録と、その記録の写真だけ。
 export default async function PassportPage({
   params,
 }: {
@@ -17,11 +17,11 @@ export default async function PassportPage({
 
   const { data: vehicle, error } = await supabase
     .from("vehicles")
-    .select("id, manufacturer, model, year, status, vin")
+    .select("id, manufacturer, model, year, status, vin, is_public")
     .eq("id", vehicleId)
     .maybeSingle();
 
-  if (error || !vehicle) notFound();
+  if (error || !vehicle || !vehicle.is_public) notFound();
 
   const [{ data: histories }, { data: images }, { count: documentCount }] =
     await Promise.all([
@@ -34,7 +34,7 @@ export default async function PassportPage({
         .order("created_at", { ascending: true }),
       supabase
         .from("images")
-        .select("id, image_url, created_at")
+        .select("id, image_url, history_id, created_at")
         .eq("vehicle_id", vehicleId)
         .order("created_at", { ascending: true }),
       supabase
@@ -46,8 +46,10 @@ export default async function PassportPage({
   const title =
     [vehicle.manufacturer, vehicle.model].filter(Boolean).join(" ") ||
     "名称未設定の車両";
-  const photos = images ?? [];
   const timeline = histories ?? [];
+  // 非公開の記録に付いた写真は出さない
+  const publicHistoryIds = new Set(timeline.map((h) => h.id));
+  const photos = (images ?? []).filter((img) => !img.history_id || publicHistoryIds.has(img.history_id));
 
   // 証拠ベースの信頼度を算出（写真・書類・VIN・履歴の充実）
   const trust = computeTrust({
@@ -149,7 +151,7 @@ export default async function PassportPage({
       <footer className="mt-12 text-center text-xs text-muted">
         <p>History is never deleted.</p>
         <Link href="/" className="mt-2 inline-block text-accent">
-          ARIOS トップ
+          LIFE LINE GARAGE
         </Link>
       </footer>
     </main>

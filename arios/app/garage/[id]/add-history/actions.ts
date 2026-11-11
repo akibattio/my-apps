@@ -68,7 +68,7 @@ export async function addHistory(
       description: memo || null,
       event_date: eventDate,
       source: "OWNER",
-      visibility: "PUBLIC",
+      visibility: "PRIVATE",
     })
     .select("id")
     .single();
