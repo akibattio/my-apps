@@ -127,6 +127,20 @@ export default async function Home() {
       accent: "border-sky-400/40 bg-sky-400/[0.06] hover:border-sky-400",
     },
     {
+      href: "/garage",
+      icon: (
+        <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M6 22 L24 9 L42 22 V40 H6 Z" />
+          <path d="M14 40 V28 H34 V40" />
+        </svg>
+      ),
+      color: "text-amber-300",
+      title: t("top_garage_title"),
+      lead: t("top_garage_lead"),
+      body: t("top_garage_body"),
+      accent: "border-amber-300/30 bg-amber-300/[0.04] hover:border-amber-300",
+    },
+    {
       href: "/cars",
       icon: (
         <svg viewBox="0 0 48 48" fill="none" className="h-9 w-9" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

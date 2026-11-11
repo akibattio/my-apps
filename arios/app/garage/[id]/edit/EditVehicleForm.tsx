@@ -2,14 +2,18 @@
 
 import { useActionState } from "react";
 import { updateVehicle, type EditVehicleState } from "./actions";
+import { tr, type Lang } from "@/lib/i18n";
 
 export default function EditVehicleForm({
   vehicleId,
   initial,
+  lang = "ja",
 }: {
+  lang?: Lang;
   vehicleId: string;
   initial: { manufacturer: string; model: string; year: string };
 }) {
+  const t = tr(lang);
   const [state, formAction, isPending] = useActionState<EditVehicleState, FormData>(
     updateVehicle,
     {}
@@ -22,14 +26,14 @@ export default function EditVehicleForm({
         name="manufacturer"
         type="text"
         defaultValue={initial.manufacturer}
-        placeholder="メーカー（例: トヨタ）"
+        placeholder={`${t("form_maker")}（${t("form_maker_ph")}）`}
         className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
       />
       <input
         name="model"
         type="text"
         defaultValue={initial.model}
-        placeholder="モデル（例: スープラ）"
+        placeholder={`${t("form_model")}（${t("form_model_ph")}）`}
         className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
       />
       <input
@@ -37,7 +41,7 @@ export default function EditVehicleForm({
         type="number"
         inputMode="numeric"
         defaultValue={initial.year}
-        placeholder="年式（例: 1994）"
+        placeholder={`${t("reg_year")}（${t("reg_year_ph")}）`}
         className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-3 text-foreground placeholder:text-neutral-500"
       />
 
@@ -48,10 +52,10 @@ export default function EditVehicleForm({
         disabled={isPending}
         className="w-full rounded-full bg-primary px-6 py-4 font-medium text-black disabled:opacity-60"
       >
-        {isPending ? "保存中…" : "変更を保存する"}
+        {isPending ? t("ev_saving") : t("ev_save")}
       </button>
       <p className="text-center text-xs text-muted">
-        変更内容は記録に残ります（ARIOSは履歴を消しません）。
+        {t("ev_note")}
       </p>
     </form>
   );

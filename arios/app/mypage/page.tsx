@@ -6,11 +6,12 @@ import { signOut } from "@/app/auth/actions";
 import { STATUS_ACTIVE } from "@/app/admin/inquiries/constants";
 import { DEAL_STATUS_STYLE } from "@/app/admin/deals/constants";
 import { getLang } from "@/lib/lang";
-import { tr } from "@/lib/i18n";
+import { tr, fill } from "@/lib/i18n";
 import LangToggle from "../LangToggle";
 import { pageTitle } from "@/lib/meta";
 import { carKey } from "@/lib/carname";
 import { throwIfDbError } from "@/lib/db";
+import { nextDueByVehicle, todayIso, carName } from "@/lib/garage";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -160,6 +161,31 @@ export default async function MyPage({
     </section>
   );
 
+  // マイガレージ: 持ち主になっている車の数と、いちばん近い整備予定
+  const garage: { count: number; due: { car: string; date: string } | null } = { count: 0, due: null };
+  const { data: ownerRow } = await supabase.from("owners").select("id").eq("auth_user_id", user.id).maybeSingle();
+  if (ownerRow) {
+    const { data: cars } = await supabase
+      .from("vehicles")
+      .select("id, manufacturer, model")
+      .eq("current_owner_id", ownerRow.id);
+    garage.count = (cars ?? []).length;
+    if (garage.count > 0) {
+      const { data: dueRows } = await supabase
+        .from("histories")
+        .select("vehicle_id, next_due_date, event_date, created_at")
+        .in("vehicle_id", (cars ?? []).map((c) => c.id))
+        .neq("visibility", "ADMIN")
+        .not("next_due_date", "is", null);
+      for (const [vid, date] of nextDueByVehicle(dueRows ?? [])) {
+        if (!garage.due || date < garage.due.date) {
+          const c = (cars ?? []).find((x) => x.id === vid);
+          garage.due = { car: c ? carName(c, t("garage_unnamed")) : "", date };
+        }
+      }
+    }
+  }
+
   const contactMethodLabel =
     meta.contact_method === "LINE" ? t("lineId") : meta.contact_method === "PHONE" ? t("phone") : "";
 
@@ -228,6 +254,28 @@ export default async function MyPage({
           {t("my_add_buy")}
         </Link>
       </div>
+
+      {/* マイガレージ（登録した車と次の整備予定） */}
+      <Link
+        href="/garage"
+        className="mt-8 block rounded-2xl border border-border bg-card p-4 hover:border-accent/50"
+      >
+        <span className="flex items-center justify-between">
+          <span className="text-sm font-semibold">{t("my_garage_title")}</span>
+          <span className="text-xs text-muted">
+            {fill(t("my_garage_count"), { n: garage.count })} ›
+          </span>
+        </span>
+        <span className="mt-1 block text-xs text-muted">{t("my_garage_body")}</span>
+        {garage.due && (
+          <span className={`mt-2 block text-xs ${garage.due.date < todayIso() ? "text-red-400" : "text-accent"}`}>
+            {fill(t(garage.due.date < todayIso() ? "my_garage_overdue" : "my_garage_due"), {
+              car: garage.due.car,
+              date: garage.due.date.replaceAll("-", "."),
+            })}
+          </span>
+        )}
+      </Link>
 
       {/* 会員情報 */}
       <section className="mt-8 overflow-hidden rounded-2xl border border-border bg-card">

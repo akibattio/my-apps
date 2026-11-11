@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureOwner } from "@/lib/auth";
+import { getLang } from "@/lib/lang";
+import { tr } from "@/lib/i18n";
 
 export type EditVehicleState = { error?: string };
 
@@ -12,6 +14,7 @@ export async function updateVehicle(
   _prev: EditVehicleState,
   formData: FormData
 ): Promise<EditVehicleState> {
+  const t = tr(await getLang());
   const owner = await ensureOwner();
   if (!owner) redirect("/login");
 
@@ -32,7 +35,7 @@ export async function updateVehicle(
     .eq("current_owner_id", owner.ownerId)
     .maybeSingle();
   if (!before) {
-    return { error: "この車を編集する権限がありません。" };
+    return { error: t("ah_err_perm") };
   }
 
   const after = {
@@ -46,7 +49,7 @@ export async function updateVehicle(
     .update(after)
     .eq("id", vehicleId);
   if (error) {
-    return { error: "更新に失敗しました。時間をおいて試してください。" };
+    return { error: t("ev_err") };
   }
 
   // 変更履歴を残す（削除・上書きの証跡）

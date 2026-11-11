@@ -1,135 +1,107 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ensureOwner, getCurrentUser } from "@/lib/auth";
+import { ensureOwner } from "@/lib/auth";
 import { validateImageFile } from "@/lib/upload";
+import { rateLimitDb } from "@/lib/ratelimit";
+import { getLang } from "@/lib/lang";
+import { tr, fill } from "@/lib/i18n";
+import { normalizeVin, isValidVin } from "@/app/listings/vin";
+import { findOrCreateVehicle, assignOwnerOrClaim } from "@/lib/vehicles";
+import { notifyGarageClaim } from "@/lib/notify";
 
 const BUCKET = "vehicle-images";
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = 10; // RegisterForm と同じ値
 
 export type RegisterState = { error?: string };
 
-// 公開登録（Step 1）。ログイン不要。写真＋最小限の手入力で Vehicle と最初の History を作る。
-// 認証・RLSポリシーは Step 2 以降で入れるため、ここではサーバー側の service_role で書き込む。
+// マイガレージへの車の登録（売らない車も）。ログイン必須・車体番号必須。
+// 1つの車体番号につき車の記録は1つ。すでに別の会員が持ち主なら書き換えず、運営の確認待ちにする。
 export async function registerVehicle(
   _prev: RegisterState,
   formData: FormData
 ): Promise<RegisterState> {
-  // 認証必須（ページだけでなくアクション自体でガードする）
-  const user = await getCurrentUser();
-  if (!user) return { error: "ログインが必要です。" };
+  const t = tr(await getLang());
+  const owner = await ensureOwner();
+  if (!owner) redirect("/login?next=/register");
 
-  const manufacturer = String(formData.get("manufacturer") ?? "").trim();
-  const model = String(formData.get("model") ?? "").trim();
+  const rl = await rateLimitDb(`garage:register:${owner.userId}`, 10, 60 * 60_000);
+  if (!rl.ok) return { error: t("signup_err_rate") };
+
+  const vin = normalizeVin(String(formData.get("vin") ?? ""));
+  const manufacturer = String(formData.get("manufacturer") ?? "").trim().slice(0, 100);
+  const model = String(formData.get("model") ?? "").trim().slice(0, 100);
   const yearRaw = String(formData.get("year") ?? "").trim();
-
+  const yearNum = /^\d{4}$/.test(yearRaw) ? Number(yearRaw) : null;
+  const year = yearNum && yearNum >= 1885 && yearNum <= 2100 ? yearNum : null;
   const photos = formData
     .getAll("photos")
     .filter((f): f is File => f instanceof File && f.size > 0);
 
-  if (photos.length === 0 && !manufacturer && !model) {
-    return { error: "写真か車名（メーカー・モデル）のどちらかは入力してください。" };
+  if (!isValidVin(vin)) return { error: t("sell_vin_err") };
+  if (!manufacturer || !model) return { error: t("form_err_makermodel") };
+  if (photos.length > MAX_PHOTOS) return { error: fill(t("reg_err_photos"), { n: MAX_PHOTOS }) };
+
+  const vehicle = await findOrCreateVehicle(vin, manufacturer, model, "MEMBER", { year });
+  if (!vehicle) return { error: t("reg_err_failed") };
+
+  const result = await assignOwnerOrClaim(vehicle, owner.ownerId, "MEMBER");
+  if (result === "CLAIMED") {
+    after(() =>
+      notifyGarageClaim({ vehicleId: vehicle.id, vin, manufacturer, model, email: owner.email })
+    );
+    redirect("/garage?pending=1");
   }
-  if (photos.length > MAX_PHOTOS) {
-    return { error: `写真は最大${MAX_PHOTOS}枚までです。` };
-  }
+  if (result === "ALREADY_MINE") redirect(`/garage/${vehicle.id}`);
 
-  const yearNum = yearRaw ? Number(yearRaw) : null;
-  const year = yearNum && Number.isFinite(yearNum) ? Math.trunc(yearNum) : null;
+  const supabase = createAdminClient();
+  const today = new Date().toISOString().slice(0, 10);
 
-  let vehicleId: string;
-
-  try {
-    const supabase = createAdminClient();
-
-    // ログイン中なら所有者として紐付ける（未ログインなら owner なしで登録）
-    const owner = await ensureOwner();
-
-    // 1. Vehicle（永久・削除不可）
-    const { data: vehicle, error: vErr } = await supabase
-      .from("vehicles")
-      .insert({
-        manufacturer: manufacturer || null,
-        model: model || null,
-        year,
-        status: "REGISTERED",
-        source: "MEMBER",
-        current_owner_id: owner?.ownerId ?? null,
-      })
-      .select("id")
-      .single();
-
-    if (vErr || !vehicle) {
-      console.error("[register] vehicle insert failed:", vErr);
-      return { error: "車両の作成に失敗しました。時間をおいて試してください。" };
-    }
-    vehicleId = vehicle.id as string;
-
-    // 2. Ownership（所有履歴。ログイン時のみ）
-    const today0 = new Date().toISOString().slice(0, 10);
-    if (owner) {
-      const { error: oErr } = await supabase.from("ownerships").insert({
-        vehicle_id: vehicleId,
-        owner_id: owner.ownerId,
-        is_current: true,
-        start_date: today0,
-        source: "REGISTRATION",
-      });
-      if (oErr) console.error("[register] ownership insert failed:", oErr);
-    }
-
-    // 3. 最初の History（この車の Timeline の起点）
-    const { data: history, error: hErr } = await supabase
-      .from("histories")
-      .insert({
-        vehicle_id: vehicleId,
-        owner_id: owner?.ownerId ?? null,
-        history_type: "OTHER",
-        title: "ARIOSに登録",
-        description: "この車の記録がARIOSで始まりました。",
-        event_date: today0,
-        source: "PUBLIC_REGISTRATION",
-        visibility: "PUBLIC",
-      })
-      .select("id")
-      .single();
-    if (hErr) console.error("[register] history insert failed:", hErr);
-
-    // 4. 写真を Storage にアップロードして images に記録（1枚失敗しても他は続行）
-    for (let i = 0; i < photos.length; i++) {
-      const file = photos[i];
-      // 実バイト(マジックナンバー)で画像か検証。拡張子/申告MIMEは信用しない。非画像・過大はスキップ。
-      const v = await validateImageFile(file);
-      if (!v.ok) {
-        console.warn("[register] rejected upload:", v.reason);
-        continue;
-      }
-      const path = `vehicles/${vehicleId}/${String(i).padStart(2, "0")}-${Date.now()}.${v.ext}`;
-
-      const { error: upErr } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, file, { contentType: v.contentType, upsert: false });
-      if (upErr) {
-        console.error("[register] image upload failed:", upErr);
-        continue;
-      }
-
-      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      await supabase.from("images").insert({
-        vehicle_id: vehicleId,
-        history_id: history?.id ?? null,
-        image_url: pub.publicUrl,
-        image_type: i === 0 ? "EXTERIOR" : null,
-      });
-    }
-  } catch (e) {
-    console.error("[register] unexpected error:", e);
-    return {
-      error: "登録に失敗しました。通信環境を確認して、もう一度お試しください。",
-    };
+  // 既存の記録（売りたい登録から作られたもの等）を引き継いだ場合は、車名を上書きしない。
+  if (!vehicle.created && year) {
+    await supabase.from("vehicles").update({ year }).eq("id", vehicle.id).is("year", null);
   }
 
-  // 成功時のみ完了ページへ（redirect は例外を投げるので try の外で呼ぶ）
-  redirect(`/thank-you?v=${vehicleId}`);
+  // この車の記録の起点（表示は「LIFE LINE GARAGE に登録」）
+  const { data: history } = await supabase
+    .from("histories")
+    .insert({
+      vehicle_id: vehicle.id,
+      owner_id: owner.ownerId,
+      history_type: "OTHER",
+      event_date: today,
+      source: "MEMBER_REGISTRATION",
+      visibility: "PRIVATE",
+    })
+    .select("id")
+    .single();
+
+  // 写真（1枚失敗しても他は続行）。実バイトで画像か検証する。
+  for (let i = 0; i < photos.length; i++) {
+    const v = await validateImageFile(photos[i]);
+    if (!v.ok) {
+      console.warn("[register] rejected upload:", v.reason);
+      continue;
+    }
+    const path = `vehicles/${vehicle.id}/${String(i).padStart(2, "0")}-${Date.now()}.${v.ext}`;
+    const { error: upErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, photos[i], { contentType: v.contentType, upsert: false });
+    if (upErr) {
+      console.error("[register] image upload failed:", upErr);
+      continue;
+    }
+    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    await supabase.from("images").insert({
+      vehicle_id: vehicle.id,
+      owner_id: owner.ownerId,
+      history_id: history?.id ?? null,
+      image_url: pub.publicUrl,
+      image_type: i === 0 ? "EXTERIOR" : null,
+    });
+  }
+
+  redirect(`/garage/${vehicle.id}`);
 }

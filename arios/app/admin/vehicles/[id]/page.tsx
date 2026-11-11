@@ -4,6 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { throwIfDbError } from "@/lib/db";
 import { PARTY_LABEL, STATUS_LABEL } from "../../inquiries/constants";
 import { decideClaim } from "../actions";
+import { tr } from "@/lib/i18n";
+
+const ja = tr("ja");
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "車両の記録 — LIFE LINE GARAGE" };
@@ -48,7 +51,7 @@ export default async function AdminVehicleDetail({ params }: { params: Promise<{
       .order("created_at", { ascending: false }),
     supabase
       .from("histories")
-      .select("id, title, description, event_date, source, visibility, created_at, owner:owner_id(name, email)")
+      .select("id, history_type, title, description, event_date, next_due_date, links, source, visibility, created_at, owner:owner_id(name, email)")
       .eq("vehicle_id", id)
       .order("event_date", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false }),
@@ -175,12 +178,18 @@ export default async function AdminVehicleDetail({ params }: { params: Promise<{
               <li key={h.id} className="text-sm">
                 <div className="flex flex-wrap items-baseline gap-2">
                   <span className="tabular-nums text-accent">{(h.event_date ?? h.created_at.slice(0, 10)).replaceAll("-", ".")}</span>
-                  <span className="font-medium">{h.title ?? "記録"}</span>
+                  <span className="font-medium">
+                    {h.title ?? (h.source === "MEMBER_REGISTRATION" ? ja("ht_registered") : ja(`ht_${h.history_type}`))}
+                  </span>
                   <span className="rounded-full border border-border px-2 text-[11px] text-muted">
                     {VISIBILITY_LABEL[h.visibility] ?? h.visibility}
                   </span>
                 </div>
                 {h.description && <p className="mt-1 text-muted">{h.description}</p>}
+                {h.next_due_date && <p className="mt-0.5 text-xs text-accent">次回予定: {h.next_due_date}</p>}
+                {(h.links ?? []).length > 0 && (
+                  <p className="mt-0.5 break-all text-xs text-muted">{(h.links as string[]).join("  ")}</p>
+                )}
                 <p className="mt-0.5 text-[11px] text-neutral-500">
                   入力: {ho?.email ?? ho?.name ?? "運営"} · {h.source ?? "—"}
                 </p>

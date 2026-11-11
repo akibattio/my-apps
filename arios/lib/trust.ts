@@ -20,12 +20,36 @@ export type TrustResult = {
   reasons: TrustReason[];
 };
 
-export function computeTrust(i: TrustInput): TrustResult {
+const LABELS = {
+  ja: {
+    photo: "写真がある",
+    doc: "書類がある（車検証・整備記録など）",
+    vin: "車体番号が登録されている",
+    hist: "記録が2件以上ある（育っている）",
+    l0: "自己申告",
+    l1: "写真あり",
+    l2: "書類あり",
+    l3: "車体番号あり",
+  },
+  en: {
+    photo: "Has photos",
+    doc: "Has documents (registration, service records, etc.)",
+    vin: "VIN is registered",
+    hist: "Has 2 or more records",
+    l0: "Self-reported",
+    l1: "Photos",
+    l2: "Documents",
+    l3: "VIN registered",
+  },
+};
+
+export function computeTrust(i: TrustInput, lang: "ja" | "en" = "ja"): TrustResult {
+  const L = LABELS[lang];
   const reasons: TrustReason[] = [
-    { label: "写真がある", met: i.photoCount > 0 },
-    { label: "書類がある（車検証・整備記録など）", met: i.documentCount > 0 },
-    { label: "車台番号(VIN)が登録されている", met: i.hasVin },
-    { label: "履歴が2件以上ある（育っている）", met: i.historyCount >= 2 },
+    { label: L.photo, met: i.photoCount > 0 },
+    { label: L.doc, met: i.documentCount > 0 },
+    { label: L.vin, met: i.hasVin },
+    { label: L.hist, met: i.historyCount >= 2 },
   ];
 
   let score = 0;
@@ -38,21 +62,21 @@ export function computeTrust(i: TrustInput): TrustResult {
   // 到達している最上位の証拠段階をレベルとする
   let levelIndex = 0;
   let level = "LEVEL_0_SELF_REPORTED";
-  let levelLabel = "自己申告";
+  let levelLabel = L.l0;
   if (i.photoCount > 0) {
     levelIndex = 1;
     level = "LEVEL_1_PHOTO_CONFIRMED";
-    levelLabel = "写真で確認";
+    levelLabel = L.l1;
   }
   if (i.documentCount > 0) {
     levelIndex = 2;
     level = "LEVEL_2_DOCUMENT_CONFIRMED";
-    levelLabel = "書類で確認";
+    levelLabel = L.l2;
   }
   if (i.hasVin) {
     levelIndex = 3;
     level = "LEVEL_3_VIN_CONFIRMED";
-    levelLabel = "車台番号で確認";
+    levelLabel = L.l3;
   }
 
   return { score, level, levelLabel, levelIndex, reasons };

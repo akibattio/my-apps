@@ -35,3 +35,28 @@ export async function setVehiclePublic(formData: FormData): Promise<void> {
 
   redirect(`/garage/${vehicleId}`);
 }
+
+// 記録1件の公開・非公開を切り替える。本人の車の記録のみ（運営だけの記録は対象外）。
+export async function setHistoryVisibility(formData: FormData): Promise<void> {
+  const owner = await ensureOwner();
+  if (!owner) redirect("/login");
+
+  const historyId = String(formData.get("historyId") ?? "");
+  const visibility = String(formData.get("public") ?? "") === "1" ? "PUBLIC" : "PRIVATE";
+
+  const admin = createAdminClient();
+  const { data: h } = await admin
+    .from("histories")
+    .select("id, vehicle_id, visibility, vehicle:vehicle_id(current_owner_id)")
+    .eq("id", historyId)
+    .maybeSingle();
+  const v = h ? (Array.isArray(h.vehicle) ? h.vehicle[0] : h.vehicle) : null;
+  if (!h || (v as { current_owner_id: string | null } | null)?.current_owner_id !== owner.ownerId) {
+    redirect("/garage");
+  }
+  if (h.visibility !== "ADMIN" && h.visibility !== visibility) {
+    await admin.from("histories").update({ visibility }).eq("id", h.id);
+  }
+
+  redirect(`/garage/${h.vehicle_id}#h-${h.id}`);
+}

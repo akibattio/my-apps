@@ -173,3 +173,29 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
         };
   await sendMail([l.email], receipt.subject, receipt.text);
 }
+
+// マイガレージの登録で、別の会員の車として登録済みの車体番号が来たとき（持ち主の確認待ち）。
+export async function notifyGarageClaim(c: {
+  vehicleId: string;
+  vin: string;
+  manufacturer: string | null;
+  model: string | null;
+  email: string | null;
+}): Promise<void> {
+  const site = siteUrl();
+  const car = [c.manufacturer, c.model].filter(Boolean).join(" ") || "（車名なし）";
+  await sendMail(
+    adminRecipients(),
+    `【持ち主確認】マイガレージ: ${car}`,
+    [
+      "マイガレージに、別の会員の車として登録済みの車体番号で登録がありました。",
+      "持ち主は書き換えず、確認待ちにしています。両方の会員に確認してから判断してください。",
+      "",
+      `車両: ${car}`,
+      `車体番号: ${c.vin}`,
+      `登録しようとした会員: ${c.email ?? "—"}`,
+      "",
+      `車の記録: ${site}/admin/vehicles/${c.vehicleId}`,
+    ].join("\n")
+  );
+}

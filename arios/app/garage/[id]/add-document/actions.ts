@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureOwner } from "@/lib/auth";
+import { getLang } from "@/lib/lang";
+import { tr, fill } from "@/lib/i18n";
 
 const BUCKET = "vehicle-documents"; // 非公開バケット
 const MAX_FILES = 10;
@@ -23,6 +25,7 @@ export async function addDocument(
   _prev: AddDocumentState,
   formData: FormData
 ): Promise<AddDocumentState> {
+  const t = tr(await getLang());
   const owner = await ensureOwner();
   if (!owner) redirect("/login");
 
@@ -35,10 +38,10 @@ export async function addDocument(
     .filter((f): f is File => f instanceof File && f.size > 0);
 
   if (files.length === 0) {
-    return { error: "書類ファイルを選んでください。" };
+    return { error: t("ad_err_none") };
   }
   if (files.length > MAX_FILES) {
-    return { error: `一度に添付できるのは${MAX_FILES}件までです。` };
+    return { error: fill(t("ad_too_many"), { n: MAX_FILES }) };
   }
 
   const admin = createAdminClient();
@@ -51,23 +54,23 @@ export async function addDocument(
     .eq("current_owner_id", owner.ownerId)
     .maybeSingle();
   if (!vehicle) {
-    return { error: "この車を編集する権限がありません。" };
+    return { error: t("ah_err_perm") };
   }
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Timeline に「書類を追加」を1件残す（ファイル本体は非公開・履歴には出さない）
+  // 記録に「書類を追加」を1件残す（非公開。表示名は documents.document_type から日英で出す）
   const { data: history } = await admin
     .from("histories")
     .insert({
       vehicle_id: vehicleId,
       owner_id: owner.ownerId,
       history_type: "DOCUMENT",
-      title: `${TYPE_LABEL[documentType]}を追加`,
+      title: null,
       description: null,
       event_date: today,
       source: "OWNER",
-      visibility: "PUBLIC",
+      visibility: "PRIVATE",
     })
     .select("id")
     .single();
@@ -103,7 +106,7 @@ export async function addDocument(
   }
 
   if (uploaded === 0) {
-    return { error: "アップロードに失敗しました。ファイル形式を確認してください。" };
+    return { error: t("ad_err_failed") };
   }
 
   redirect(`/garage/${vehicleId}`);

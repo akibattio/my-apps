@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import AddDocumentForm from "./AddDocumentForm";
 import { pageTitle } from "@/lib/meta";
+import { getLang } from "@/lib/lang";
+import { tr, fill } from "@/lib/i18n";
+import { carName } from "@/lib/garage";
+import LangToggle from "../../../LangToggle";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -17,7 +21,9 @@ export default async function AddDocumentPage({
 }) {
   const { id } = await params;
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(`/login?next=/garage/${id}/add-document`);
+  const lang = await getLang();
+  const t = tr(lang);
 
   const supabase = await createClient();
   const { data: vehicle } = await supabase
@@ -27,22 +33,20 @@ export default async function AddDocumentPage({
     .maybeSingle();
   if (!vehicle) notFound();
 
-  const name =
-    [vehicle.manufacturer, vehicle.model].filter(Boolean).join(" ") || "この車";
+  const name = carName(vehicle, t("garage_unnamed"));
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl px-6 py-10">
-      <header className="mb-8 flex items-center gap-3">
-        <Link href={`/garage/${id}`} className="text-muted" aria-label="戻る">
-          ←
+      <div className="mb-6 flex items-center justify-between">
+        <Link href={`/garage/${id}`} className="text-sm text-accent hover:underline">
+          ‹ {name}
         </Link>
-        <h1 className="text-xl font-semibold">書類を追加</h1>
-      </header>
-      <p className="mb-6 text-sm text-muted">
-        {name} の車検証・整備記録などを保管します（非公開）。
-      </p>
+        <LangToggle lang={lang} />
+      </div>
+      <h1 className="text-2xl font-semibold">{t("ad_title")}</h1>
+      <p className="mt-2 mb-8 text-sm text-muted">{fill(t("ad_lead"), { name })}</p>
 
-      <AddDocumentForm vehicleId={id} />
+      <AddDocumentForm vehicleId={id} lang={lang} />
     </main>
   );
 }

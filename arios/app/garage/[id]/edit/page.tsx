@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth";
 import EditVehicleForm from "./EditVehicleForm";
 import { pageTitle } from "@/lib/meta";
+import { getLang } from "@/lib/lang";
+import { tr } from "@/lib/i18n";
+import LangToggle from "../../../LangToggle";
 
 export const dynamic = "force-dynamic";
 export async function generateMetadata() {
@@ -17,27 +20,37 @@ export default async function EditVehiclePage({
 }) {
   const { id } = await params;
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(`/login?next=/garage/${id}/edit`);
+  const lang = await getLang();
+  const t = tr(lang);
 
   // 本人が所有する車か（RLS）
   const supabase = await createClient();
   const { data: vehicle } = await supabase
     .from("vehicles")
-    .select("id, manufacturer, model, year")
+    .select("id, vin, manufacturer, model, year")
     .eq("id", id)
     .maybeSingle();
   if (!vehicle) notFound();
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl px-6 py-10">
-      <header className="mb-8 flex items-center gap-3">
-        <Link href={`/garage/${id}`} className="text-muted" aria-label="戻る">
-          ←
+      <div className="mb-6 flex items-center justify-between">
+        <Link href={`/garage/${id}`} className="text-sm text-accent hover:underline">
+          ‹ {t("gd_back")}
         </Link>
-        <h1 className="text-xl font-semibold">登録内容を編集</h1>
-      </header>
+        <LangToggle lang={lang} />
+      </div>
+      <h1 className="mb-6 text-2xl font-semibold">{t("ev_title")}</h1>
+      {vehicle.vin && (
+        <p className="mb-5 rounded-xl border border-border bg-card p-3 text-xs text-muted">
+          {t("gd_vin")}: <span className="font-mono text-foreground">{vehicle.vin}</span>
+          <span className="mt-1 block">{t("ev_vin_note")}</span>
+        </p>
+      )}
 
       <EditVehicleForm
+        lang={lang}
         vehicleId={id}
         initial={{
           manufacturer: vehicle.manufacturer ?? "",

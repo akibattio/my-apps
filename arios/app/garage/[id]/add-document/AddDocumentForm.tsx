@@ -2,17 +2,13 @@
 
 import { useActionState, useRef, useState } from "react";
 import { addDocument, type AddDocumentState } from "./actions";
+import { tr, fill, type Lang } from "@/lib/i18n";
 
 const MAX_FILES = 10;
-const TYPES = [
-  { value: "REGISTRATION", label: "車検証" },
-  { value: "SERVICE_RECORD", label: "整備記録" },
-  { value: "INVOICE", label: "請求書" },
-  { value: "CONTRACT", label: "契約書" },
-  { value: "OTHER", label: "その他" },
-];
+const TYPES = ["REGISTRATION", "SERVICE_RECORD", "INVOICE", "CONTRACT", "OTHER"];
 
-export default function AddDocumentForm({ vehicleId }: { vehicleId: string }) {
+export default function AddDocumentForm({ vehicleId, lang = "ja" }: { vehicleId: string; lang?: Lang }) {
+  const tt = tr(lang);
   const [state, formAction, isPending] = useActionState<AddDocumentState, FormData>(
     addDocument,
     {}
@@ -41,19 +37,19 @@ export default function AddDocumentForm({ vehicleId }: { vehicleId: string }) {
 
       {/* 種類 */}
       <div className="flex flex-wrap gap-2">
-        {TYPES.map((t) => (
+        {TYPES.map((v) => (
           <button
-            key={t.value}
+            key={v}
             type="button"
-            onClick={() => setType(t.value)}
+            onClick={() => setType(v)}
             className={
               "rounded-full px-4 py-2 text-sm " +
-              (type === t.value
+              (type === v
                 ? "bg-primary font-medium text-black"
                 : "border border-neutral-700 text-muted")
             }
           >
-            {t.label}
+            {tt(`dt_${v}`)}
           </button>
         ))}
       </div>
@@ -65,7 +61,7 @@ export default function AddDocumentForm({ vehicleId }: { vehicleId: string }) {
           className="flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-neutral-600 text-muted"
         >
           <span className="text-2xl text-accent">＋</span>
-          <span className="mt-1 text-sm">書類を選ぶ（写真・PDF、最大{MAX_FILES}件）</span>
+          <span className="mt-1 text-sm">{fill(tt("ad_choose"), { n: MAX_FILES })}</span>
         </label>
         <input
           ref={inputRef}
@@ -79,7 +75,7 @@ export default function AddDocumentForm({ vehicleId }: { vehicleId: string }) {
         />
         {tooMany && (
           <p className="mt-2 text-sm text-red-400">
-            一度に添付できるのは{MAX_FILES}件までです。
+            {fill(tt("ad_too_many"), { n: MAX_FILES })}
           </p>
         )}
         {names.length > 0 && (
@@ -92,8 +88,7 @@ export default function AddDocumentForm({ vehicleId }: { vehicleId: string }) {
       </div>
 
       <p className="text-xs text-muted">
-        書類は非公開で保管されます。公開ページには「書類あり」という事実だけが反映され、
-        中身（画像・PDF）は第三者に見えません。
+        {tt("ad_note")}
       </p>
 
       {state.error && <p className="text-sm text-red-400">{state.error}</p>}
@@ -103,7 +98,7 @@ export default function AddDocumentForm({ vehicleId }: { vehicleId: string }) {
         disabled={isPending}
         className="w-full rounded-full bg-primary px-6 py-4 font-medium text-black disabled:opacity-60"
       >
-        {isPending ? "アップロード中…" : "書類を追加する"}
+        {isPending ? tt("ad_submitting") : tt("ad_submit")}
       </button>
     </form>
   );

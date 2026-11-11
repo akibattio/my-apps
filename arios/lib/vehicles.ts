@@ -23,11 +23,13 @@ type Listing = {
   email: string | null;
 };
 
-// 車体番号で車の記録を探す。無ければ作る（同時に作られたら作られた方を使う）。
-async function findOrCreateVehicle(
+// 車体番号で車の記録を探す。無ければ作る（同時に作られたら作られた方を使う）。vin は正規化済みで渡す。
+export async function findOrCreateVehicle(
   vin: string,
   manufacturer: string | null,
-  model: string | null
+  model: string | null,
+  source: "SELL_LISTING" | "MEMBER" | "ADMIN",
+  extra: { year?: number | null } = {}
 ): Promise<{ id: string; currentOwnerId: string | null; created: boolean } | null> {
   const supabase = createAdminClient();
   const find = async () => {
@@ -44,7 +46,7 @@ async function findOrCreateVehicle(
 
   const { data: inserted, error } = await supabase
     .from("vehicles")
-    .insert({ vin, manufacturer, model, status: "REGISTERED", source: "SELL_LISTING" })
+    .insert({ vin, manufacturer, model, year: extra.year ?? null, status: "REGISTERED", source })
     .select("id")
     .single();
   if (inserted) return { id: inserted.id, currentOwnerId: null, created: true };
@@ -65,7 +67,7 @@ export async function linkListingToVehicle(l: Listing): Promise<VehicleLink | nu
 
   try {
     const supabase = createAdminClient();
-    const vehicle = await findOrCreateVehicle(vin, l.manufacturer, l.model);
+    const vehicle = await findOrCreateVehicle(vin, l.manufacturer, l.model, "SELL_LISTING");
     if (!vehicle) return null;
 
     const listerOwnerId = l.authUserId ? await ownerIdForUser(l.authUserId, l.email) : null;
@@ -75,33 +77,8 @@ export async function linkListingToVehicle(l: Listing): Promise<VehicleLink | nu
     // すでに別の会員が持ち主なら書き換えず、確認待ちとして運営に判断してもらう。
     let ownerConflict = false;
     if (l.partyType === "OWNER" && listerOwnerId) {
-      if (!vehicle.currentOwnerId) {
-        const { data: claimed } = await supabase
-          .from("vehicles")
-          .update({ current_owner_id: listerOwnerId })
-          .eq("id", vehicle.id)
-          .is("current_owner_id", null)
-          .select("id");
-        if (claimed && claimed.length > 0) {
-          await supabase.from("ownerships").insert({
-            vehicle_id: vehicle.id,
-            owner_id: listerOwnerId,
-            is_current: true,
-            start_date: today,
-            source: "SELL_LISTING",
-          });
-        } else {
-          ownerConflict = true; // 同時にほかの会員が持ち主になった
-        }
-      } else if (vehicle.currentOwnerId !== listerOwnerId) {
-        ownerConflict = true;
-      }
-      if (ownerConflict) {
-        // 同じ会員の確認待ちがすでにあれば一意制約で弾かれる（それで良い）
-        await supabase
-          .from("vehicle_claims")
-          .insert({ vehicle_id: vehicle.id, owner_id: listerOwnerId, inquiry_id: l.id, status: "PENDING" });
-      }
+      const r = await assignOwnerOrClaim(vehicle, listerOwnerId, "SELL_LISTING", l.id);
+      ownerConflict = r === "CLAIMED";
     }
 
     await supabase.from("inquiries").update({ vehicle_id: vehicle.id }).eq("id", l.id);
@@ -143,4 +120,41 @@ export async function linkListingToVehicle(l: Listing): Promise<VehicleLink | nu
     console.error("[vehicles] link failed:", e);
     return null;
   }
+}
+
+// 持ち主を決める。持ち主がいなければその会員にする。別の会員が持ち主なら確認待ちにする。
+export async function assignOwnerOrClaim(
+  vehicle: { id: string; currentOwnerId: string | null },
+  ownerId: string,
+  source: string,
+  inquiryId: string | null = null
+): Promise<"ASSIGNED" | "ALREADY_MINE" | "CLAIMED"> {
+  const supabase = createAdminClient();
+  if (vehicle.currentOwnerId === ownerId) return "ALREADY_MINE";
+
+  if (!vehicle.currentOwnerId) {
+    const { data: claimed } = await supabase
+      .from("vehicles")
+      .update({ current_owner_id: ownerId })
+      .eq("id", vehicle.id)
+      .is("current_owner_id", null)
+      .select("id");
+    if (claimed && claimed.length > 0) {
+      await supabase.from("ownerships").insert({
+        vehicle_id: vehicle.id,
+        owner_id: ownerId,
+        is_current: true,
+        start_date: new Date().toISOString().slice(0, 10),
+        source,
+      });
+      return "ASSIGNED";
+    }
+    // 同時にほかの会員が持ち主になった → 下の確認待ちへ
+  }
+
+  // 同じ会員の確認待ちがすでにあれば一意制約で弾かれる（それで良い）
+  await supabase
+    .from("vehicle_claims")
+    .insert({ vehicle_id: vehicle.id, owner_id: ownerId, inquiry_id: inquiryId, status: "PENDING" });
+  return "CLAIMED";
 }
