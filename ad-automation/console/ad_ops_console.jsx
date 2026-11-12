@@ -64,9 +64,12 @@ const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
 // 顧客レポート（Report GLASS / Netlify）へのリンク。クライアント提出レポートはReport GLASSに一本化。
 // コンソールの「簡易分析」タブは社内確認用（混同回避のため"レポート"表記を避ける）。
-// ※per-client のディープリンク書式が判明したら reportGlassUrl(client) を差し替え。
-const AD_REPORT_URL = "https://report-glass.netlify.app/";
-const reportGlassUrl = (client) => AD_REPORT_URL; // TODO: 社別URL書式が分かればクエリ等を付与
+const AD_REPORT_URL = "https://report-glass.onrender.com/";
+// 社別レポート（Render版・Googleログイン）。slug は data.json の reportSlug（REPORT GLASSの対応表由来）。無ければ管理画面トップ。
+const reportGlassUrl = (client, accts) => {
+  const a = (accts || []).find((x) => x.client === client && x.reportSlug);
+  return a ? `${AD_REPORT_URL}${a.reportSlug}/index.html` : AD_REPORT_URL;
+};
 
 // 媒体（Google広告/Meta広告マネージャ）の該当ページURL。alertの種類(kind)から「修正する画面」を選ぶ。
 const onlyDigits = (s) => (s || "").replace(/\D/g, "");
@@ -688,7 +691,7 @@ export default function AdOpsConsole() {
                 <button onClick={() => { setView("dash"); setOpenClient(null); }} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#0891b2", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
                   <ArrowLeft size={15} /> ダッシュボードへ
                 </button>
-                <a href={reportGlassUrl(cl.client)} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#0e3a46", fontSize: 12.5, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}>
+                <a href={reportGlassUrl(cl.client, A)} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, border: "none", background: "#f59e0b", color: "#0e3a46", fontSize: 12.5, fontWeight: 700, cursor: "pointer", textDecoration: "none" }}>
                   Report GLASS（顧客レポート）で開く ↗
                 </a>
               </div>
@@ -946,7 +949,7 @@ export default function AdOpsConsole() {
                   {[...allMonths].reverse().map((m) => <option key={m} value={m}>{m.replace("-", "年") + "月"}</option>)}
                   {allMonths.length === 0 && <option value="">データなし</option>}
                 </select>
-                <a href={reportGlassUrl(rc)} target="_blank" rel="noopener noreferrer" style={{ ...btnP, marginLeft: "auto", textDecoration: "none" }}>Report GLASS（顧客レポート）で開く ↗</a>
+                <a href={reportGlassUrl(rc, A)} target="_blank" rel="noopener noreferrer" style={{ ...btnP, marginLeft: "auto", textDecoration: "none" }}>Report GLASS（顧客レポート）で開く ↗</a>
               </div>
 
               {/* レポート本体（印刷対象） */}

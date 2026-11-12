@@ -383,6 +383,14 @@ def main():
         "proposals": proposals,
         "connectionIssues": conn_issues,  # 媒体の取得失敗（トークン失効等）→ monitorが重大アラート化
     }
+    # 社名の名寄せ（Meta口座名→運用名）＋REPORT GLASSの社別リンク用slug
+    from client_map import canonical, report_slug
+    for a in accounts:
+        if a.get("media") == "meta":
+            name = canonical(a["client"], a.get("acct", ""))
+            if name != a["client"]:
+                a["acctName"], a["client"] = a["client"], name
+        a["reportSlug"] = report_slug(a["client"])
     # 全媒体が0件（全滅）のときは前回データを温存して画面を空にしない（generatedAtに注記＝古さが分かる）
     out_path = Path("console/data.json")
     if not accounts and out_path.exists():

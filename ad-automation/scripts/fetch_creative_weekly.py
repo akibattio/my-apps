@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_daily_series import load_env, google_service  # noqa: E402
+from client_map import canonical  # noqa: E402
 from build_console_data import get as meta_get, sum_action, CV_ACTIONS, EXCLUDE_ACCOUNTS  # noqa: E402
 
 PROJ = Path(__file__).resolve().parent.parent
@@ -155,8 +156,8 @@ def main():
                 continue
             try:
                 rows = meta_account("act_" + a["account_id"], tok, start, end)
-                if rows:
-                    out[f"{name}|meta"] = rows
+                if rows:  # コンソールと同じく運用名に寄せる（TOOGU.shop→【東海グランド】TOOGU 等）
+                    out[f"{canonical(name, 'act_' + a['account_id'])}|meta"] = rows
                 print(f"  [meta]   {name[:20]:22} {len(rows)}広告")
             except Exception as e:
                 print(f"  [meta]   {name[:20]:22} 取得失敗: {str(e)[:80]}")

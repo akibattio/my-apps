@@ -1,0 +1,18 @@
+{
+  "_comment": "ad-automation運用クライアント名（＝MCCのdescriptive_name）→ ad-reportのslug/表示名/Meta。sync-clients.js が参照。ここに載っている社を同期対象にする。※本番はRenderディスクが正（管理画面の追加フォーム=/api/slugmapで編集）。これはseed/バックアップ。新規はフォーム追加、ここも合わせて更新推奨。",
+  "clients": {
+    "【SUBACO】": { "slug": "subaco", "short": "SUBACO" },
+    "【エスジー】RiceLog": { "slug": "ricelog", "short": "RiceLog", "metaAccountIds": ["act_734954661767339", "act_985352212782072"] },
+    "【メディナビ】AICE": { "slug": "medinavi", "short": "メディナビAICE" },
+    "【EM生活】公式オンラインショップ": { "slug": "em", "short": "EM生活" },
+    "【東海グランド】TOOGU": { "slug": "toogu", "short": "TOOGU", "metaAccountIds": ["act_1637452587956648"] },
+    "【あんじゅホーム】": { "slug": "anju", "short": "あんじゅホーム" },
+    "【展示会ブース装飾】": { "slug": "tenjikai", "short": "展示会ブース" },
+    "【SC】コーポレートサイト": { "slug": "sccorp", "short": "SCコーポレート" },
+    "【リアリット】ドン・キホーテ": { "slug": "realit", "short": "リアリット" },
+    "【明成建設】クラテルリノベ": { "slug": "meisei", "short": "明成建設" },
+    "【村上建設】": { "slug": "murakami", "short": "村上建設" },
+    "【コニカミノルタ】イイプリ": { "slug": "iipuri", "short": "イイプリ" },
+    "【厚労省】就業環境改善支援セミナー": { "slug": "korosho", "short": "就業改善支援", "metaAccountIds": ["act_2132975200965065"] }
+  }
+}
