@@ -5,3 +5,11 @@ node_modules
 .netlify
 deno.lock
 .claude/settings.local.json
+tsconfig.tsbuildinfo
+
+# 社外向けの文書（取引先向けの操作マニュアル・DNS の設定・利用規約の下書き・共有用・PDF）は公開リポジトリに入れない
+docs/*.pdf
+docs/share/
+docs/SAM*
+docs/利用規約_*
+docs/ARIOS開発状況*

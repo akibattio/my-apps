@@ -1,6 +1,6 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { reorderSeller } from "@/app/listings/actions";
 import { createDeal } from "@/app/admin/deals/actions";
 import { sellerOrder } from "@/app/listings/order";
@@ -36,11 +36,10 @@ export default async function MatchingDetailPage({
 }: {
   params: Promise<{ key: string }>;
 }) {
+  const { db: supabase } = await adminDb();
   const { key } = await params;
   const { maker, model } = parseMatchKey(key);
   if (!maker && !model) notFound();
-
-  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("inquiries")
     .select(

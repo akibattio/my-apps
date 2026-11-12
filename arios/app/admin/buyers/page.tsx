@@ -1,5 +1,5 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   CHANNEL_LABEL,
   STATUS_LABEL,
@@ -41,7 +41,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default async function BuyersPage() {
-  const supabase = createAdminClient();
+  const { db: supabase } = await adminDb();
   const { data, error } = await supabase
     .from("inquiries")
     .select(

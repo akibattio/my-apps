@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ensureOwner, isAdminEmail } from "@/lib/auth";
+import { ensureOwner, isAdminUser } from "@/lib/auth";
 import { getLang } from "@/lib/lang";
 import { tr, fill } from "@/lib/i18n";
 import { pageTitle } from "@/lib/meta";
@@ -80,7 +80,7 @@ export default async function GaragePage({
           ‹ {t("np_to_mypage")}
         </Link>
         <div className="flex items-center gap-4">
-          {isAdminEmail(owner.email) && (
+          {isAdminUser({ id: owner.userId }) && (
             <Link href="/admin/vehicles" className="text-sm text-accent">
               {t("garage_admin")}
             </Link>

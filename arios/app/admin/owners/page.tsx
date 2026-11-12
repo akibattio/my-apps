@@ -1,10 +1,10 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { adminDb } from "@/lib/auth";
 import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOwners() {
-  const admin = createAdminClient();
+  const { db: admin } = await adminDb();
   const { data, error } = await admin
     .from("owners")
     .select("id, name, email, owner_type, created_at")

@@ -1,5 +1,5 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_LABEL, KIND_LABEL, STATUS_ACTIVE } from "./constants";
 import { throwIfDbError } from "@/lib/db";
 
@@ -14,7 +14,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default async function InquiriesPage() {
-  const supabase = createAdminClient();
+  const { db: supabase } = await adminDb();
   const { data: inquiries, error } = await supabase
     .from("inquiries")
     .select("id, kind, manufacturer, model, price, name, contact, message, status, created_at")

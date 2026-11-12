@@ -8,12 +8,15 @@ import type { VehicleLink } from "@/lib/vehicles";
 // RESEND_API_KEY が無い環境では何もしない（登録処理は止めない）。
 const FROM = process.env.NOTIFY_FROM?.trim() || "LIFE LINE GARAGE <no-reply@mail.arios.info>";
 
+// 運営への通知先は環境変数 ADMIN_NOTIFY_EMAILS（カンマ区切り）。既定値は置かない。
+// 未設定なら送らず、サーバーのログに残す。
 function adminRecipients(): string[] {
-  const raw = process.env.ADMIN_NOTIFY_EMAILS?.trim() || "arios.suzuki@gmail.com";
-  return raw
+  const list = (process.env.ADMIN_NOTIFY_EMAILS ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s));
+  if (list.length === 0) console.warn("[notify] 通知先が未設定です（ADMIN_NOTIFY_EMAILS）。運営への通知は送りません。");
+  return list;
 }
 
 function siteUrl(): string {
@@ -60,6 +63,7 @@ export type NewListing = {
   photoCount: number;
   lang: Lang;
   vehicle?: VehicleLink | null;
+  receiptTo: string | null; // 受付メールの宛先（ログイン中の本人のアドレス。フォームの入力は使わない）
 };
 
 // 新規登録の後に呼ぶ: 運営への新着通知・マッチ通知、会員への受付メール。
@@ -171,7 +175,7 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
             "（このメールは送信専用です。返信いただいても確認できません）",
           ].join("\n"),
         };
-  await sendMail([l.email], receipt.subject, receipt.text);
+  if (l.receiptTo) await sendMail([l.receiptTo], receipt.subject, receipt.text);
 }
 
 // マイガレージの登録で、別の会員の車として登録済みの車体番号が来たとき（持ち主の確認待ち）。

@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureOwner } from "@/lib/auth";
 import { getLang } from "@/lib/lang";
 import { tr, fill } from "@/lib/i18n";
+import { validateDocumentFile } from "@/lib/upload";
+import { rateLimitDb } from "@/lib/ratelimit";
 
 const BUCKET = "vehicle-documents"; // 非公開バケット
 const MAX_FILES = 10;
@@ -44,6 +46,22 @@ export async function addDocument(
     return { error: fill(t("ad_too_many"), { n: MAX_FILES }) };
   }
 
+  // 1日あたりの回数の上限（1回の送信を1回と数える）
+  const rl = await rateLimitDb(`garage:doc:user:${owner.userId}`, 20, 24 * 60 * 60_000);
+  if (!rl.ok) return { error: t("signup_err_rate") };
+
+  // 中身のバイトで PDF か画像かを判定する（拡張子・申告の種類は信用しない）。1件 10MB まで。
+  const checked: { file: File; ext: string; contentType: string }[] = [];
+  for (const file of files) {
+    const v = await validateDocumentFile(file);
+    if (!v.ok) {
+      console.warn("[add-document] rejected upload:", v.reason);
+      continue;
+    }
+    checked.push({ file, ext: v.ext, contentType: v.contentType });
+  }
+  if (checked.length === 0) return { error: t("ad_err_failed") };
+
   const admin = createAdminClient();
 
   // 所有権チェック
@@ -76,13 +94,12 @@ export async function addDocument(
     .single();
 
   let uploaded = 0;
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const ext = (file.name.split(".").pop() || "bin").toLowerCase();
+  for (let i = 0; i < checked.length; i++) {
+    const { file, ext, contentType } = checked[i];
     const path = `vehicles/${vehicleId}/docs/${Date.now()}-${i}.${ext}`;
     const { error: upErr } = await admin.storage
       .from(BUCKET)
-      .upload(path, file, { contentType: file.type || undefined });
+      .upload(path, file, { contentType });
     if (upErr) {
       console.error("[add-document] upload failed:", upErr);
       continue;

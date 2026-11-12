@@ -215,7 +215,7 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 https://my-apps-akibattios-projects.vercel.app/ （詳細はメモ arios-deployment）
 - ✅ 書類アップロードUI（Trust LEVEL_2到達）— 2026-07-05
 - ✅ migration 0003 適用（documents RLS）— 2026-07-12
-- ✅ マイページ `/account` + 管理者画面 `/admin`（サマリー/車両/オーナー、isAdminEmailで判定）— 2026-07-12
+- ✅ マイページ `/account` + 管理者画面 `/admin`（サマリー/車両/オーナー、管理者判定は当時メール一致。2026-11-12 から ADMIN_USER_IDS のユーザー ID 一致に変更）— 2026-07-12
 - ✅ 登録内容の修正機能 `/garage/[id]/edit`（audit_logs記録）— 2026-07-13
 - ✅ 本番デプロイ: **Vercel**（Netlifyはアカウント403で断念）。GitHub push で自動デプロイ。
 - ✅ メールログイン稼働（マジックリンク方式・Resend SMTP）— 2026-07-17

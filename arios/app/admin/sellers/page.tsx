@@ -1,5 +1,5 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { sellerOrder } from "@/app/listings/order";
 import {
   PARTY_LABEL,
@@ -34,7 +34,7 @@ const yen = (n: number | null) => (n == null ? "価格未定" : "¥" + Number(n)
 const methodLabel = (m: string | null) => (m === "LINE" ? "LINE" : m === "PHONE" ? "電話" : "");
 
 export default async function SellersPage() {
-  const supabase = createAdminClient();
+  const { db: supabase } = await adminDb();
   const { data, error } = await supabase
     .from("inquiries")
     .select(

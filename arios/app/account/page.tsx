@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentUser, ensureOwner, isAdminEmail } from "@/lib/auth";
+import { getCurrentUser, ensureOwner, isAdminUser } from "@/lib/auth";
 import { signOut } from "@/app/auth/actions";
 import AccountForm from "./AccountForm";
 import { pageTitle } from "@/lib/meta";
@@ -26,7 +26,7 @@ export default async function AccountPage() {
       .eq("current_owner_id", owner.ownerId),
   ]);
 
-  const isAdmin = isAdminEmail(user.email);
+  const isAdmin = isAdminUser(user);
 
   return (
     <main className="mx-auto max-w-xl px-6 py-10">

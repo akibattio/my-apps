@@ -36,6 +36,26 @@ function sniffImage(b: Uint8Array): ImageKind | null {
   return null;
 }
 
+export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // 書類は1件 10MB まで
+
+export type ValidatedDocument =
+  | { ok: true; ext: "jpg" | "png" | "webp" | "pdf"; contentType: string }
+  | { ok: false; reason: "empty" | "too_large" | "not_document" };
+
+// 書類（PDF か画像）を中身のバイトで判定する。拡張子・申告 MIME は信用しない。
+export async function validateDocumentFile(file: File): Promise<ValidatedDocument> {
+  if (!file || file.size === 0) return { ok: false, reason: "empty" };
+  if (file.size > MAX_DOCUMENT_BYTES) return { ok: false, reason: "too_large" };
+  const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  // PDF: "%PDF-"
+  if (head.length >= 5 && head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46 && head[4] === 0x2d) {
+    return { ok: true, ext: "pdf", contentType: "application/pdf" };
+  }
+  const kind = sniffImage(head);
+  if (!kind) return { ok: false, reason: "not_document" };
+  return { ok: true, ...kind };
+}
+
 // 1ファイルを検証する。OK なら保存用の拡張子・contentType を返す。
 export async function validateImageFile(file: File): Promise<ValidatedImage> {
   if (!file || file.size === 0) return { ok: false, reason: "empty" };

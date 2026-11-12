@@ -6,10 +6,10 @@ export async function POST(request: Request) {
   const form = await request.formData();
   const code = String(form.get("code") ?? "");
   // オープンリダイレクト対策: 自サイト内パスのみ許可（バックスラッシュ等も拒否）
-  const next = safeNext(String(form.get("next") ?? "/"), "/");
+  const origin = new URL(request.url).origin;
+  const next = safeNext(String(form.get("next") ?? "/"), "/", origin);
 
   const passcode = process.env.SITE_PASSCODE;
-  const origin = new URL(request.url).origin;
 
   if (passcode && code === passcode) {
     const res = NextResponse.redirect(new URL(next, origin), { status: 303 });

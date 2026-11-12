@@ -7,6 +7,7 @@ import { validateImageFile } from "@/lib/upload";
 import { getLang } from "@/lib/lang";
 import { tr, fill } from "@/lib/i18n";
 import { parseLinks } from "@/lib/garage";
+import { rateLimitDb } from "@/lib/ratelimit";
 
 const BUCKET = "vehicle-images";
 const MAX_PHOTOS = 10; // AddHistoryForm と同じ値
@@ -20,6 +21,13 @@ export async function addHistory(_prev: AddHistoryState, formData: FormData): Pr
   const t = tr(await getLang());
   const owner = await ensureOwner();
   if (!owner) redirect("/login");
+
+  // 回数の上限（1時間30回・1日100回）
+  const [perHour, perDay] = await Promise.all([
+    rateLimitDb(`garage:history:hour:${owner.userId}`, 30, 60 * 60_000),
+    rateLimitDb(`garage:history:day:${owner.userId}`, 100, 24 * 60 * 60_000),
+  ]);
+  if (!perHour.ok || !perDay.ok) return { error: t("signup_err_rate") };
 
   const vehicleId = String(formData.get("vehicleId") ?? "");
   const typeRaw = String(formData.get("historyType") ?? "OTHER");

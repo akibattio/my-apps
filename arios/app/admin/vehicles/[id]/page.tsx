@@ -1,6 +1,6 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { throwIfDbError } from "@/lib/db";
 import { PARTY_LABEL, STATUS_LABEL } from "../../inquiries/constants";
 import { decideClaim } from "../actions";
@@ -28,8 +28,8 @@ const yen = (n: number | null) => (n != null ? "¥" + n.toLocaleString("ja-JP") 
 
 // 車体番号ごとの車の記録（運営用）。つながっている売りたい登録・経緯・持ち主の確認待ちをまとめて見る。
 export default async function AdminVehicleDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { db: supabase } = await adminDb();
   const { id } = await params;
-  const supabase = createAdminClient();
 
   const { data: v, error } = await supabase
     .from("vehicles")

@@ -1,6 +1,6 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   updateInquiryStatus,
   linkInquiryToVehicle,
@@ -30,9 +30,9 @@ export default async function InquiryDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ vehicle_err?: string }>;
 }) {
+  const { db: supabase } = await adminDb();
   const { id } = await params;
   const { vehicle_err } = await searchParams;
-  const supabase = createAdminClient();
 
   const { data: inq, error } = await supabase
     .from("inquiries")

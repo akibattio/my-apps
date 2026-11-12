@@ -45,6 +45,7 @@ const ERR_KEYS = new Set([
   "sell_owner_name_err",
   "my_delete_blocked",
   "my_save_err",
+  "signup_err_rate",
 ]);
 
 export default async function EditMyListing({

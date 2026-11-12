@@ -1,6 +1,6 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
 import {
   DEAL_STATUS_LABEL,
   DEAL_STATUS_FLOW,
@@ -51,8 +51,8 @@ export default async function DealDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { db: supabase } = await adminDb();
   const { id } = await params;
-  const supabase = createAdminClient();
 
   const { data: deal, error } = await supabase
     .from("deals")

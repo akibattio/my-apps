@@ -15,6 +15,7 @@ import { notifyNewListing } from "@/lib/notify";
 import { normalizeVin, isValidVin } from "./vin";
 import { carKey } from "@/lib/carname";
 import { linkListingToVehicle } from "@/lib/vehicles";
+import { LIMITS } from "./limits";
 
 const BUCKET = "inquiry-photos";
 const MAX_PHOTOS = 20;
@@ -48,28 +49,28 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
     return { error: t("signup_err_rate") };
   }
 
-  const manufacturer = String(formData.get("manufacturer") ?? "").trim();
-  const model = String(formData.get("model") ?? "").trim();
+  const manufacturer = String(formData.get("manufacturer") ?? "").trim().slice(0, LIMITS.maker);
+  const model = String(formData.get("model") ?? "").trim().slice(0, LIMITS.model);
   if (!manufacturer || !model) {
     return { error: t("form_err_makermodel") };
   }
 
   const priceRaw = String(formData.get("price") ?? "").replace(/[,\s¥円]/g, "").trim();
-  const price = priceRaw && /^\d+$/.test(priceRaw) ? Number(priceRaw) : null;
+  const price = priceRaw && /^\d{1,12}$/.test(priceRaw) ? Number(priceRaw) : null;
   const partyRaw = String(formData.get("partyType") ?? "").trim().toUpperCase();
   const partyType = PARTY_TYPES.includes(partyRaw) ? partyRaw : null;
-  const vin = normalizeVin(String(formData.get("vin") ?? ""));
+  const vin = normalizeVin(String(formData.get("vin") ?? "")).slice(0, 30);
   const ownerConsent = String(formData.get("ownerConsent") ?? "") === "on";
   const ownerName = String(formData.get("ownerName") ?? "").trim().slice(0, 100);
-  const name = String(formData.get("name") ?? "").trim();
-  const company = String(formData.get("company_name") ?? "").trim();
-  const contact = String(formData.get("contact") ?? "").trim();
-  const contactMethod = String(formData.get("contactMethod") ?? "").trim();
-  const channel = String(formData.get("channel") ?? "").trim() || null;
-  const message = String(formData.get("message") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim().slice(0, LIMITS.name);
+  const company = String(formData.get("company_name") ?? "").trim().slice(0, LIMITS.company);
+  const contact = String(formData.get("contact") ?? "").trim().slice(0, LIMITS.contact);
+  const contactMethod = String(formData.get("contactMethod") ?? "").trim().slice(0, 20);
+  const channel = String(formData.get("channel") ?? "").trim().slice(0, 40) || null;
+  const message = String(formData.get("message") ?? "").trim().slice(0, LIMITS.message);
 
-  // 連絡用メール（必須）。入力されたメールをそのまま使う。
-  const emailRaw = String(formData.get("email") ?? "").trim().toLowerCase();
+  // 連絡用メール（必須）。連絡先として保存するだけで、受付メールの宛先には使わない（宛先はログイン中の本人のアドレス）。
+  const emailRaw = String(formData.get("email") ?? "").trim().toLowerCase().slice(0, LIMITS.email);
   const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : null;
 
   // 必須項目: 名前・連絡先(電話/LINE)・メール
@@ -205,6 +206,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
       photoCount,
       lang,
       vehicle,
+      receiptTo: user.email ?? null,
     });
   });
 

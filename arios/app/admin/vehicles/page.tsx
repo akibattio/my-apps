@@ -1,5 +1,5 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { throwIfDbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ function ownerName(owner: Row["owner"]): string {
 
 // 車体番号ごとの車の記録の一覧。
 export default async function AdminVehicles() {
-  const admin = createAdminClient();
+  const { db: admin } = await adminDb();
   const [{ data, error }, { data: listings, error: lErr }, { data: claims, error: cErr }] =
     await Promise.all([
       admin

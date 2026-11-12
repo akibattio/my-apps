@@ -1,8 +1,10 @@
+import { requireAdmin } from "@/lib/auth";
 import QuickAddForm from "./QuickAddForm";
 
 export const metadata = { title: "依頼を登録 — LIFE LINE GARAGE" };
 
-export default function AdminNewPage() {
+export default async function AdminNewPage() {
+  await requireAdmin();
   return (
     <div>
       <header className="mb-4">

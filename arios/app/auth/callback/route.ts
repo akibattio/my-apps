@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const token_hash = searchParams.get("token_hash");
   const type = (searchParams.get("type") ?? "email") as EmailOtpType;
   // オープンリダイレクト対策: 自サイト内パスのみ許可（バックスラッシュ等も拒否）
-  const next = safeNext(searchParams.get("next"), "/mypage");
+  const next = safeNext(searchParams.get("next"), "/mypage", origin);
 
   const supabase = await createClient();
 

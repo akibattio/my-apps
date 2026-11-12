@@ -1,5 +1,5 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
 import RowLink from "../RowLink";
 import { DEAL_STATUS_LABEL, DEAL_STATUS_STYLE } from "./constants";
 import { throwIfDbError } from "@/lib/db";
@@ -22,7 +22,7 @@ const md = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("ja-JP", { year: "numeric", month: "numeric", day: "numeric" }) : "—";
 
 export default async function DealsPage() {
-  const supabase = createAdminClient();
+  const { db: supabase } = await adminDb();
   const { data, error } = await supabase
     .from("deals")
     .select("id, manufacturer, model, status, agreed_price, contract_date, updated_at")

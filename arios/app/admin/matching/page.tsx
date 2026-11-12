@@ -1,5 +1,5 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE } from "../inquiries/constants";
 import RowLink from "../RowLink";
 import { matchKey } from "./key";
@@ -22,7 +22,7 @@ type Row = {
 const yen = (n: number | null) => (n == null ? "—" : "¥" + Number(n).toLocaleString("ja-JP"));
 
 export default async function MatchingPage() {
-  const supabase = createAdminClient();
+  const { db: supabase } = await adminDb();
   const { data, error } = await supabase
     .from("inquiries")
     .select("id, kind, manufacturer, model, price, message")

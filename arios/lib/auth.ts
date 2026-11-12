@@ -1,4 +1,5 @@
 // 認証まわりのサーバー側ヘルパー。
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -55,29 +56,47 @@ export async function ownerIdForUser(userId: string, email: string | null): Prom
 }
 
 // ---- 管理者判定 ----
-// 管理者はメール許可リストで判定する。既定は akiba@sofcom.co.jp。
-// 本番では ADMIN_EMAILS（カンマ区切り）で上書きできる。
-const DEFAULT_ADMIN_EMAILS = ["akiba@sofcom.co.jp", "arios.suzuki@gmail.com"];
-
-export function getAdminEmails(): string[] {
-  const env = process.env.ADMIN_EMAILS;
-  if (env && env.trim()) {
-    return env
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-  }
-  return DEFAULT_ADMIN_EMAILS;
+// 管理者は Supabase の認証のユーザー ID（環境変数 ADMIN_USER_IDS、カンマ区切り）で判定する。
+// メールアドレスは判定に使わない（同じアドレスで別のアカウントを作られても管理者にならない）。
+// ADMIN_USER_IDS が未設定なら管理者なし（誰も管理画面に入れない）。既定値は置かない。
+function listFromEnv(name: string, lower = false): string[] {
+  return (process.env[name] ?? "")
+    .split(",")
+    .map((s) => (lower ? s.trim().toLowerCase() : s.trim()))
+    .filter(Boolean);
 }
 
-export function isAdminEmail(email?: string | null): boolean {
-  if (!email) return false;
-  return getAdminEmails().includes(email.toLowerCase());
+export function getAdminUserIds(): string[] {
+  return listFromEnv("ADMIN_USER_IDS");
+}
+
+// 管理者のメールアドレス（会員登録で同じアドレスを使わせないためだけに使う。判定には使わない）。
+export function getAdminEmails(): string[] {
+  return listFromEnv("ADMIN_EMAILS", true);
+}
+
+export function isAdminUser(user?: { id: string } | null): boolean {
+  if (!user) return false;
+  return getAdminUserIds().includes(user.id);
 }
 
 // ログイン中かつ管理者なら user を返す。そうでなければ null。
 export async function getCurrentAdmin() {
   const user = await getCurrentUser();
-  if (!user || !isAdminEmail(user.email)) return null;
+  if (!user || !isAdminUser(user)) return null;
   return user;
+}
+
+// 管理画面のページの最初で呼ぶ。管理者でなければ管理者ログインへ転送する。
+export async function requireAdmin() {
+  const admin = await getCurrentAdmin();
+  if (!admin) redirect("/admin-login");
+  return admin;
+}
+
+// 管理者の確認が済んでから、強い鍵（service_role）のクライアントを返す。
+// 管理画面のページとアクションはこれを使う（確認を忘れて強い鍵を使うことがないように）。
+export async function adminDb() {
+  const admin = await requireAdmin();
+  return { admin, db: createAdminClient() };
 }

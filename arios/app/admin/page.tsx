@@ -1,3 +1,4 @@
+import { adminDb } from "@/lib/auth";
 import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { STATUS_ACTIVE } from "./inquiries/constants";
@@ -76,7 +77,7 @@ async function dealCount(
 }
 
 export default async function AdminDashboard() {
-  const admin = createAdminClient();
+  const { db: admin } = await adminDb();
   const [
     vehicles,
     owners,
