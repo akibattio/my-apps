@@ -26,6 +26,8 @@ on:
 permissions:
   contents: read
 
+# 外部のプルリクエストでは起動しない（きっかけは schedule と workflow_dispatch だけ）。
+# 外部のアクションはコミット番号で固定。秘密はそれを使うステップにだけ渡す。入力値はシェルに直接埋め込まず環境変数で渡し、形を確かめてから使う。
 concurrency:
   group: ad-automation-monthly
   cancel-in-progress: false
@@ -34,41 +36,21 @@ jobs:
   export:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      YAHOO_ADS_CLIENT_ID: ${{ secrets.YAHOO_ADS_CLIENT_ID }}
-      YAHOO_ADS_CLIENT_SECRET: ${{ secrets.YAHOO_ADS_CLIENT_SECRET }}
-      YAHOO_ADS_REFRESH_TOKEN: ${{ secrets.YAHOO_ADS_REFRESH_TOKEN }}
-      YAHOO_ADS_BASE_ACCOUNT_ID: ${{ secrets.YAHOO_ADS_BASE_ACCOUNT_ID }}
-      YAHOO_ADS_API_VERSION: ${{ secrets.YAHOO_ADS_API_VERSION }}
-      MS_ADS_DEVELOPER_TOKEN: ${{ secrets.MS_ADS_DEVELOPER_TOKEN }}
-      MS_ADS_CUSTOMER_ID: ${{ secrets.MS_ADS_CUSTOMER_ID }}
-      MS_ADS_ACCOUNT_ID: ${{ secrets.MS_ADS_ACCOUNT_ID }}
-      MS_ADS_ENVIRONMENT: ${{ secrets.MS_ADS_ENVIRONMENT }}
-      MS_ADS_GOOGLE_CLIENT_ID: ${{ secrets.MS_ADS_GOOGLE_CLIENT_ID }}
-      MS_ADS_GOOGLE_CLIENT_SECRET: ${{ secrets.MS_ADS_GOOGLE_CLIENT_SECRET }}
-      MS_ADS_GOOGLE_REFRESH_TOKEN: ${{ secrets.MS_ADS_GOOGLE_REFRESH_TOKEN }}
-      MS_ADS_CLIENT_ID: ${{ secrets.MS_ADS_CLIENT_ID }}
-      MS_ADS_CLIENT_SECRET: ${{ secrets.MS_ADS_CLIENT_SECRET }}
-      MS_ADS_REFRESH_TOKEN: ${{ secrets.MS_ADS_REFRESH_TOKEN }}
-      MS_ADS_REDIRECT_URI: ${{ secrets.MS_ADS_REDIRECT_URI }}
-      # 担当者がコンソールで追加した Yahoo!/Microsoft アカウント（KV mediaAccounts）を wrangler で読む
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      DO_PUSH: ${{ github.event_name == 'schedule' || inputs.push }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           path: my-apps
           sparse-checkout: ad-automation
+          persist-credentials: false
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           repository: akibattio/report-glass
           ref: master
           path: report-glass
           ssh-key: ${{ secrets.REPORT_GLASS_DEPLOY_KEY }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: "3.11"
 
@@ -77,9 +59,34 @@ jobs:
 
       - name: 先月分を書き出し（読み取りのみ）
         working-directory: my-apps/ad-automation
+        env:
+          MONTH_INPUT: ${{ inputs.month }}
+          YAHOO_ADS_CLIENT_ID: ${{ secrets.YAHOO_ADS_CLIENT_ID }}
+          YAHOO_ADS_CLIENT_SECRET: ${{ secrets.YAHOO_ADS_CLIENT_SECRET }}
+          YAHOO_ADS_REFRESH_TOKEN: ${{ secrets.YAHOO_ADS_REFRESH_TOKEN }}
+          YAHOO_ADS_BASE_ACCOUNT_ID: ${{ secrets.YAHOO_ADS_BASE_ACCOUNT_ID }}
+          YAHOO_ADS_API_VERSION: ${{ secrets.YAHOO_ADS_API_VERSION }}
+          MS_ADS_DEVELOPER_TOKEN: ${{ secrets.MS_ADS_DEVELOPER_TOKEN }}
+          MS_ADS_CUSTOMER_ID: ${{ secrets.MS_ADS_CUSTOMER_ID }}
+          MS_ADS_ACCOUNT_ID: ${{ secrets.MS_ADS_ACCOUNT_ID }}
+          MS_ADS_ENVIRONMENT: ${{ secrets.MS_ADS_ENVIRONMENT }}
+          MS_ADS_GOOGLE_CLIENT_ID: ${{ secrets.MS_ADS_GOOGLE_CLIENT_ID }}
+          MS_ADS_GOOGLE_CLIENT_SECRET: ${{ secrets.MS_ADS_GOOGLE_CLIENT_SECRET }}
+          MS_ADS_GOOGLE_REFRESH_TOKEN: ${{ secrets.MS_ADS_GOOGLE_REFRESH_TOKEN }}
+          MS_ADS_CLIENT_ID: ${{ secrets.MS_ADS_CLIENT_ID }}
+          MS_ADS_CLIENT_SECRET: ${{ secrets.MS_ADS_CLIENT_SECRET }}
+          MS_ADS_REFRESH_TOKEN: ${{ secrets.MS_ADS_REFRESH_TOKEN }}
+          MS_ADS_REDIRECT_URI: ${{ secrets.MS_ADS_REDIRECT_URI }}
+          # 担当者がコンソールで追加した Yahoo!/Microsoft アカウント（KV mediaAccounts）を wrangler で読む
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # 記録（公開）に出るのは件数・成否だけ（scripts/adops_log.py）。識別名や数字は出さない
         run: |
-          MONTH="${{ inputs.month }}"
+          MONTH="$MONTH_INPUT"
           [ -n "$MONTH" ] || MONTH=$(TZ=Asia/Tokyo date -d "$(TZ=Asia/Tokyo date +%Y-%m-01) -1 month" +%Y-%m)
+          if ! printf '%s' "$MONTH" | grep -Eq '^20[0-9]{2}-(0[1-9]|1[0-2])$'; then
+            echo "対象月は YYYY-MM で指定してください"; exit 1
+          fi
           echo "MONTH=$MONTH" >> "$GITHUB_ENV"
           echo "対象月: $MONTH"
           RG="$GITHUB_WORKSPACE/report-glass"
@@ -90,17 +97,21 @@ jobs:
 
       - name: report-glass へ commit/push
         working-directory: report-glass
+        env:
+          OVERWRITE: ${{ inputs.overwrite }}
+          DO_PUSH: ${{ github.event_name == 'schedule' || inputs.push }}
         run: |
-          # 既にあるファイルは戻す＝新しい月だけ追加（例：tenjikai の Microsoft は CSV で補った分を手で維持している）
-          if [ "${{ inputs.overwrite }}" != "true" ]; then
-            git diff --name-only -- pipeline/yahoo pipeline/microsoft | sed 's/^/上書きしない: /'
+          # 既にあるファイルは戻す＝新しい月だけ追加（手で補った分＝CSV から足した項目などを消さない）
+          if [ "$OVERWRITE" != "true" ]; then
+            echo "上書きしない既存ファイル: $(git diff --name-only -- pipeline/yahoo pipeline/microsoft | wc -l | tr -d ' ')件"
             git checkout -- pipeline/yahoo pipeline/microsoft
           fi
           git add pipeline/yahoo/*-"$MONTH".json pipeline/microsoft/*-"$MONTH".json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "変更なし（push不要）"; exit 0
           fi
-          git diff --cached --stat
+          # ファイル名には識別名が入るので、記録には件数だけ出す
+          echo "追加・更新: $(git diff --cached --name-only | wc -l | tr -d ' ')ファイル"
           git config user.name "ad-automation (GitHub Actions)"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -q -m "Yahoo/Microsoft ${MONTH} を自動取得（my-apps ad-automation-monthly）" -- pipeline/yahoo pipeline/microsoft
@@ -108,5 +119,5 @@ jobs:
             git push -q origin master && echo "push 完了 → Render が自動デプロイ"
           else
             # 手動の確認実行：書き込み権限だけ確かめて、実際には送らない
-            git push --dry-run origin master && echo "（確認のみ・push していません）"
+            git push --dry-run -q origin master && echo "（確認のみ・push していません）"
           fi

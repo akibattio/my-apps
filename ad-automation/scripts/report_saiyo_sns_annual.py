@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""採用SNS（ミスマッチナッシー）通年 分析・改善レポート HTML 生成（月次推移グラフ統合版）。
+"""採用SNS 通年 分析・改善レポート HTML 生成（月次推移グラフ統合版）。
 
-bespoke: customer 3784292445 のミスマッチナッシー3キャンペーン専用。所見/提案(P1〜P6)/除外KW候補は
-本ファイルに直書き（数値の根拠は下記データJSON）。他アカウントへ流用する場合は内容を書き換えること。
+bespoke: 自社の採用SNS広告（1アカウント内の数キャンペーン）専用。所見/提案/除外KW候補・数値・対象の名前は
+report_content.json（Git管理外）に置く。他アカウントへ流用する場合は report_content.json を書き換えること。
 
 データ配置（既定 data/saiyo_sns/ ・第1引数でディレクトリ指定可）:
-  mmn_pmax.json    … scripts/google_pmax_creatives.py 3784292445 <out> 2025-01-01 2026-07-06
-  mmn_monthly.json … campaign.name LIKE '%ミスマッチ%' の月次(合算 monthly[]＋per_campaign{})
+  report_content.json … 見出し・所見・提案・数値（見本: data/samples/saiyo_sns/report_content.example.json）
+  mmn_pmax.json    … scripts/google_pmax_creatives.py <customer_id> <out> <開始日> <終了日>
+  mmn_monthly.json … 対象キャンペーン（名前に report_content.json の campaign_match を含む）の月次(合算 monthly[]＋per_campaign{})
 使い方: python3 scripts/report_saiyo_sns_annual.py [data_dir]  → out/google_kaizen_saiyo_sns.html
 """
 import sys, json, html
@@ -16,18 +17,20 @@ S = sys.argv[1] if len(sys.argv) > 1 else "data/saiyo_sns"
 PMAX = json.loads(Path(f"{S}/mmn_pmax.json").read_text(encoding="utf-8"))
 MON = json.loads(Path(f"{S}/mmn_monthly.json").read_text(encoding="utf-8"))
 M = MON["monthly"]; PC = MON["per_campaign"]
+
+# 社名・ID・数値・所見文は Git に入らない {S}/report_content.json から読む（公開リポジトリに実データを置かない）。
+# 項目の見本（値は架空）: data/samples/saiyo_sns/report_content.example.json
+from types import SimpleNamespace
+C = json.loads(Path(f"{S}/report_content.json").read_text(encoding="utf-8"))
+K = SimpleNamespace(**C)  # 本文（f-string）から {K.項目} で参照
 OUT = Path("out/google_kaizen_saiyo_sns.html")
 
 def yen(n): return "¥"+format(round(n), ",")
 def num(n): return format(round(n), ",")
 
 # 配信別実績（2026 YTD・採用SNS抽出）
-ROWS = [
-    ("検索_ミスマッチナッシー", 272660, 2688, 202, 11, 24787),
-    ("デマンドジェネレーション", 108117, 176119, 1099, 0, None),
-    ("P-MAX_ミスマッチナッシー", 68800, 81885, 612, 6, 11467),
-]
-TOT = ("採用SNS 合計", 449577, 260692, 1913, 17, 26446)
+ROWS = C["rows"]
+TOT = C["total"]
 
 def perf_rows():
     r = []
@@ -41,17 +44,17 @@ def perf_rows():
     return "\n".join(r)
 
 # 目標CPA判定（担当合意値：有効問い合わせ ¥20,000/件）
-TARGET_CPA = 20000
-MBUDGET = 80000  # 同予算の月次目安（直近ペース）
+TARGET_CPA = C["target_cpa"]
+MBUDGET = C["monthly_budget"]  # 同予算の月次目安（直近ペース）
 bym = {d["m"]: d for d in M}
 def target_section():
-    may, jun = bym.get("2026-05"), bym.get("2026-06")
+    may, jun = bym.get(C["recent_months"][0]), bym.get(C["recent_months"][1])
     rc = (may["cost"] + jun["cost"]) if may and jun else 0
     rv = (may["cv"] + jun["cv"]) if may and jun else 0
     recent = rc/rv if rv else None
     jcpa = jun["cost"]/jun["cv"] if jun and jun["cv"] else None
-    scen = [("通年(YTD)平均", 449577/17, None), ("直近2ヶ月(5-6月)", recent, None),
-            ("6月単月", jcpa, None), ("改善後(推定・保守〜楽観)", None, "¥8,500〜11,000")]
+    scen = [("通年(YTD)平均", C["ytd_cpa"], None), (C["recent_label"], recent, None),
+            ("6月単月", jcpa, None), ("改善後(推定・保守〜楽観)", None, C["improved_range"])]
     rows = []
     for name, cp, txt in scen:
         if txt:
@@ -64,9 +67,9 @@ def target_section():
     be_cv = MBUDGET / TARGET_CPA
     be_valid = (recent/TARGET_CPA*100) if recent else None
     cards = (f"<div class='cards'>"
-             f"<div class='card'><div class='lab'>目標CPA（合意値）</div><div class='val num'>¥20,000</div><div class='sub'>有効問い合わせ/件</div></div>"
-             f"<div class='card'><div class='lab'>直近実績CPA</div><div class='val num'>{yen(recent)}</div><div class='sub'>5-6月・目標を下回る</div></div>"
-             f"<div class='card'><div class='lab'>損益分岐CV</div><div class='val num'>{be_cv:.1f}</div><div class='sub'>件/月（同予算¥8万）</div></div>"
+             f"<div class='card'><div class='lab'>目標CPA（合意値）</div><div class='val num'>{K.card_target_val}</div></div>"
+             f"<div class='card'><div class='lab'>直近実績CPA</div><div class='val num'>{yen(recent)}</div><div class='sub'>{K.card_recent_sub}</div></div>"
+             f"<div class='card'><div class='lab'>損益分岐CV</div><div class='val num'>{be_cv:.1f}</div><div class='sub'>{K.card_breakeven_sub}</div></div>"
              f"<div class='card'><div class='lab'>必要な有効率</div><div class='val num'>{be_valid:.0f}%</div><div class='sub'>記録CVのうち有効なら達成</div></div></div>")
     tbl = ("<div class='tbl'><table><thead><tr><th>局面</th><th>CPA</th><th>対目標</th><th>判定</th></tr></thead><tbody>"
            + "\n".join(rows) + "</tbody></table></div>")
@@ -84,24 +87,7 @@ def mini_cards():
         f'<canvas id="c_{k}" width="620" height="200"></canvas></div>' for k, name, _ in METRICS)
 
 # 要対応
-ISSUES = [
-    ("fail", "① デマンドジェネレーション：¥108,117 消化・CV0", "上長",
-     "176,119表示・1,099クリックで<b>CV0</b>。日予算¥2,500に対し消化¥108k（無駄消化基準を大幅超過）。",
-     "推定：DGは認知向け（上位ファネル）。B2B採用SNSの直接問い合わせを最終クリックで取りにくく、オーディエンス/訴求のミスマッチ。",
-     "直接CV目的での運用停止を継続。再開時は上位KPI（訪問・動画視聴）で評価し少額テストから。予算は成果のある検索KWへ。"),
-    ("warn", "② 計測の質：ページ表示を「主要CV」に設定", "担当（要記録）",
-     "「ミスマッチナッシー問い合わせ完了」が <b>type=PAGE_VIEW かつ 主要CV=True</b>。別に「ページビュー」もCV有効。酷似名の重複あり（_問い合わせ完了(SIGNUP) と 問い合わせ完了(PAGE_VIEW)）。",
-     "推定：ページ表示を成果計上→CV水増し／スマート入札の誤学習。",
-     "主要CVを実問い合わせ（SIGNUP/フォーム完了）に一本化。PAGE_VIEW系は主要から外す。重複を統合。"),
-    ("warn", "③ 無駄消化・検索：フレーズ一致が競合/無関係語へ流出", "担当",
-     "検索CPA¥24,787。検索語句で競合名（SAKIYOMI・マルゴト・ヒトトレ・トルトルくん・アルパカsns・フェリエスト・バズリク）や無関係（tiktok/instagram/youtube運用代行・個人・成果報酬）に多数支出・ほぼCV0。KW「採用SNS代行」[P]は¥69,978でCV1（<b>CPA¥70k</b>）。",
-     "推定：フレーズ/部分一致＋除外KW不足で意図しない検索に配信。",
-     "除外KW追加・低効率KW停止・成果KW集約（下記P1〜P3）。"),
-    ("warn", "④ PMax脆弱：素材不足で広告の有効性 UNKNOWN", "担当→承認",
-     "P-MAX_ミスマッチナッシー 強度<b>UNKNOWN</b>・全素材種で本数不足・<b>動画/ロゴ/縦型画像なし</b>。¥68,800/6CV/¥11,467。",
-     "推定：素材不足で機械学習が最適化できず品質低。",
-     "素材拡充（P6）。整うまで再開保留。"),
-]
+ISSUES = C["issues"]
 def issues_html():
     SEV = {"fail": ("#AE4A26", "#FBECE4", "重度"), "warn": ("#B7791F", "#FBF1DD", "注意")}
     b = []
@@ -114,24 +100,17 @@ def issues_html():
                  f"<div class='il'><span class='ik'>提案</span>{act}</div></div>")
     return "\n".join(b)
 
-PROPS = [
-    ("P1", "除外KW追加（競合名）", "なし → SAKIYOMI/マルゴト/ヒトトレ/トルトルくん/アルパカsns/フェリエスト/バズリク 等を除外", "担当"),
-    ("P2", "低効率KW停止", "「採用SNS代行」[P]¥70k/CV1・[B]¥16k/CV0 → PAUSED", "担当"),
-    ("P3", "成果KWへ集約", "分散 → 「sns 運用 外注」(¥86k/7CV=唯一の成果源)中心＋完全一致化", "担当"),
-    ("P4", "CV計測是正", "PAGE_VIEW主要 → 問い合わせ完了(SIGNUP)一本化・重複統合", "担当（要記録）"),
-    ("P5", "DG停止継続/再設計", "直接CV目的で稼働 → 停止 or 上位KPI評価・少額", "上長"),
-    ("P6", "PMax素材拡充", "動画0/ロゴ0/縦型0・全種本数不足 → 推奨本数を充足", "担当→承認"),
-]
+PROPS = C["props"]
 def props_html():
     return "\n".join(f"<tr><td class='pid'>{p}</td><td class='kw'>{n}</td><td>{html.escape(ba)}</td><td class='ap'>{ap}</td></tr>"
                      for p, n, ba, ap in PROPS)
 
-EXCLUDE_SAFE = ["株式会社sakiyomi", "マルゴト", "ヒトトレ", "トルトルくん", "アルパカ sns", "フェリエスト", "バズリク"]
-EXCLUDE_CHECK = ["tiktok 運用 代行", "instagram 運用 代行", "youtube 運用 代行", "sns 運用 代行 大阪", "成果 報酬", "個人"]
+EXCLUDE_SAFE = C["exclude_safe"]
+EXCLUDE_CHECK = C["exclude_check"]
 def chips(xs, cls): return "".join(f"<span class='chip {cls}'>{html.escape(x)}</span>" for x in xs)
 
 def pmax_html():
-    g = next((x for x in PMAX["asset_groups"] if "ミスマッチ" in x["name"]), None)
+    g = next((x for x in PMAX["asset_groups"] if C["campaign_match"] in x["name"]), None)
     if not g: return ""
     STR = {"EXCELLENT": ("#3C7A52", "優良"), "GOOD": ("#3C7A52", "良好"), "AVERAGE": ("#B7791F", "平均"),
            "POOR": ("#AE4A26", "低い"), "UNKNOWN": ("#AE4A26", "未評価/不足"), "PENDING": ("#8b95a3", "評価中")}
@@ -155,22 +134,10 @@ def pmax_html():
             f"<span>CPA <b>{cpa}</b></span></div><div class='cov-wrap'>{cov}</div>{gal}"
             f"<div class='txts'>{texts}</div></div>")
 
-# 着地ページ(LPO) 所見（https://www.sofcom.co.jp/business/sns/ を実取得して評価）
-LPO_URL = "https://www.sofcom.co.jp/business/sns/"
-LPO_SCORES = [
-    ("メッセージ一致", 55, "ブランド名は一致。ただし成果KW『sns 運用 外注』(汎用SNS外注)とLP(採用特化・H1「人事担当者をラクにするSNS運用代行」)で意図がズレ、離脱を招く。"),
-    ("フォーム", 35, "LP内に入力フォームがなく、CTAは別ページ /contact-sns/ へ遷移。1クリック余分でCV最大の漏れ。"),
-    ("信頼要素", 60, "事例3社(和田電気/セレスポ/マハロ)・自社SNS実績・会社概要あり。ただし定量成果(応募数等)の記載なし。"),
-    ("モバイル", 70, "tel:リンクあり◎。タップ領域・実速度は未検証。"),
-    ("表示速度", None, "未計測。アニメ付きヒーロー(スマホ画面複数)で重い可能性。PageSpeed Insightsでの実測が必要。"),
-]
-LPO_WINS = [
-    ("1", "LP内に短いフォーム(氏名・会社・連絡先の3項目)を設置し、別ページ遷移を廃止", "+10〜25% CVR"),
-    ("2", "広告↔LPの意図統一：採用狙いなら『採用 sns』系KWへ寄せ汎用語を除外／汎用も獲るなら汎用SNS運用LPを別途", "無駄クリック減・CV質↑"),
-    ("3", "CTA文言を行動喚起へ(「お問い合わせ」→「無料で相談する」)＋資料DLの軽いCVを追加", "上位ファネル(PMax/DG)の取りこぼし回収"),
-    ("4", "事例に定量成果(応募数・採用単価の改善幅)を付与", "信頼↑・CVR↑"),
-    ("5", "ヒーロー画像/アニメを軽量化(WebP・遅延読込) ※要速度実測", "表示改善"),
-]
+# 着地ページ(LPO) 所見（report_content.json の lpo_url を実取得して評価）
+LPO_URL = C["lpo_url"]
+LPO_SCORES = C["lpo_scores"]
+LPO_WINS = C["lpo_wins"]
 def lpo_section():
     rows = []
     for name, sc, note in LPO_SCORES:
@@ -182,9 +149,7 @@ def lpo_section():
         rows.append(f"<div class='lpo-row'><span class='lpo-lab'>{name}</span>{bar}<span class='lpo-val'>{valv}</span></div>"
                     f"<div class='lpo-note'>{html.escape(note)}</div>")
     wins = "".join(f"<tr><td class='pid'>{p}</td><td>{html.escape(a)}</td><td class='ap'>{html.escape(e)}</td></tr>" for p, a, e in LPO_WINS)
-    key = ("<div class='lpo-key'><b>核心：LPは採用特化なのに、費用を集めているKWは汎用SNS運用外注。</b>"
-           "この意図ズレがCPA¥15k・低CVの構造的原因と考えられます（推定）。検索語句に競合名や"
-           "『tiktok/instagram運用代行』等の汎用意図が多数混入し、採用特化LPと合わず0CVに。</div>")
+    key = C["lpo_key_html"]
     return (f"<p class='caption' style='margin-top:0'>対象LP：<a href='{LPO_URL}' target='_blank'>{LPO_URL}</a>（実取得して評価）</p>"
             f"<div class='lpo'>{''.join(rows)}</div>{key}"
             f"<div class='tbl' style='margin-top:12px'><table><thead><tr><th>優先</th><th>クイックウィン（下書き）</th><th>期待効果</th></tr></thead><tbody>{wins}</tbody></table></div>")
@@ -249,30 +214,29 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);display
 @media(max-width:600px){.sheet{padding:34px 18px 52px}.cards{grid-template-columns:1fr 1fr}.meta,.txts,.grid-sm{grid-template-columns:1fr}}
 """
 
+def meta_html():
+    return "\n    ".join(f"<div><dt>{dt}</dt><dd>{dd}</dd></div>" for dt, dd in C["meta"])
+
+def cards_html():
+    return "".join(f'\n    <div class="card"><div class="lab">{lab}</div><div class="val num">{v}</div><div class="sub">{sub}</div></div>'
+                   for lab, v, sub in C["cards"]) + "\n"
+
 HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>採用SNS（ミスマッチナッシー）分析・改善</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>{K.title}</title>
 <style>{CSS}</style></head><body><main class="sheet">
 <header>
-  <div class="eyebrow">Google広告 分析・改善レポート ・ 採用SNS</div>
-  <h1>採用SNS（ミスマッチナッシー）分析・改善</h1>
+  <div class="eyebrow">{K.eyebrow}</div>
+  <h1>{K.title}</h1>
   <span class="draft">下書き（未適用）・ 実データ（Google Ads API）</span>
   <dl class="meta">
-    <div><dt>対象</dt><dd>customer 3784292445（【SC】コーポレートサイト 内）</dd></div>
-    <div><dt>抽出</dt><dd>ミスマッチナッシー 3キャンペーン</dd></div>
-    <div><dt>期間</dt><dd>2026年1月〜6月（YTD）</dd></div>
-    <div><dt>状態</dt><dd>全キャンペーン停止中</dd></div>
+    {meta_html()}
   </dl>
 </header>
 
 <section>
   <div class="sec-label">01 — サマリ</div>
-  <div class="summary">採用SNSは <b>¥449,577 消化・CV17件・CPA約¥26,446</b> と、同アカウントのWeb広告LP系（CPA¥4,256〜6,383）比で <b>4〜6倍非効率</b>。ただし月次では改善傾向で、<b>序盤（1〜3月）はCPA¥69,000〜78,000</b> だったが、デマンドジェネを停止しP-MAX投入・検索調整で <b>5〜6月はCPA¥10,563／¥15,121</b> まで低下。主因は①DGの成果ゼロ消化、②検索の競合/無関係語流出、③CV計測の質、④PMax素材不足。要対応4件・改善提案6件。</div>
-  <div class="cards">
-    <div class="card"><div class="lab">費用（YTD）</div><div class="val num">¥449,577</div><div class="sub">採用SNS 3キャンペーン計</div></div>
-    <div class="card"><div class="lab">CV</div><div class="val num">17</div><div class="sub">件</div></div>
-    <div class="card"><div class="lab">CPA</div><div class="val num">¥26,446</div><div class="sub">直近は¥10〜15kへ改善</div></div>
-    <div class="card"><div class="lab">無駄消化</div><div class="val num">¥108,117</div><div class="sub">DG・CV0</div></div>
-  </div>
+  <div class="summary">{K.summary_html}</div>
+  <div class="cards">{cards_html()}  </div>
 </section>
 
 <section>
@@ -280,23 +244,23 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
   <div class="tbl"><table>
     <thead><tr><th>キャンペーン</th><th>費用</th><th>表示</th><th>クリック</th><th>CV</th><th>CPA</th></tr></thead>
     <tbody>{perf_rows()}</tbody></table></div>
-  <p class="caption">※内部基準として同アカウントWeb広告LP系 CPA¥4〜6千を参照。目標CPAは下記03で判定。</p>
+  <p class="caption">{K.caption_perf}</p>
 </section>
 
 <section>
-  <div class="sec-label">03 — 目標CPA判定（有効問い合わせ ¥20,000/件）</div>
+  <div class="sec-label">03 — {K.label_target}</div>
   {target_section()}
-  <p class="caption">担当合意値 <b>¥20,000/件</b> に対し、<b>直近2ヶ月(5-6月)はCPA¥12,491で達成</b>。通年平均は序盤のデマンドジェネ浪費で未達だが、同予算（月約¥8万）なら<b>月4.0件で損益分岐</b>・直近は月約6.5件で上回る。ただし目標は「<b>有効</b>問い合わせ」のため、記録CVのうち有効が約63%以上なら現状効率で達成（改善後は50%でも可）。有効率の実測を推奨。信頼度：中。</p>
+  <p class="caption">{K.caption_target_html}</p>
 </section>
 
 <section>
-  <div class="sec-label">04 — 月次推移（2026年1〜6月）</div>
+  <div class="sec-label">04 — {K.label_monthly}</div>
   <div class="grid-sm">{mini_cards()}</div>
   <div class="wide">
     <div class="legend">{''.join(f'<span><i style="background:{c}"></i>{n}</span>' for n,c in CAMPS)}</div>
     <canvas id="stack" width="860" height="360"></canvas>
   </div>
-  <p class="caption">上：各指標の月次推移（縦軸目盛り付き）。下：費用を配信方法別に積み上げ。デマンドジェネ（橙）は1〜3月のみ・成果ゼロ、5月からP-MAX（緑）へ配分移行し、CV/CPAが改善。</p>
+  <p class="caption">{K.caption_monthly}</p>
 </section>
 
 <section>
@@ -333,10 +297,10 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
 
 <section>
   <div class="sec-label">10 — 注記</div>
-  <p class="caption">実データ（Google Ads API・2025-01〜2026-07-06、採用SNS3キャンペーン抽出）。目標CPA未設定のため良否は内部相対＋全社既定しきい値で判定（要確認）。全キャンペーン停止中。本レポートは再開を前提とした改善<b>下書き</b>で、<b>適用は人間の承認後のみ</b>（CLAUDE.md §0）。医療・薬機の対象外。</p>
+  <p class="caption">{K.caption_notes_html}</p>
 </section>
 
-<footer><span>ソフトコミュニケーションズ ／ 広告運用 半自動化</span><span class="num">2026-07-06</span></footer>
+<footer><span>ソフトコミュニケーションズ ／ 広告運用 半自動化</span><span class="num">{K.footer_date}</span></footer>
 </main>
 <script>
 const M={json.dumps(M, ensure_ascii=False)};

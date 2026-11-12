@@ -48,7 +48,7 @@ mkdir -p logs
   # 本番コンソール(sofcom-adops.pages.dev)へ反映。認証情報は .env の CLOUDFLARE_API_TOKEN/ACCOUNT_ID（wranglerが読む）
   # launchd はPATHが最小なので node/npx は絶対パスで呼ぶ
   NODE_BIN="/Users/som-013/.nvm/versions/node/v24.15.0/bin"
-  deploy_out=$(PATH="$NODE_BIN:$PATH" "$NODE_BIN/npx" -y wrangler@4 pages deploy console --project-name sofcom-adops \
+  deploy_out=$(PATH="$NODE_BIN:$PATH" "$NODE_BIN/npx" -y wrangler@4.158.0 pages deploy console --project-name sofcom-adops \
        --branch main --commit-hash "$(git rev-parse --short HEAD)" --commit-dirty=true 2>&1)
   if echo "$deploy_out" | grep -q "Deployment complete"; then
     echo "本番コンソールへ反映しました"

@@ -26,6 +26,7 @@ import os, re, sys, json, ssl, smtplib, statistics, urllib.request
 from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 JST = timezone(timedelta(hours=9))
 PROJ = Path(__file__).resolve().parent.parent
@@ -282,7 +283,7 @@ def notify(msg: str) -> str:
             return "メール送信"
         return f"未知の通知先: {ch}"
     except Exception as e:
-        return f"送信失敗（{ch}）: {str(e)[:80]}"
+        return f"送信失敗（{ch}）: {err(e)}"
 
 
 def main():
@@ -328,7 +329,7 @@ def main():
                 cadence_map[name] = cad
                 alerts += daily_checks(acct, tdy, cad)
         except Exception as e:
-            print("daily.json 判定失敗:", str(e)[:80])
+            print("daily.json 判定失敗:", err(e))
 
     # Google検索の診断（改善：IS大幅低下・不要検索クエリ）
     sd_path = PROJ / "data" / "search_diag.json"
@@ -339,7 +340,7 @@ def main():
                 cad = cadence_map.get(a.get("client")) or bench_cad.get(a.get("client")) or "daily"
                 alerts += search_check(a, cad, tdy)
         except Exception as e:
-            print("search_diag.json 判定失敗:", str(e)[:80])
+            print("search_diag.json 判定失敗:", err(e))
 
     generated = datetime.now(JST).strftime("%Y-%m-%d %H:%M JST")
     msg = build_message(alerts, data.get("period", "直近30日"), generated, n_proposals=len(data.get("proposals") or []))
@@ -360,8 +361,9 @@ def main():
     # 3) 通知（--send かつ 通知先設定時のみ）
     result = notify(msg) if send else "ドライラン（--send未指定・送信なし）"
 
-    print(msg)
-    print(f"\n[monitor] アラート{len(alerts)}件 / 通知: {result}")
+    detail(msg)  # 通知の本文（社内宛て）は記録に出さない
+    crit = sum(1 for x in alerts if x["severity"] == "critical")
+    print(f"[monitor] アラート{len(alerts)}件（うち重大 {crit}） / 通知: {result}")
 
 
 if __name__ == "__main__":

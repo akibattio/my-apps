@@ -10,12 +10,33 @@ from __future__ import annotations
 import os, re, json, urllib.request, urllib.parse, urllib.error
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 JST = timezone(timedelta(hours=9))
 BASE = "https://graph.facebook.com/v21.0"
 # 監視対象から外すアカウント（未使用など）。名前で完全一致。
 # ※これは自社システムの表示/取得除外。Meta側の権限解除は Business設定で別途行う。
-EXCLUDE_ACCOUNTS = {"【SC用】RiceLog2"}
+# 公開リポジトリに口座名を置かないため、環境変数 ADOPS_EXCLUDE_ACCOUNTS（JSON の配列 または 改行/カンマ区切り）から読む。
+# 手元は .env、GitHub Actions は Secret ADOPS_EXCLUDE_ACCOUNTS。未設定なら除外なし。
+def _exclude_accounts() -> set:
+    raw = os.environ.get("ADOPS_EXCLUDE_ACCOUNTS", "")
+    if not raw:  # 手元：.env にだけ書いてある場合（load_env より先に読まれるため直接見る）
+        try:
+            for ln in (Path(__file__).resolve().parent.parent / ".env").read_text(encoding="utf-8").splitlines():
+                if ln.strip().startswith("ADOPS_EXCLUDE_ACCOUNTS="):
+                    raw = ln.split("=", 1)[1].strip()
+        except Exception:
+            pass
+    raw = raw.strip()
+    if raw.startswith("["):
+        try:
+            return {str(x).strip() for x in json.loads(raw) if str(x).strip()}
+        except Exception:
+            return set()
+    return {x.strip() for x in re.split(r"[,\n]", raw) if x.strip()}
+
+
+EXCLUDE_ACCOUNTS = _exclude_accounts()
 CV_ACTIONS = ("offsite_conversion.fb_pixel_lead", "lead", "complete_registration",
               "offsite_conversion.fb_pixel_complete_registration", "purchase",
               "offsite_conversion.fb_pixel_purchase")
@@ -157,7 +178,8 @@ def pull_google(bench_cfg, lm_days, start_id):
             d7 = _g_agg(r30[-7:] if len(r30) >= 7 else r30)
             lm = _g_agg(_g_rows(ga, cid, "LAST_MONTH"))
         except Exception as e:
-            print(f"  Google取得失敗 {name}: {str(e)[:60]}")
+            print(f"  Google取得失敗: {err(e)}")
+            detail(f"    {name}: {str(e)[:60]}")
             continue
         if d30["spend"] == 0 and lm["spend"] == 0:
             continue  # 休止アカウントは除外
@@ -199,7 +221,7 @@ def pull_yahoo(bench_cfg, lm_days, start_id):
     """設定済みのYahooアカウント（clients/yahoo_accounts.json）の実績を取得。(accounts, proposals) を返す。読み取りのみ。
 
     clients/yahoo_accounts.json の形（accountIdの実値のみ。トークンは.env）:
-      [{"client":"社名","kind":"search","accountId":"1462425"},
+      [{"client":"社名","kind":"search","accountId":"1234567"},
        {"client":"社名","kind":"display","accountId":"1002817859"}]
     未設定/未接続なら安全にスキップ（推測でデータを作らない）。"""
     try:
@@ -214,7 +236,7 @@ def pull_yahoo(bench_cfg, lm_days, start_id):
         from media_accounts import load as load_media_accounts  # ファイル＋コンソール追加分
         entries = load_media_accounts("yahoo")
     except Exception as e:
-        print("yahoo_accounts 読み込み失敗:", e); return [], []
+        print("yahoo_accounts 読み込み失敗:", err(e)); return [], []
     if not entries:
         print("Yahooアカウントが未設定のためYahooはスキップ"); return [], []
 
@@ -239,7 +261,8 @@ def pull_yahoo(bench_cfg, lm_days, start_id):
             d7 = yahoo_summary(acct, kind, d7s, end)
             lm = yahoo_summary(acct, kind, lm_start.isoformat(), lm_end.isoformat())
         except Exception as ex:
-            print(f"  Yahoo取得失敗 {name}({kind}): {str(ex)[:60]}")
+            print(f"  Yahoo取得失敗（{kind}）: {err(ex)}")
+            detail(f"    {name}: {str(ex)[:60]}")
             accounts.append({"id": i + 1, "client": name, "tier": "mid", "monthly": None,
                              "media": media, "kind": kind, "acct": acct, "status": "error",
                              "tokenDays": None, "cp": 0, "sync": datetime.now(JST).strftime("%H:%M 取得"),
@@ -286,9 +309,10 @@ def main():
     except Exception as e:
         accts_resp = {"__error__": str(e)[:200]}
     if "__error__" in accts_resp:
-        err = str(accts_resp.get("__error__"))[:200]
-        print("Meta 取得失敗（トークン失効の可能性・後続媒体は継続）:", err)
-        conn_issues.append({"media": "meta", "detail": err})
+        err_detail = str(accts_resp.get("__error__"))[:200]
+        print("Meta 取得失敗（トークン失効の可能性・後続媒体は継続）:", err(err_detail))
+        detail("   ", err_detail)
+        conn_issues.append({"media": "meta", "detail": err_detail})
         accts = []
     else:
         accts = accts_resp.get("data", [])
@@ -298,7 +322,8 @@ def main():
     excluded = [a.get("name") for a in accts if a.get("name") in EXCLUDE_ACCOUNTS]
     accts = [a for a in accts if a.get("name") not in EXCLUDE_ACCOUNTS]
     if excluded:
-        print("除外（監視対象外）:", ", ".join(excluded))
+        print(f"除外（監視対象外）: {len(excluded)}件")
+        detail("   ", ", ".join(excluded))
 
     # 先月の日数（1日あたり比較に使用）
     _first_this = datetime.now(JST).replace(day=1)
@@ -311,7 +336,7 @@ def main():
         try:
             bench_cfg = json.loads(bpath.read_text(encoding="utf-8")).get("byClient", {})
         except Exception as e:
-            print("benchmarks.json 読み込み失敗（全社既定を使用）:", e)
+            print("benchmarks.json 読み込み失敗（全社既定を使用）:", err(e))
 
     accounts, proposals = [], []
     for i, a in enumerate(accts, 1):
@@ -357,7 +382,7 @@ def main():
     try:
         g_accounts, g_proposals = pull_google(bench_cfg, lm_days, len(accounts))
     except Exception as e:
-        print("Google 取得失敗（後続は継続）:", str(e)[:200]); g_accounts, g_proposals = [], []
+        print("Google 取得失敗（後続は継続）:", err(e)); g_accounts, g_proposals = [], []
         conn_issues.append({"media": "google", "detail": str(e)[:200]})
     accounts += g_accounts
     proposals += g_proposals
@@ -368,7 +393,7 @@ def main():
     try:
         y_accounts, y_proposals = pull_yahoo(bench_cfg, lm_days, len(accounts))
     except Exception as e:
-        print("Yahoo 取得失敗（後続は継続）:", str(e)[:200]); y_accounts, y_proposals = [], []
+        print("Yahoo 取得失敗（後続は継続）:", err(e)); y_accounts, y_proposals = [], []
         conn_issues.append({"media": "yahoo", "detail": str(e)[:200]})
     accounts += y_accounts
     proposals += y_proposals
@@ -406,14 +431,15 @@ def main():
     Path("console").mkdir(exist_ok=True)
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {google_n} / Yahoo {yahoo_n}） / 提案{len(proposals)}件")
+    print(f"  うち取得失敗 {sum(1 for a in accounts if 'spend' not in a)}件")
     for a in accounts:
         if "spend" not in a:  # 取得失敗の行（数値なし）。一覧表示だけ飛ばす
-            print(f"  [{a.get('media', '?'):6}] {str(a.get('client', ''))[:20]:22} 取得失敗")
+            detail(f"  [{a.get('media', '?'):6}] {str(a.get('client', ''))[:20]:22} 取得失敗")
             continue
         # ログ表示だけなので、欠けた数字（取得失敗の期間など）は0で出す。ここで止めない
         mt = a.get("metrics") or {}
         m7, ml = mt.get("d7") or {}, mt.get("lm") or {}
-        print(f"  [{a['media']:6}] {a['client'][:20]:22} 日予算¥{a.get('dailyBudget') or 0:>6,}/日 | 30日:¥{a['spend']:>7,} CV{a.get('cv', 0):>4} | 7日:¥{m7.get('spend', 0):>7,} | 先月:¥{ml.get('spend', 0):>7,}")
+        detail(f"  [{a['media']:6}] {a['client'][:20]:22} 日予算¥{a.get('dailyBudget') or 0:>6,}/日 | 30日:¥{a['spend']:>7,} CV{a.get('cv', 0):>4} | 7日:¥{m7.get('spend', 0):>7,} | 先月:¥{ml.get('spend', 0):>7,}")
 
 
 if __name__ == "__main__":

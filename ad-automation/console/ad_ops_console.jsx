@@ -184,7 +184,22 @@ export default function AdOpsConsole() {
   }, []);
   // アラート対応（確認済み/様子見/メモ）— localStorage＋共有(KV)に保存
   // 媒体アカウントの追加/削除（共有KVのみ。localStorageには持たない＝全員で同じ一覧）
-  const saveMediaAccounts = (list) => { const next = { list }; setMediaAccounts(next); putState("mediaAccounts", next); };
+  // 担当者が追加した Yahoo!/Microsoft のアカウント。保存の入口（_worker.js）が形と識別名の結び付けを検査するので、
+  // 結果を見てから画面に反映する（拒否されたら理由を出し、画面は元のまま）。confirmSlug＝既存の識別名への明示の結び付け。
+  const MEDIA_SAVE_ERR = { slug_bound: "この識別名には別のアカウントが結び付いています", slug_other_client: "この識別名は別のクライアント名で使われています", bad_slug: "識別名の形が正しくありません", duplicate_account: "同じアカウントがすでに登録されています" };
+  const saveMediaAccounts = (list, confirmSlug) => {
+    const next = { list };
+    const q = confirmSlug ? `?confirmSlug=${encodeURIComponent(confirmSlug)}` : "";
+    return fetch(`./api/state/mediaAccounts${q}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && !j.error) { setMediaAccounts(next); return true; }
+        if (j.error === "kv_unbound") { setMediaAccounts(next); return true; } // 共有なし（手元確認時）
+        window.alert(`保存できませんでした：${MEDIA_SAVE_ERR[j.error] || j.error || r.status}`);
+        return false;
+      })
+      .catch(() => { window.alert("保存できませんでした（通信エラー）"); return false; });
+  };
   const saveAlertOps = (next) => { setAlertOps(next); try { localStorage.setItem("adops_alert_ops", JSON.stringify(next)); } catch (e) {} putState("alertOps", next); };
   const setAlertOp = (key, patch) => {
     const cur = alertOps[key] || {};
@@ -1969,12 +1984,18 @@ function MediaAccountsPanel({ list, clients, operator, onSave }) {
     if (!row.client) return setMsg("クライアント名を入れてください（Google広告のMCC表示名と同じ書き方）");
     if (!row.accountId) return setMsg("アカウントIDを数字で入れてください");
     if (isMs && !row.customerId) return setMsg("Microsoftは顧客ID（Customer ID）も必要です");
-    if (row.slug && !/^[a-z0-9]+$/.test(row.slug)) return setMsg("REPORT GLASS識別子は半角英数字のみです（例: tenjikai）");
+    if (row.slug && !/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(row.slug)) return setMsg("REPORT GLASS識別子は半角英小文字・数字・ハイフンのみです（例: tenjikai）");
     if (list.some((x) => x.accountId === row.accountId && x.media === row.media)) return setMsg("同じアカウントがすでに登録されています");
+    const sameSlug = row.slug ? list.filter((x) => x.slug === row.slug) : [];
+    if (sameSlug.some((x) => x.client !== row.client)) return setMsg(`識別子「${row.slug}」は別のクライアント名で使われています`);
+    // 既存の識別子に別のアカウントを足すと、REPORT GLASS では同じレポートに合算される。明示の確認を取ってから送る
+    if (sameSlug.length && !window.confirm(`識別子「${row.slug}」には既に ${sameSlug.length}件のアカウントが結び付いています。\n同じクライアントの別アカウントとして結び付け、レポートで合算しますか？`)) return setMsg("追加を取りやめました");
     if (!isMs) delete row.customerId;
-    onSave([...list, { ...row, addedBy: operator || "", addedAt: new Date().toISOString().slice(0, 10) }]);
-    setF({ ...empty, client: row.client, slug: row.slug });
-    setMsg("追加しました。翌朝の取得からコンソールに出ます。");
+    onSave([...list, { ...row, addedBy: operator || "", addedAt: new Date().toISOString().slice(0, 10) }], sameSlug.length ? row.slug : "").then((ok) => {
+      if (!ok) return setMsg("保存できませんでした（理由は表示のとおり）");
+      setF({ ...empty, client: row.client, slug: row.slug });
+      setMsg("追加しました。翌朝の取得からコンソールに出ます。");
+    });
   };
   const remove = (i) => { if (window.confirm(`${list[i].client} の ${list[i].accountId} を一覧から外しますか？（広告アカウント自体は消えません）`)) onSave(list.filter((_, idx) => idx !== i)); };
   const inp = { padding: "7px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff", minWidth: 0 };

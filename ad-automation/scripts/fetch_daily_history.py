@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_daily_series import load_env, google_daily, meta_daily  # noqa: E402
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 MONTHS = 13          # 何か月さかのぼって保持するか
@@ -50,7 +51,7 @@ def target_accounts() -> list[dict]:
             for e in media_accounts.load("microsoft"):
                 out.append({"client": e.get("client"), "media": "microsoft", "acct": str(e.get("accountId"))})
     except Exception as e:
-        print("  Microsoft口座の読み込みをスキップ:", str(e)[:100])
+        print("  Microsoft口座の読み込みをスキップ:", err(e))
     return out
 
 
@@ -111,7 +112,8 @@ def main():
         f_start = w_start if backfill else max(w_start, today - datetime.timedelta(days=REFRESH_DAYS))
         series = fetch(a, f_start.isoformat(), end)
         if isinstance(series, dict) and "__error__" in series:
-            print(f"  取得失敗（前回までの蓄積を維持）{a['client']}[{a['media']}]: {series['__error__']}")
+            print(f"  取得失敗（前回までの蓄積を維持）[{a['media']}]: {err(series['__error__'])}")
+            detail(f"    {a['client']}: {series['__error__']}")
             ng += 1
             if prev:
                 accts[key] = {**prev, "client": a["client"], "error": series["__error__"]}
@@ -128,7 +130,7 @@ def main():
                       "from": w_start.isoformat() if backfill else (prev.get("from") or w_start.isoformat()),
                       "updated": end, "rows": rows}
         ok += 1
-        print(f"  {a['client'][:22]:24}[{a['media']}] {'13か月取得' if backfill else '直近更新'} "
+        detail(f"  {a['client'][:22]:24}[{a['media']}] {'13か月取得' if backfill else '直近更新'} "
               f"{f_start.isoformat()}〜{end} / 蓄積{len(rows)}日")
 
     # 13か月より古い日を落とす（口座ごと）

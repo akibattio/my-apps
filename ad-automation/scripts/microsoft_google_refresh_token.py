@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Microsoft広告APIを「Googleでサインインするユーザー」で使うための refresh_token 取得（1回だけ）。
 
-背景: Microsoft広告に「Googleでサインイン」で登録されたユーザー（例 promo@sc-scc.com）は、
+背景: Microsoft広告に「Googleでサインイン」で登録されたユーザー（例 ads@example.com）は、
 Microsoftアカウントのトークンだと IdentityTypeMismatch(126) で弾かれる。公式の Google OAuth 経路
 （accounts.google.com で同意 → oauth2.googleapis.com/token）で取ったトークンを使う。
   https://learn.microsoft.com/en-us/advertising/guides/authentication-oauth-get-tokens （Google 節）
@@ -11,7 +11,7 @@ Microsoftアカウントのトークンだと IdentityTypeMismatch(126) で弾�
 - 同意後のコードはこのMacの localhost で自動受信（人がコピーして渡す必要なし＝期限切れが起きない）。
 - 取得した refresh_token は .env の MS_ADS_GOOGLE_REFRESH_TOKEN に保存。画面には出さない（確認用にメールだけ表示）。
 
-使い方: python3 scripts/microsoft_google_refresh_token.py [login_hint]   （既定 promo@sc-scc.com）
+使い方: python3 scripts/microsoft_google_refresh_token.py [login_hint]   （省略時は .env の MS_ADS_LOGIN_HINT）
 """
 from __future__ import annotations
 import base64, json, os, re, sys, threading, urllib.parse, urllib.request
@@ -24,7 +24,7 @@ EYE_ENV = Path.home() / "dev" / "report-eye" / ".env"
 PORT = 5858
 REDIRECT = f"http://localhost:{PORT}/oauth2callback"
 SCOPE = "openid email profile"
-LOGIN_HINT = sys.argv[1] if len(sys.argv) > 1 else "promo@sc-scc.com"
+LOGIN_HINT = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("MS_ADS_LOGIN_HINT", "")
 WAIT_SEC = int(os.environ.get("WAIT_SEC", "3600"))  # 押してもらうまで待つ秒数
 
 

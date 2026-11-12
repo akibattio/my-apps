@@ -21,6 +21,10 @@ venv/
 # 取得データ・生成物（個社の実データはリポジトリに残さない）
 data/*.csv
 data/*.json
+# 下位フォルダの取得データも除外（見本の data/samples/ だけ追跡）
+data/**/*.json
+data/**/*.csv
+!data/samples/**
 !data/samples/
 out/
 *.log
@@ -39,7 +43,13 @@ console/keywords.json
 console/breakdowns.json
 console/history.json
 console/creatives_weekly.json
+console/ga4.json
 
 # 実行ログ
 logs/
-.wrangler/  # wrangler pages dev のローカル状態（試験用KV）
+# wrangler のローカル状態（試験用KV・ログイン情報）。ad-automation/.wrangler と cron-trigger/.wrangler の両方
+# ※ Git の除外指定は行の途中にコメントを書けない（書くと指定ごと効かない）
+.wrangler/
+
+# Claude Code の手元設定（許可の一覧など・端末ごと）
+.claude/settings.local.json

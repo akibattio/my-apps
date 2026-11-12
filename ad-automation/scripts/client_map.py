@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """クライアント名の名寄せ。REPORT GLASS の対応表（report-glass/pipeline/client_slug_map.json）を正とする。
 
-- Meta広告アカウント名（例「TOOGU.shop」）→ 運用名（例「【東海グランド】TOOGU」）。コンソールで媒体別でなく社別にまとめるため
-  修正依頼 2026-11-09（今井）「東海グランドとTOOGU.shopを統合」
+- Meta広告アカウント名（例「example.shop」）→ 運用名（例「【架空商事】example」）。コンソールで媒体別でなく社別にまとめるため
+  修正依頼 2026-11-09（Meta口座と運用名の統合）
 - 運用名 → REPORT GLASS の slug（社別レポートへのリンク用）
 対応表が無い環境では何もしない（名前はそのまま）。
 """

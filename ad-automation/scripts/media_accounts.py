@@ -12,14 +12,29 @@
   microsoft … [{client, accountId, customerId, slug}]
 """
 from __future__ import annotations
-import os, json, shutil, subprocess
+import os, re, json, shutil, subprocess
 from pathlib import Path
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 KV_NAMESPACE_ID = "3248fc5bc14f4f3a807bc4b17a2a7376"  # adops-state（コンソールの _worker.js が STATE で使う）
 # launchd は PATH が最小なので Mac では絶対パスにフォールバック。GitHub Actions では PATH 上の npx を使う。
 NPX = shutil.which("npx") or "/Users/som-013/.nvm/versions/node/v24.15.0/bin/npx"
+WRANGLER_VERSION = "4.158.0"  # 定時実行のデプロイ（.github/workflows/ad-automation-daily.yml）と同じ版
 FILES = {"yahoo": "yahoo_accounts.json", "microsoft": "microsoft_accounts.json"}
+MEDIA_KINDS = {"yahoo": ("yahoo_search", "yahoo_display"), "microsoft": ("microsoft",)}
+# 管理画面の保存の入口（console/_worker.js）と同じ決まり。識別名はファイル名の一部になるので、英小文字・数字・ハイフンだけ。
+SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$")
+ID_RE = re.compile(r"^[0-9]{1,20}$")
+YM_RE = re.compile(r"^20[0-9]{2}-(0[1-9]|1[0-2])$")
+
+
+def valid_slug(s) -> bool:
+    return isinstance(s, str) and bool(SLUG_RE.match(s))
+
+
+def valid_ym(s) -> bool:
+    return isinstance(s, str) and bool(YM_RE.match(s))
 _kv_cache: list | None = None
 
 
@@ -31,17 +46,23 @@ def _kv_entries() -> list:
     _kv_cache = []
     try:
         node_bin = str(Path(NPX).parent)
-        r = subprocess.run([NPX, "-y", "wrangler@4", "kv", "key", "get", "mediaAccounts",
+        # wrangler は版を固定し（配布物の差し替えに巻き込まれない）、渡す環境変数は Cloudflare の2つと動作に要る最小限だけ
+        # （広告媒体のトークンを外部の道具に渡さない）。手元では wrangler が ad-automation/.env からも読む。
+        env = {"PATH": node_bin + ":/usr/bin:/bin", "HOME": os.environ.get("HOME", str(PROJ))}
+        for k in ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "npm_config_cache", "XDG_CONFIG_HOME"):
+            if os.environ.get(k):
+                env[k] = os.environ[k]
+        r = subprocess.run([NPX, "-y", f"wrangler@{WRANGLER_VERSION}", "kv", "key", "get", "mediaAccounts",
                             "--namespace-id", KV_NAMESPACE_ID, "--remote"],
-                           cwd=PROJ, capture_output=True, text=True, timeout=120,
-                           env={**os.environ, "PATH": node_bin + ":/usr/bin:/bin"})
+                           cwd=PROJ, capture_output=True, text=True, timeout=120, env=env)
         out = r.stdout.strip()
         if r.returncode == 0 and out.startswith("{"):
             _kv_cache = json.loads(out).get("list", []) or []
         elif "not found" not in (r.stdout + r.stderr).lower():
-            print("  （コンソール追加分のアカウントを読めず・ファイルのみで続行）", (r.stderr or r.stdout).strip()[:120])
+            print(f"  （コンソール追加分のアカウントを読めず・ファイルのみで続行）終了コード {r.returncode}")
+            detail("   ", (r.stderr or r.stdout).strip()[:120])
     except Exception as e:
-        print("  （コンソール追加分のアカウントを読めず・ファイルのみで続行）", str(e)[:120])
+        print("  （コンソール追加分のアカウントを読めず・ファイルのみで続行）", err(e))
     return _kv_cache
 
 
@@ -50,17 +71,40 @@ def load(media: str) -> list[dict]:
     p = PROJ / "clients" / FILES[media]
     base = [e for e in (json.loads(p.read_text(encoding="utf-8")) if p.exists() else [])
             if isinstance(e, dict) and e.get("accountId")]
+    bad = [e for e in base if e.get("slug") and not valid_slug(e["slug"])]
+    if bad:  # ファイル側でも、ファイル名に使えない識別名は使わない
+        print(f"  {media}: 識別名の形が正しくない {len(bad)}件をファイル側から除外")
+        base = [e for e in base if e not in bad]
     seen = {str(e["accountId"]) for e in base}
+    slug_owner = {e["slug"]: e.get("client", "") for e in base if e.get("slug")}
+    skipped = 0
     for e in _kv_entries():
-        m, acct = e.get("media", ""), str(e.get("accountId", "")).strip()
-        if not acct or acct in seen or not m.startswith(media):
+        if not isinstance(e, dict):
+            skipped += 1; continue
+        m, acct = str(e.get("media", "")), str(e.get("accountId", "")).strip()
+        if m not in MEDIA_KINDS[media]:
             continue
-        row = {"client": e.get("client", ""), "accountId": acct, "slug": e.get("slug", ""), "_from": "console"}
+        slug, client = str(e.get("slug", "") or ""), str(e.get("client", "") or "").strip()
+        cid = str(e.get("customerId", "") or "").strip()
+        ok = (ID_RE.match(acct) and client and len(client) <= 80 and (not slug or valid_slug(slug))
+              and (media != "microsoft" or ID_RE.match(cid)))
+        # ファイル側・先に採った分と同じ識別名を、別の取引先名で使っているものは採らない（別口座の数値の混入防止）
+        if ok and slug and slug in slug_owner and slug_owner[slug] != client:
+            ok = False
+        if not ok:
+            skipped += 1; continue
+        if acct in seen:
+            continue
+        row = {"client": client, "accountId": acct, "slug": slug, "_from": "console"}
         if media == "yahoo":
             row["kind"] = "display" if m == "yahoo_display" else "search"
         else:
-            row["customerId"] = str(e.get("customerId", "")).strip()
+            row["customerId"] = cid
         base.append(row); seen.add(acct)
+        if slug:
+            slug_owner.setdefault(slug, client)
+    if skipped:
+        print(f"  {media}: 管理画面の追加分のうち {skipped}件は検査に通らず使わない（形の誤り・識別名の重複）")
     return base
 
 

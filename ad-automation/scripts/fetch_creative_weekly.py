@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_daily_series import load_env, google_service  # noqa: E402
 from client_map import canonical  # noqa: E402
 from build_console_data import get as meta_get, sum_action, CV_ACTIONS, EXCLUDE_ACCOUNTS  # noqa: E402
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 TOP_N = 15  # 1アカウントあたりの表示広告数（期間合計の費用順）
@@ -138,29 +139,31 @@ def main():
                     rows = google_account(ga, cid, start, end)
                     if rows:
                         out[f"{a['client']}|google"] = rows
-                    print(f"  [google] {a['client'][:20]:22} {len(rows)}広告")
+                    detail(f"  [google] {a['client'][:20]:22} {len(rows)}広告")
                 except Exception as e:
-                    print(f"  [google] {a['client'][:20]:22} 取得失敗: {str(e)[:80]}")
+                    print(f"  [google] 取得失敗: {err(e)}")
+                    detail(f"    {a['client']}: {str(e)[:80]}")
         except Exception as e:
-            issues.append(f"google: {str(e)[:120]}"); print("Google接続不可:", str(e)[:120])
+            issues.append(f"google: {str(e)[:120]}"); print("Google接続不可:", err(e))
 
     # Meta：トークンで読める広告アカウント（名前でキー。build_console_data と同じ除外）
     tok = os.environ.get("SOFCOM_META_SYSTEM_USER_TOKEN", "").strip()
     if tok:
         r = meta_get("me/adaccounts", {"fields": "name,account_id", "limit": "100"}, tok)
         if "__error__" in r:
-            issues.append(f"meta: {str(r['__error__'])[:120]}"); print("Meta取得失敗:", str(r["__error__"])[:120])
+            issues.append(f"meta: {str(r['__error__'])[:120]}"); print("Meta取得失敗:", err(r["__error__"]))
         for a in r.get("data", []):
             name = a.get("name", "")
             if name in EXCLUDE_ACCOUNTS:
                 continue
             try:
                 rows = meta_account("act_" + a["account_id"], tok, start, end)
-                if rows:  # コンソールと同じく運用名に寄せる（TOOGU.shop→【東海グランド】TOOGU 等）
+                if rows:  # コンソールと同じく運用名に寄せる（Meta口座名→運用名。対応表は client_map）
                     out[f"{canonical(name, 'act_' + a['account_id'])}|meta"] = rows
-                print(f"  [meta]   {name[:20]:22} {len(rows)}広告")
+                detail(f"  [meta]   {name[:20]:22} {len(rows)}広告")
             except Exception as e:
-                print(f"  [meta]   {name[:20]:22} 取得失敗: {str(e)[:80]}")
+                print(f"  [meta]   取得失敗: {err(e)}")
+                detail(f"    {name}: {str(e)[:80]}")
     else:
         issues.append("meta: SOFCOM_META_SYSTEM_USER_TOKEN 未設定")
 

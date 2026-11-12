@@ -22,12 +22,14 @@ on:
 
 permissions:
   contents: read
-  actions: write  # 期間集計の蓄積（actions/cache）の保存
 
 concurrency:
   group: ad-automation-daily
   cancel-in-progress: false
 
+# 外部のプルリクエストでは起動しない（きっかけは workflow_dispatch と main への push だけ）。
+# 外部のアクションは版の名前ではなくコミット番号で固定（2026-11-12 時点の各メジャー版の番号。更新するときは番号ごと差し替える）。
+# 秘密はジョブ全体ではなく、それを使うステップにだけ渡す。
 jobs:
   refresh-and-deploy:
     runs-on: ubuntu-latest
@@ -35,42 +37,12 @@ jobs:
     defaults:
       run:
         working-directory: ad-automation
-    env:
-      GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
-      GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
-      GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
-      GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
-      GOOGLE_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_LOGIN_CUSTOMER_ID }}
-      SOFCOM_META_SYSTEM_USER_TOKEN: ${{ secrets.SOFCOM_META_SYSTEM_USER_TOKEN }}
-      # LINEヤフー広告（未登録なら空→scriptsが自動スキップ）
-      YAHOO_ADS_CLIENT_ID: ${{ secrets.YAHOO_ADS_CLIENT_ID }}
-      YAHOO_ADS_CLIENT_SECRET: ${{ secrets.YAHOO_ADS_CLIENT_SECRET }}
-      YAHOO_ADS_REFRESH_TOKEN: ${{ secrets.YAHOO_ADS_REFRESH_TOKEN }}
-      YAHOO_ADS_BASE_ACCOUNT_ID: ${{ secrets.YAHOO_ADS_BASE_ACCOUNT_ID }}
-      YAHOO_ADS_API_VERSION: ${{ secrets.YAHOO_ADS_API_VERSION }}
-      # Microsoft広告（未登録なら空→ms_enabled() が False でスキップ）
-      MS_ADS_DEVELOPER_TOKEN: ${{ secrets.MS_ADS_DEVELOPER_TOKEN }}
-      MS_ADS_CUSTOMER_ID: ${{ secrets.MS_ADS_CUSTOMER_ID }}
-      MS_ADS_ACCOUNT_ID: ${{ secrets.MS_ADS_ACCOUNT_ID }}
-      MS_ADS_ENVIRONMENT: ${{ secrets.MS_ADS_ENVIRONMENT }}
-      MS_ADS_GOOGLE_CLIENT_ID: ${{ secrets.MS_ADS_GOOGLE_CLIENT_ID }}
-      MS_ADS_GOOGLE_CLIENT_SECRET: ${{ secrets.MS_ADS_GOOGLE_CLIENT_SECRET }}
-      MS_ADS_GOOGLE_REFRESH_TOKEN: ${{ secrets.MS_ADS_GOOGLE_REFRESH_TOKEN }}
-      MS_ADS_CLIENT_ID: ${{ secrets.MS_ADS_CLIENT_ID }}
-      MS_ADS_CLIENT_SECRET: ${{ secrets.MS_ADS_CLIENT_SECRET }}
-      MS_ADS_REFRESH_TOKEN: ${{ secrets.MS_ADS_REFRESH_TOKEN }}
-      MS_ADS_REDIRECT_URI: ${{ secrets.MS_ADS_REDIRECT_URI }}
-      # 担当者がコンソールで追加した Yahoo!/Microsoft アカウント（KV mediaAccounts）を wrangler で読む
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
-      # 通知は「Webhookが登録済み かつ notify=true（朝8:30の Cloudflare 起動 または 手動）」のときだけ Google Chat へ。
-      # push(コード修正の反映)や昼12:00/夕16:00の再取得では送らない（通知は1日1回・ノイズ回避）。
-      NOTIFY_CHANNEL: ${{ (secrets.GOOGLE_CHAT_WEBHOOK_URL != '' && github.event_name == 'workflow_dispatch' && inputs.notify) && 'googlechat' || 'none' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: "3.11"
 
@@ -78,15 +50,63 @@ jobs:
         run: pip install -r requirements.txt
 
       # 期間集計（過去13か月の日次）は前回までの蓄積に直近40日を上書きする方式。実行をまたいで cache に持つ。
-      # cache が無い（初回・7日以上未実行で消えた）ときは fetch_daily_history.py が13か月分を取り直す。
-      - name: 期間集計の蓄積を復元
-        uses: actions/cache/restore@v4
+      # cache は同じリポジトリのプルリクエストからも復元できてしまうので、秘密 HISTORY_CACHE_KEY で暗号化したものだけを置く
+      # （鍵が無い環境では cache を使わず、毎回13か月分を取り直す）。cache が無い（初回・7日以上未実行）ときも取り直す。
+      - name: 期間集計の蓄積を復元（暗号化済み）
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
-          path: ad-automation/data/history.json
-          key: adops-history-${{ github.run_id }}
-          restore-keys: adops-history-
+          path: ad-automation/data/history.json.enc
+          key: adops-history-enc-${{ github.run_id }}
+          restore-keys: adops-history-enc-
+
+      - name: 期間集計の蓄積を復号
+        env:
+          HISTORY_CACHE_KEY: ${{ secrets.HISTORY_CACHE_KEY }}
+        run: |
+          if [ -n "$HISTORY_CACHE_KEY" ] && [ -f data/history.json.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in data/history.json.enc -out data/history.json -pass env:HISTORY_CACHE_KEY \
+              && echo "蓄積を復号しました" || { echo "蓄積の復号に失敗（13か月分を取り直す）"; rm -f data/history.json; }
+          else
+            echo "暗号化済みの蓄積なし（13か月分を取り直す）"
+          fi
+          rm -f data/history.json.enc
 
       - name: 取得 → 日次時系列 → 検索診断 → 監視（読み取りのみ）
+        env:
+          GOOGLE_ADS_DEVELOPER_TOKEN: ${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+          GOOGLE_ADS_CLIENT_ID: ${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+          GOOGLE_ADS_CLIENT_SECRET: ${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+          GOOGLE_ADS_REFRESH_TOKEN: ${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+          GOOGLE_LOGIN_CUSTOMER_ID: ${{ secrets.GOOGLE_LOGIN_CUSTOMER_ID }}
+          SOFCOM_META_SYSTEM_USER_TOKEN: ${{ secrets.SOFCOM_META_SYSTEM_USER_TOKEN }}
+          # 監視から外すアカウント名（公開リポジトリに口座名を置かないため Secret。未設定なら除外なし）
+          ADOPS_EXCLUDE_ACCOUNTS: ${{ secrets.ADOPS_EXCLUDE_ACCOUNTS }}
+          # LINEヤフー広告（未登録なら空→scriptsが自動スキップ）
+          YAHOO_ADS_CLIENT_ID: ${{ secrets.YAHOO_ADS_CLIENT_ID }}
+          YAHOO_ADS_CLIENT_SECRET: ${{ secrets.YAHOO_ADS_CLIENT_SECRET }}
+          YAHOO_ADS_REFRESH_TOKEN: ${{ secrets.YAHOO_ADS_REFRESH_TOKEN }}
+          YAHOO_ADS_BASE_ACCOUNT_ID: ${{ secrets.YAHOO_ADS_BASE_ACCOUNT_ID }}
+          YAHOO_ADS_API_VERSION: ${{ secrets.YAHOO_ADS_API_VERSION }}
+          # Microsoft広告（未登録なら空→ms_enabled() が False でスキップ）
+          MS_ADS_DEVELOPER_TOKEN: ${{ secrets.MS_ADS_DEVELOPER_TOKEN }}
+          MS_ADS_CUSTOMER_ID: ${{ secrets.MS_ADS_CUSTOMER_ID }}
+          MS_ADS_ACCOUNT_ID: ${{ secrets.MS_ADS_ACCOUNT_ID }}
+          MS_ADS_ENVIRONMENT: ${{ secrets.MS_ADS_ENVIRONMENT }}
+          MS_ADS_GOOGLE_CLIENT_ID: ${{ secrets.MS_ADS_GOOGLE_CLIENT_ID }}
+          MS_ADS_GOOGLE_CLIENT_SECRET: ${{ secrets.MS_ADS_GOOGLE_CLIENT_SECRET }}
+          MS_ADS_GOOGLE_REFRESH_TOKEN: ${{ secrets.MS_ADS_GOOGLE_REFRESH_TOKEN }}
+          MS_ADS_CLIENT_ID: ${{ secrets.MS_ADS_CLIENT_ID }}
+          MS_ADS_CLIENT_SECRET: ${{ secrets.MS_ADS_CLIENT_SECRET }}
+          MS_ADS_REFRESH_TOKEN: ${{ secrets.MS_ADS_REFRESH_TOKEN }}
+          MS_ADS_REDIRECT_URI: ${{ secrets.MS_ADS_REDIRECT_URI }}
+          # 担当者がコンソールで追加した Yahoo!/Microsoft アカウント（KV mediaAccounts）を wrangler で読む
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          # 通知は「Webhookが登録済み かつ notify=true（朝8:30の Cloudflare 起動 または 手動）」のときだけ Google Chat へ。
+          # push(コード修正の反映)や昼12:00/夕16:00の再取得では送らない（通知は1日1回・ノイズ回避）。
+          NOTIFY_CHANNEL: ${{ (secrets.GOOGLE_CHAT_WEBHOOK_URL != '' && github.event_name == 'workflow_dispatch' && inputs.notify) && 'googlechat' || 'none' }}
+        # 記録（公開）に出るのは件数・媒体名・成否・所要時間だけ（scripts/adops_log.py）。取引先の名前や数字は出さない
         run: |
           python3 scripts/build_console_data.py
           python3 scripts/fetch_daily_series.py
@@ -110,17 +130,30 @@ jobs:
           # 週次/月次ビュー用に日次時系列を配信ディレクトリへ複製
           cp data/daily.json console/daily.json 2>/dev/null || true
 
-      - name: 期間集計の蓄積を保存
-        if: always() && hashFiles('ad-automation/data/history.json') != ''
-        uses: actions/cache/save@v4
+      - name: 期間集計の蓄積を暗号化
+        if: always()
+        env:
+          HISTORY_CACHE_KEY: ${{ secrets.HISTORY_CACHE_KEY }}
+        run: |
+          if [ -n "$HISTORY_CACHE_KEY" ] && [ -f data/history.json ]; then
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in data/history.json -out data/history.json.enc -pass env:HISTORY_CACHE_KEY
+            echo "蓄積を暗号化しました"
+          else
+            echo "HISTORY_CACHE_KEY が未設定のため蓄積を cache に置かない（次回も13か月分を取り直す）"
+          fi
+
+      - name: 期間集計の蓄積を保存（暗号化済みのみ）
+        if: always() && hashFiles('ad-automation/data/history.json.enc') != ''
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
         with:
-          path: ad-automation/data/history.json
-          key: adops-history-${{ github.run_id }}
+          path: ad-automation/data/history.json.enc
+          key: adops-history-enc-${{ github.run_id }}
 
       - name: Cloudflare Pages へデプロイ（console/ を配信）
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd  # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.158.0"
           workingDirectory: ad-automation
           command: pages deploy console --project-name=sofcom-adops --branch=main

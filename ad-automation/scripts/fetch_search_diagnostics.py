@@ -10,6 +10,7 @@ console/data.json の Google アカウントごとに:
 from __future__ import annotations
 import os, re, json, datetime
 from pathlib import Path
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 WASTE_MIN_COST = 3000
@@ -85,7 +86,8 @@ def main():
             isp = is_weighted(cid, prev7)
             waste = waste_terms(cid, last30)
         except Exception as e:
-            print(f"  取得失敗 {client}: {str(e)[:70]}")
+            print(f"  取得失敗（google）: {err(e)}")
+            detail(f"    {client}: {str(e)[:70]}")
             continue
         out.append({"client": client, "acct": cid, "is7": is7, "isPrev7": isp,
                     "waste": waste, "wasteTotal": sum(w["cost"] for w in waste)})
@@ -96,7 +98,7 @@ def main():
     print(f"data/search_diag.json 出力: {len(out)}アカウント")
     for x in out:
         chg = (f"{x['isPrev7']}→{x['is7']}%" if x["is7"] is not None and x["isPrev7"] is not None else "IS取得不可")
-        print(f"  {x['client'][:20]:22} IS {chg} / 不要クエリ {len(x['waste'])}件 ¥{x['wasteTotal']:,}")
+        detail(f"  {x['client'][:20]:22} IS {chg} / 不要クエリ {len(x['waste'])}件 ¥{x['wasteTotal']:,}")
 
 
 if __name__ == "__main__":

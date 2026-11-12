@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from google_audit import pull, audit, client, load_env  # noqa: E402
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 
@@ -42,14 +43,15 @@ def main():
             d = pull(ga, cid, dr)
             res = audit(d, label)
             out[f"{a['client']}|{a['media']}"] = res
-            print(f"  {a['client'][:18]:20} スコア{res['score']}/100({res['grade']}) 所見{len(res['findings'])}件")
+            detail(f"  {a['client'][:18]:20} スコア{res['score']}/100({res['grade']}) 所見{len(res['findings'])}件")
         except Exception as e:
-            print(f"  監査失敗 {a['client']}: {str(e)[:100]}")
+            print(f"  監査失敗（google）: {err(e)}")
+            detail(f"    {a['client']}: {str(e)[:100]}")
             out[f"{a['client']}|{a['media']}"] = {"error": str(e)[:120]}
 
     payload = {"generated": end.isoformat(), "period": label, "byAccount": out}
     (PROJ / "console" / "audit.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    print(f"console/audit.json 出力: {len(out)}アカウント / 期間 {label}")
+    print(f"console/audit.json 出力: {len(out)}アカウント（うち失敗 {sum(1 for v in out.values() if 'error' in v)}） / 期間 {label}")
 
 
 if __name__ == "__main__":

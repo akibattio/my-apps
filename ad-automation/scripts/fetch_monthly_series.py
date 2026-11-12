@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_daily_series import load_env, google_service, META_BASE, CV_ACTIONS, sum_action  # noqa: E402
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 
@@ -85,9 +86,10 @@ def main():
             else:
                 continue
         except Exception as e:
-            print(f"  取得失敗 {client}({media}): {str(e)[:80]}"); series = []
+            print(f"  取得失敗（{media}）: {err(e)}"); series = []
+            detail(f"    {client}: {str(e)[:80]}")
         out[f"{client}|{media}"] = series
-        print(f"  {client[:18]:20}[{media}] {len(series)}ヶ月")
+        detail(f"  {client[:18]:20}[{media}] {len(series)}ヶ月")
 
     (PROJ / "console" / "monthly.json").write_text(
         json.dumps({"generated": end, "range": f"{start}〜{end}", "byAccount": out}, ensure_ascii=False), encoding="utf-8")

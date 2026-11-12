@@ -9,6 +9,7 @@ data/daily.json に保存する。急変検知（インプ急停止・消化大�
 from __future__ import annotations
 import os, re, sys, json, urllib.request, urllib.parse, urllib.error, datetime
 from pathlib import Path
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 META_BASE = "https://graph.facebook.com/v21.0"
@@ -141,7 +142,8 @@ def main():
         except Exception as e:
             series = {"__error__": str(e)[:80]}
         if isinstance(series, dict) and "__error__" in series:
-            print(f"  取得失敗 {client}({media}): {series['__error__']}")
+            print(f"  取得失敗（{media}）: {err(series['__error__'])}")
+            detail(f"    {client}: {series['__error__']}")
             out.append({"client": client, "media": media, "acct": acct, "days": [], "byType": {}, "error": series["__error__"]})
             continue
         out.append({"client": client, "media": media, "acct": acct, "days": series, "byType": by_type})
@@ -152,7 +154,7 @@ def main():
     print(f"data/daily.json 出力: {len(out)}アカウント / 期間 {start}〜{end}")
     for x in out:
         n = len(x["days"]); last = x["days"][-1] if n else None
-        print(f"  {x['client'][:20]:22}[{x['media']}] {n}日" + (f" 直近 {last['date']} imp{last['imp']:,} ¥{last['cost']:,}" if last else " (データなし)"))
+        detail(f"  {x['client'][:20]:22}[{x['media']}] {n}日" + (f" 直近 {last['date']} imp{last['imp']:,} ¥{last['cost']:,}" if last else " (データなし)"))
 
 
 if __name__ == "__main__":

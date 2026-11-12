@@ -11,7 +11,7 @@ YAHOO_ADS_CLIENT_ID=＜アプリのClient ID＞
 YAHOO_ADS_CLIENT_SECRET=＜アプリのClient Secret＞
 YAHOO_ADS_REFRESH_TOKEN=＜認可で取得したrefresh token＞
 # 識別子
-YAHOO_ADS_BASE_ACCOUNT_ID=＜ベースアカウントID＞   # ヘッダ x-z-base-account-id。テスト時は 1001994926
+YAHOO_ADS_BASE_ACCOUNT_ID=＜ベースアカウントID＞   # ヘッダ x-z-base-account-id。テスト時は Yahoo! の案内にあるテスト用ID
 YAHOO_ADS_API_VERSION=＜例 v13 / v202XXX＞          # ★稼働前にリファレンスで最新版を確認
 YAHOO_ADS_REDIRECT_URI=＜アプリ登録時のリダイレクトURIと完全一致＞  # refresh_token取得時のみ
 ```
@@ -24,7 +24,7 @@ YAHOO_ADS_REDIRECT_URI=＜アプリ登録時のリダイレクトURIと完全一
    ```
    python3 scripts/yahoo_generate_refresh_token.py
    ```
-   表示URLをブラウザで開き→ビジネスID(motel7790swab)でログイン→許可→ code を貼付 → 出た refresh_token を .env へ
+   表示URLをブラウザで開き→広告用のビジネスID（担当者が保管）でログイン→許可→ code を貼付 → 出た refresh_token を .env へ
 4. アカウント対応表を用意：`clients/yahoo_accounts.example.json` を `clients/yahoo_accounts.json` にコピーして実accountIdを記入（Git管理外）
 5. 疎通確認（テストアカウントで）：
    ```

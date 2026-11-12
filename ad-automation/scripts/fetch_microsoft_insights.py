@@ -33,7 +33,7 @@
   # 任意:
   MS_ADS_ENVIRONMENT       既定 production
   MS_ADS_REDIRECT_URI      OAuthWebAuthCodeGrant 用（confidential client のとき）
-  # Googleでサインインする広告ユーザー（例 promo@sc-scc.com）の場合はこちら。あれば優先して使う。
+  # Googleでサインインする広告ユーザー（例 ads@example.com.com）の場合はこちら。あれば優先して使う。
   #   Microsoftアカウントのトークンだと IdentityTypeMismatch(126) になるため。取得: scripts/microsoft_google_refresh_token.py
   MS_ADS_GOOGLE_CLIENT_ID / MS_ADS_GOOGLE_CLIENT_SECRET / MS_ADS_GOOGLE_REFRESH_TOKEN
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """クライアント提出レポート用の内訳（ブレイクダウン）取得 → console/breakdowns.json。読み取りのみ。
 
-既存のSUBACO等クライアントレポート（Looker Studio）に相当する内訳を Google Ads API から取得し、
+既存のクライアントレポート（Looker Studio）に相当する内訳を Google Ads API から取得し、
 コンソールの「レポート」タブに媒体別詳細として表示する。直近3ヶ月分（当月＋前2ヶ月）を月別に保持。
 
 ディメンション：キャンペーンタイプ(検索/PMax/デマンド)・デバイス・曜日・時間帯・キャンペーン(上位)・検索クエリ(上位)
@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_daily_series import load_env, google_service, CH_LABEL  # noqa: E402
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 TOP_N = 30  # キャンペーン/検索クエリの月別上位件数（費用順）
@@ -210,7 +211,7 @@ def main():
     try:
         ga = google_service()
     except Exception as e:
-        print("Google接続不可のためスキップ:", str(e)[:80]); return
+        print("Google接続不可のためスキップ:", err(e)); return
 
     out = {}
     for a in accounts:
@@ -221,7 +222,7 @@ def main():
         try:
             b = account_breakdowns(ga, cid, start, end)
         except Exception as e:
-            print(f"  取得失敗 {client}: {str(e)[:80]}"); continue
+            print(f"  取得失敗（google）: {err(e)}"); detail(f"    {client}: {str(e)[:80]}"); continue
         # 月ごとに { dim: rows } へ組み替え（レポートは月選択で引く）
         by_month = {}
         for dim, permonth in b.items():
@@ -229,7 +230,7 @@ def main():
                 by_month.setdefault(mo, {})[dim] = rows
         out[f"{client}|google"] = by_month
         nmo = len(by_month)
-        print(f"  {client[:18]:20} {nmo}ヶ月分")
+        detail(f"  {client[:18]:20} {nmo}ヶ月分")
 
     (PROJ / "console" / "breakdowns.json").write_text(
         json.dumps({"generated": end, "range": f"{start}〜{end}", "byAccount": out}, ensure_ascii=False), encoding="utf-8")

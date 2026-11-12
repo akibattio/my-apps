@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""採用SNS（ミスマッチナッシー）月次報告（先月）HTML 生成。
+"""採用SNS 月次報告（先月）HTML 生成。
 
-bespoke: customer 3784292445 のミスマッチナッシー3キャンペーン専用（対象月は TARGET で指定）。
+bespoke: 自社の採用SNS広告（1アカウント内の数キャンペーン）専用。対象月・名前・所見は report_content.json（Git管理外）。
 データ配置（既定 data/saiyo_sns/ ・第1引数でディレクトリ指定可）:
   mmn_monthly.json    … 月次(合算 monthly[]) ※通年生成器と共通
   mmn_chan_june.json  … 対象月の配信方法別 {"june": {SEARCH/PERFORMANCE_MAX/...}}
-  mmn_kw_june.json    … 対象月の検索KW(検索_ミスマッチナッシー)
-  mmn_pmax_june.json  … scripts/google_pmax_creatives.py 3784292445 <out> 2026-06-01 2026-06-30
+  mmn_kw_june.json    … 対象月の検索KW
+  mmn_pmax_june.json  … scripts/google_pmax_creatives.py <customer_id> <out> <月初> <月末>
+  report_content.json … 見出し・所見・対象月（見本: data/samples/saiyo_sns/report_content.example.json の monthly）
 使い方: python3 scripts/report_saiyo_sns_monthly.py [data_dir]  → out/google_month_saiyo_sns.html
 """
 import sys, json, html
@@ -19,7 +20,13 @@ KW = json.loads(Path(f"{S}/mmn_kw_june.json").read_text(encoding="utf-8"))
 PMAX = json.loads(Path(f"{S}/mmn_pmax_june.json").read_text(encoding="utf-8"))
 OUT = Path("out/google_month_saiyo_sns.html")
 
-TARGET, PREV = "2026-06", "2026-05"
+# 社名・ID・数値・所見文は Git に入らない {S}/report_content.json から読む（公開リポジトリに実データを置かない）。
+# 項目の見本（値は架空）: data/samples/saiyo_sns/report_content.example.json
+from types import SimpleNamespace
+RC = json.loads(Path(f"{S}/report_content.json").read_text(encoding="utf-8"))["monthly"]  # C は当月データの名前なので RC
+K = SimpleNamespace(**RC)  # 本文（f-string）から {K.項目} で参照
+
+TARGET, PREV = RC["target"], RC["prev"]
 bym = {d["m"]: d for d in MON["monthly"]}
 C, P = bym.get(TARGET), bym.get(PREV)
 
@@ -75,7 +82,7 @@ def kw_rows():
 
 STRENGTH = {"EXCELLENT":("#3C7A52","優良"),"GOOD":("#3C7A52","良好"),"AVERAGE":("#B7791F","平均"),"POOR":("#AE4A26","低い"),"UNKNOWN":("#AE4A26","未評価/不足"),"PENDING":("#8b95a3","評価中")}
 def pmax_section():
-    g = next((x for x in PMAX["asset_groups"] if "ミスマッチ" in x["name"] and (x["status"]=="ENABLED" or x["cost"]>0)), None)
+    g = next((x for x in PMAX["asset_groups"] if RC["campaign_match"] in x["name"] and (x["status"]=="ENABLED" or x["cost"]>0)), None)
     if not g: return "<p class='caption'>6月に稼働したP-MAXアセットグループはありません。</p>"
     sc, sl = STRENGTH.get(g["ad_strength"], ("#8b95a3", g["ad_strength"]))
     ST = {"ok":("○","cov ok"),"low":("△","cov low"),"none":("✗","cov none")}
@@ -97,15 +104,15 @@ def pmax_section():
             f"<div class='cov-wrap'>{cov}</div>{gal}<div class='txts'>{texts}</div></div>")
 
 def ai_comment():
-    parts = [f"2026年6月は費用{yen(C['cost'])}・CV{cvf(C['cv'])}件（CPA{yen(cpa(C))}）でした。"]
+    parts = [f"{K.target_label}は費用{yen(C['cost'])}・CV{cvf(C['cv'])}件（CPA{yen(cpa(C))}）でした。"]
     if P and P["cv"]:
         parts.append(f"前月比では費用{delta(C['cost'],P['cost'],0)[0]}に対しCVは{cvf(P['cv'])}→{cvf(C['cv'])}件（{delta(C['cv'],P['cv'],1)[0]}）、"
-                     f"CPAは{yen(cpa(P))}→{yen(cpa(C))}（{delta(cpa(C),cpa(P),-1)[0]}）と、当月は効率がやや低下しています。")
+                     f"CPAは{yen(cpa(P))}→{yen(cpa(C))}（{delta(cpa(C),cpa(P),-1)[0]}）と、{K.trend_note}")
     ch = CH.get("june", {})
     se, pm = ch.get("SEARCH", {}), ch.get("PERFORMANCE_MAX", {})
     if se and pm:
-        parts.append(f"配信方法別では検索{yen(se.get('cost'))}（CV{cvf(se.get('cv',0))}）とP-MAX{yen(pm.get('cost'))}（CV{cvf(pm.get('cv',0))}）がほぼ均衡。検索は「sns 運用 外注」1KWに集中しています。")
-    g = next((x for x in PMAX["asset_groups"] if "ミスマッチ" in x["name"] and x["cost"]>0), None)
+        parts.append(f"配信方法別では検索{yen(se.get('cost'))}（CV{cvf(se.get('cv',0))}）とP-MAX{yen(pm.get('cost'))}（CV{cvf(pm.get('cv',0))}）がほぼ均衡。{K.search_note}")
+    g = next((x for x in PMAX["asset_groups"] if RC["campaign_match"] in x["name"] and x["cost"]>0), None)
     if g:
         miss = [c["jp"] for c in g["coverage"] if c["state"]=="none"]
         parts.append(f"P-MAXの広告の有効性は「{STRENGTH.get(g['ad_strength'],('','') )[1]}」で、{('・'.join(miss)+'が未設定です。' ) if miss else '素材は概ね充足。'}")
@@ -114,7 +121,7 @@ def ai_comment():
 
 recent = [d for d in MON["monthly"] if d["m"] <= TARGET][-6:]
 RMET = [("費用","cost","yen"),("クリック","clk","num"),("CV","cv","num"),("CPA","cpa","yen")]
-mini = "\n".join(f'<div class="mini"><h4>{n}（1〜6月）</h4><canvas id="c_{k}" width="600" height="180"></canvas></div>' for n,k,_ in RMET)
+mini = "\n".join(f'<div class="mini"><h4>{n}{K.range_label}</h4><canvas id="c_{k}" width="600" height="180"></canvas></div>' for n,k,_ in RMET)
 
 CSS = """
 :root{--ink:#18222E;--slate:#586374;--muted:#8b95a3;--line:#E5E8EC;--line-soft:#EEF1F4;--paper:#FBFBFC;--panel:#FFFFFF;--accent:#1E6B77;--accent-soft:#E7F0F1;--accent-ink:#134851;--warn:#AE4A26;--warn-soft:#FBECE4;--ok:#3C7A52;--jp:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Noto Sans JP","Meiryo",sans-serif;}
@@ -163,18 +170,18 @@ footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);display
 @media(max-width:600px){.sheet{padding:34px 18px 52px}.cards{grid-template-columns:1fr 1fr}.grid-sm,.meta,.txts{grid-template-columns:1fr}}
 """
 
+def meta_html():
+    return "\n    ".join(f"<div><dt>{dt}</dt><dd>{dd}</dd></div>" for dt, dd in RC["meta"])
+
 HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>採用SNS 月次報告 2026-06 — ミスマッチナッシー</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>{K.title}</title>
 <style>{CSS}</style></head><body><main class="sheet">
 <header>
-  <div class="eyebrow">Google広告 月次報告 ・ 採用SNS ・ 2026年6月</div>
-  <h1>月次報告：採用SNS（ミスマッチナッシー）</h1>
+  <div class="eyebrow">{K.eyebrow_service}{K.target_label}</div>
+  <h1>{K.h1}</h1>
   <span class="draft">参考／下書き ・ 実データ（Google Ads API）</span>
   <dl class="meta">
-    <div><dt>対象</dt><dd>customer 3784292445（ミスマッチナッシー3キャンペーン）</dd></div>
-    <div><dt>対象月</dt><dd>2026年6月</dd></div>
-    <div><dt>比較</dt><dd>前月（2026-05）／前年同月＝データなし</dd></div>
-    <div><dt>状態</dt><dd>全キャンペーン停止中</dd></div>
+    {meta_html()}
   </dl>
 </header>
 <section>
@@ -188,36 +195,36 @@ HTML = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8">
   <p class="caption">AIが実データから所感を自動下書き。担当が編集し「保存」で反映（この端末に保存）。適用は承認後のみ（CLAUDE.md §0）。</p>
 </section>
 <section>
-  <div class="sec-label">02 — 6月サマリ（前月比）</div>
+  <div class="sec-label">{K.label_summary}</div>
   <div class="cards">{cards()}</div>
-  <p class="caption">前年同月は配信データがないため「—」。当月はCVが前月より減り、CPAは上昇（¥10,563→¥15,121）。</p>
+  <p class="caption">{K.caption_summary}</p>
 </section>
 <section>
-  <div class="sec-label">03 — 配信方法別（6月）</div>
+  <div class="sec-label">{K.label_channel}</div>
   {channel_section()}
-  <p class="caption">6月は検索とP-MAXがほぼ均衡。デマンドジェネレーションは3月で停止済み。</p>
+  <p class="caption">{K.caption_channel}</p>
 </section>
 <section>
-  <div class="sec-label">04 — 6月 検索キーワード</div>
+  <div class="sec-label">{K.label_kw}</div>
   <div class="tbl"><table>
     <thead><tr><th>キーワード</th><th>型</th><th>費用</th><th>クリック</th><th>CTR</th><th>CPC</th><th>CV</th><th>CPA</th><th>判定</th></tr></thead>
     <tbody>{kw_rows()}</tbody></table></div>
-  <p class="caption">検索は「sns 運用 外注」1KWにほぼ集中。他は完全一致で配信ほぼなし。判定：成果=CPA≤¥8,000／無駄消化=費用¥8k+でCV0。</p>
+  <p class="caption">{K.caption_kw}</p>
 </section>
 <section>
-  <div class="sec-label">05 — P-MAX クリエイティブ（6月稼働）</div>
+  <div class="sec-label">{K.label_pmax}</div>
   {pmax_section()}
   <p class="caption">P-MAXは1素材ごとのCV/CPAをGoogleが公開していないため、有効性＋本数で評価。動画・ロゴ・縦型画像が未設定。</p>
 </section>
 <section>
-  <div class="sec-label">06 — 参考：月次推移（2026年1〜6月）</div>
+  <div class="sec-label">{K.label_trend}</div>
   <div class="grid-sm">{mini}</div>
 </section>
 <section>
   <div class="sec-label">07 — 注記</div>
-  <p class="caption">実データ（Google Ads API）。当月＝2026-06、ミスマッチナッシー3キャンペーン抽出。前年同月はデータなし。全キャンペーン停止中。詳細分析・改善提案・年間推移は「通年レポート（分析・改善）」を参照。出力は参考／下書き、適用は承認後のみ。</p>
+  <p class="caption">{K.caption_notes}</p>
 </section>
-<footer><span>ソフトコミュニケーションズ ／ 広告運用 半自動化</span><span class="num">2026-07-06</span></footer>
+<footer><span>ソフトコミュニケーションズ ／ 広告運用 半自動化</span><span class="num">{K.footer_date}</span></footer>
 </main>
 <script>
 const R={json.dumps(recent, ensure_ascii=False)};
@@ -239,7 +246,7 @@ RMET.forEach(mt=>{{
   ctx.fillStyle='#aab2bd';ctx.font='15px sans-serif';ctx.textAlign='center';R.forEach((d,i)=>ctx.fillText(d.m.slice(5)+'月',X(i),H-4));
 }});
 const AI_DRAFT={json.dumps(ai_comment())};
-const CMT_KEY='cmt:mmn:2026-06';
+const CMT_KEY='cmt:mmn:{TARGET}';
 (function(){{
   const body=document.getElementById('cmtBody'),st=document.getElementById('cmtStatus');
   const saved=localStorage.getItem(CMT_KEY);
@@ -251,4 +258,4 @@ const CMT_KEY='cmt:mmn:2026-06';
 }})();
 </script></body></html>"""
 OUT.write_text(HTML, encoding="utf-8")
-print("生成:", OUT, "| 6月 費用", yen(C["cost"]), "CV", C["cv"], "CPA", yen(cpa(C)))
+print("生成:", OUT, f"| {TARGET} 費用", yen(C["cost"]), "CV", C["cv"], "CPA", yen(cpa(C)))

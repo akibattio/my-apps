@@ -1,5 +1,5 @@
-# 定時起動専用の Worker（中身は worker.js）。デプロイ：ad-automation/cron-trigger で npx wrangler@4 deploy
-# 鍵の登録：npx wrangler@4 secret put GITHUB_TOKEN（入力は画面に出ない）
+# 定時起動専用の Worker（中身は worker.js）。デプロイ：ad-automation/cron-trigger で npx wrangler@4.158.0 deploy
+# 鍵の登録：npx wrangler@4.158.0 secret put GITHUB_TOKEN（入力は画面に出ない）
 name = "sofcom-adops-cron"
 main = "worker.js"
 compatibility_date = "2026-10-01"

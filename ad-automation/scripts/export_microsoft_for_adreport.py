@@ -37,6 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fetch_microsoft_insights as M  # noqa: E402
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 # report-glass の実体は ~/dev/report-glass。取り込みディレクトリは pipeline/microsoft。
@@ -76,17 +77,19 @@ def _build_payload(slug, accs, ym, start, end):
         e = bucket.setdefault(key, {"cost": 0, "imp": 0, "clk": 0, "cv": 0})
         e["cost"] += cost or 0; e["imp"] += imp or 0; e["clk"] += clk or 0; e["cv"] += cv or 0
 
+    default_cid = os.environ.get("MS_ADS_CUSTOMER_ID", "")
     for a in accs:
         acct = str(a["accountId"])
-        # 顧客IDはアカウントごと（コンソールから追加した社は別顧客のことがある）。無ければ .env の既定
-        if a.get("customerId"):
-            os.environ["MS_ADS_CUSTOMER_ID"] = str(a["customerId"])
+        # 顧客IDはアカウントごと（コンソールから追加した社は別顧客のことがある）。無ければ .env の既定。
+        # 前のアカウントの顧客IDが残らないよう、毎回設定し直す（ループの後で既定に戻す）
+        os.environ["MS_ADS_CUSTOMER_ID"] = str(a.get("customerId") or default_cid)
 
         def safe(fn, *args):
             try:
                 return fn(*args)
             except Exception as ex:
-                print(f"  取得失敗 {slug}/{fn.__name__}: {str(ex)[:60]}")
+                print(f"  取得失敗 {fn.__name__}: {err(ex)}")
+                detail(f"    {slug}: {str(ex)[:60]}")
                 return []
 
         campaigns += safe(M.ms_campaigns, acct, start, end)
@@ -229,6 +232,9 @@ def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     sample = "--sample" in sys.argv
     ym = args[0] if args else _last_month()
+    from media_accounts import valid_slug, valid_ym
+    if not valid_ym(ym):
+        print("対象月は YYYY-MM で指定してください"); return 2
     out_dir = Path(os.environ.get("AD_REPORT_DIR", str(DEFAULT_DIR)))
     M.load_env()
 
@@ -268,18 +274,27 @@ def main() -> int:
     start, end = _month_span(ym)
     out_dir.mkdir(parents=True, exist_ok=True)
     wrote = 0
-    for slug, accs in sorted(by_slug.items()):
+    for n, (slug, accs) in enumerate(sorted(by_slug.items()), 1):
         if sample:
             payload = _sample(slug)
         else:
-            payload = _build_payload(slug, accs, ym, start, end)
+            default_cid = os.environ.get("MS_ADS_CUSTOMER_ID", "")
+            try:
+                payload = _build_payload(slug, accs, ym, start, end)
+            finally:
+                os.environ["MS_ADS_CUSTOMER_ID"] = default_cid  # 次の識別名へ顧客IDを持ち越さない
             if payload is None:
-                print(f"  {slug}: {ym} の実績なし → 出力スキップ（推測で埋めない）")
+                print(f"  {n}件目: {ym} の実績なし → 出力スキップ（推測で埋めない）")
                 continue
+        if not valid_slug(slug):  # 識別名はファイル名の一部。形が違うものは書かない
+            print(f"  {n}件目: 識別名の形が正しくないため出力しない"); continue
         out = out_dir / f"{slug}-{ym}.json"
+        if out.resolve().parent != out_dir.resolve():
+            print(f"  {n}件目: 出力先の外になるため出力しない"); continue
         out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         extra = "+".join(k for k in ("devices", "daily", "keywords", "queries", "monthly", "genders", "ages", "regions", "hourly") if payload.get(k))
-        print(f"  出力 {out}  （{len(payload['campaigns'])}キャンペーン{'・' + extra if extra else ''}{'・サンプル' if sample else ''}）")
+        print(f"  {n}件目を出力（{extra or '基本項目のみ'}{'・サンプル' if sample else ''}）")
+        detail(f"    {out}  （{len(payload['campaigns'])}キャンペーン{'・' + extra if extra else ''}{'・サンプル' if sample else ''}）")
         wrote += 1
 
     print(f"完了: {wrote}ファイルを {out_dir} に出力（{ym}）。")

@@ -12,6 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_daily_series import load_env, google_service  # noqa: E402
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 TOP_N = 30  # 月ごとの上位キーワード数（費用順）
@@ -92,10 +93,11 @@ def main():
             else:
                 continue  # Meta/ディスプレイはキーワードなし
         except Exception as e:
-            print(f"  取得失敗 {client}({media}): {str(e)[:70]}"); bm = {}
+            print(f"  取得失敗（{media}）: {err(e)}"); bm = {}
+            detail(f"    {client}: {str(e)[:70]}")
         if bm:
             out[f"{client}|{media}"] = bm
-            print(f"  {client[:18]:20}[{media}] {sum(len(v) for v in bm.values())}件 / {len(bm)}ヶ月")
+            detail(f"  {client[:18]:20}[{media}] {sum(len(v) for v in bm.values())}件 / {len(bm)}ヶ月")
 
     (PROJ / "console" / "keywords.json").write_text(
         json.dumps({"generated": end, "topN": TOP_N, "byAccount": out}, ensure_ascii=False), encoding="utf-8")

@@ -9,6 +9,7 @@ CLAUDE.md §0/§4：AIは「下書き」までを作る。書き込み(適用)�
 from __future__ import annotations
 import json
 from pathlib import Path
+from adops_log import detail, err  # noqa: E402  記録に取引先の情報を出さない（adops_log.py）
 
 PROJ = Path(__file__).resolve().parent.parent
 CONSOLE = PROJ / "console"

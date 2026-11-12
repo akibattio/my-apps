@@ -19,7 +19,7 @@
   YAHOO_ADS_CLIENT_ID          アプリケーションの Client ID
   YAHOO_ADS_CLIENT_SECRET      アプリケーションの Client Secret（秘密）
   YAHOO_ADS_REFRESH_TOKEN      OAuth認可で取得した refresh token（秘密）
-  YAHOO_ADS_BASE_ACCOUNT_ID    ベースアカウントID（ヘッダ x-z-base-account-id）。テスト時は 1001994926
+  YAHOO_ADS_BASE_ACCOUNT_ID    ベースアカウントID（ヘッダ x-z-base-account-id）。テスト時は Yahoo! の案内にあるテスト用ID
   YAHOO_ADS_API_VERSION        APIバージョン（例 v13 / v202XXX）。※稼働前にリファレンスで最新値を要確認
   # 任意（既定値を上書きしたい場合のみ）:
   YAHOO_OAUTH_TOKEN_URL        既定 https://biz-oauth.yahoo.co.jp/oauth/v1/token
@@ -483,7 +483,10 @@ def main():
     import datetime
     end = datetime.date.today().isoformat()
     start = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
-    acct = os.environ.get("YAHOO_ADS_TEST_SEARCH_ACCOUNT_ID", "1462425")  # 検索テストアカウント
+    acct = os.environ.get("YAHOO_ADS_TEST_SEARCH_ACCOUNT_ID", "").strip()  # 検索テストアカウント（.env で指定）
+    if not acct:
+        print("YAHOO_ADS_TEST_SEARCH_ACCOUNT_ID が未設定です（疎通確認対象の検索アカウントIDを .env に設定してください）。")
+        return 2
     print(f"検索広告テストアカウント {acct} の {start}〜{end} を取得中…（version={os.environ.get('YAHOO_ADS_API_VERSION', API_VERSION)}）")
     try:
         s = yahoo_summary(acct, "search", start, end)

@@ -1,0 +1,142 @@
+{
+ "rows": [
+  [
+   "（架空の文言）",
+   1000
+  ],
+  [
+   "（架空の文言）",
+   1000
+  ]
+ ],
+ "total": [
+  "（架空の文言）",
+  1000
+ ],
+ "issues": [
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ],
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ]
+ ],
+ "props": [
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ],
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ]
+ ],
+ "exclude_safe": [
+  "（架空の文言）",
+  "（架空の文言）"
+ ],
+ "exclude_check": [
+  "（架空の文言）",
+  "（架空の文言）"
+ ],
+ "lpo_url": "https://example.com/lp/",
+ "lpo_scores": [
+  [
+   "（架空の文言）",
+   1000
+  ],
+  [
+   "（架空の文言）",
+   1000
+  ]
+ ],
+ "lpo_wins": [
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ],
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ]
+ ],
+ "target_cpa": 10000,
+ "monthly_budget": 50000,
+ "recent_months": [
+  "2026-01",
+  "2026-02"
+ ],
+ "ytd_cpa": 12345.6,
+ "recent_label": "（架空の文言）",
+ "improved_range": "（架空の文言）",
+ "card_target_val": "（架空の文言）",
+ "card_recent_sub": "（架空の文言）",
+ "card_breakeven_sub": "（架空の文言）",
+ "lpo_key_html": "（架空の文言）",
+ "campaign_match": "架空キャンペーン",
+ "title": "（架空の文言）",
+ "eyebrow": "（架空の文言）",
+ "meta": [
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ],
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ]
+ ],
+ "summary_html": "（架空の文言）",
+ "cards": [
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ],
+  [
+   "（架空の文言）",
+   "（架空の文言）"
+  ]
+ ],
+ "caption_perf": "（架空の文言）",
+ "label_target": "（架空の文言）",
+ "caption_target_html": "（架空の文言）",
+ "label_monthly": "（架空の文言）",
+ "caption_monthly": "（架空の文言）",
+ "caption_notes_html": "（架空の文言）",
+ "footer_date": "2026-01-31",
+ "monthly": {
+  "target": "2026-02",
+  "prev": "2026-01",
+  "meta": [
+   [
+    "（架空の文言）",
+    "（架空の文言）"
+   ],
+   [
+    "（架空の文言）",
+    "（架空の文言）"
+   ]
+  ],
+  "target_label": "2026年2月",
+  "search_note": "（架空の文言）",
+  "trend_note": "（架空の文言）",
+  "campaign_match": "架空キャンペーン",
+  "range_label": "（架空の文言）",
+  "title": "（架空の文言）",
+  "eyebrow_service": "（架空の文言）",
+  "h1": "（架空の文言）",
+  "label_summary": "（架空の文言）",
+  "caption_summary": "（架空の文言）",
+  "label_channel": "（架空の文言）",
+  "caption_channel": "（架空の文言）",
+  "label_kw": "（架空の文言）",
+  "caption_kw": "（架空の文言）",
+  "label_pmax": "（架空の文言）",
+  "label_trend": "（架空の文言）",
+  "caption_notes": "（架空の文言）",
+  "footer_date": "2026-02-28"
+ },
+ "_説明": "採用SNS 報告書（report_saiyo_sns_annual.py / _monthly.py）の中身の見本。値はすべて架空。実物は data/saiyo_sns/report_content.json（Git管理外）に置く。"
+}
