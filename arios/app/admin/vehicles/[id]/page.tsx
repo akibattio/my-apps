@@ -96,10 +96,24 @@ export default async function AdminVehicleDetail({ params }: { params: Promise<{
 
       {(claims ?? []).length > 0 && (
         <section className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold">持ち主の確認</h2>
+          <h2 className="mb-2 text-sm font-semibold">
+            持ち主の確認
+            <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-[11px] font-normal text-muted">
+              現在の持ち主: {owner ? "あり" : "なし"}
+            </span>
+          </h2>
           <p className="mb-3 text-xs text-muted">
-            別の会員が「オーナー」としてこの車体番号で登録しました。持ち主が代わった・入力ミス・なりすましの可能性があります。
-            両方の会員に確認してから判断してください。認めると持ち主が切り替わり、前の持ち主のマイガレージからは外れます。
+            {owner ? (
+              <>
+                別の会員が「オーナー」としてこの車体番号で登録しました。持ち主が代わった・入力ミス・なりすましの可能性があります。
+                両方の会員に確認してから判断してください。認めると持ち主が切り替わり、前の持ち主のマイガレージからは外れます。
+              </>
+            ) : (
+              <>
+                この車の記録には、まだ持ち主がいません（仲介・業者・運営の登録などで作られたもの）。車体番号は外から見える情報なので、
+                入れただけでは持ち主にしていません。本人の車か（車検証など）を確認してから判断してください。認めるとその会員のマイガレージに入ります。
+              </>
+            )}
           </p>
           <ul className="space-y-2">
             {(claims ?? []).map((c) => {

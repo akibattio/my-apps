@@ -79,7 +79,7 @@ export default async function AdminVehicles() {
                   {v.year ? <span className="text-muted"> · {v.year}</span> : null}
                   {(claimCount.get(v.id) ?? 0) > 0 && (
                     <span className="ml-2 rounded-full bg-amber-900/50 px-2 py-0.5 text-[11px] text-amber-200">
-                      持ち主確認待ち
+                      持ち主確認待ち{v.owner ? "" : "（持ち主なし）"}
                     </span>
                   )}
                 </td>

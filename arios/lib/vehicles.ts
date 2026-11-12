@@ -9,7 +9,8 @@ import { PARTY_LABEL } from "@/app/admin/inquiries/constants";
 export type VehicleLink = {
   vehicleId: string;
   created: boolean; // 今回はじめて車の記録を作ったか
-  ownerConflict: boolean; // 別の会員が持ち主として登録済み → 確認待ちにした
+  ownerConflict: boolean; // 持ち主の確認待ちにした（別の会員が持ち主の車、または持ち主のいない既存の車）
+  conflictHadOwner: boolean; // 確認待ちにしたとき、その車に持ち主がいたか
   otherListings: number; // 同じ車体番号の、ほかの売りたい登録の数
 };
 
@@ -80,6 +81,7 @@ export async function linkListingToVehicle(l: Listing): Promise<VehicleLink | nu
       const r = await assignOwnerOrClaim(vehicle, listerOwnerId, "SELL_LISTING", l.id);
       ownerConflict = r === "CLAIMED";
     }
+    const conflictHadOwner = ownerConflict && !!vehicle.currentOwnerId;
 
     await supabase.from("inquiries").update({ vehicle_id: vehicle.id }).eq("id", l.id);
 
@@ -114,6 +116,7 @@ export async function linkListingToVehicle(l: Listing): Promise<VehicleLink | nu
       vehicleId: vehicle.id,
       created: vehicle.created,
       ownerConflict,
+      conflictHadOwner,
       otherListings: others ?? 0,
     };
   } catch (e) {
@@ -122,9 +125,14 @@ export async function linkListingToVehicle(l: Listing): Promise<VehicleLink | nu
   }
 }
 
-// 持ち主を決める。持ち主がいなければその会員にする。別の会員が持ち主なら確認待ちにする。
+// 持ち主を決める（2026-11-12 秋葉さん決定:「確認待ちに回す」）。
+//  - 車の記録を今回の操作で新しく作ったときだけ、その場で持ち主にする
+//  - すでにあった車の記録は、持ち主がいなくても持ち主にせず、運営の確認待ち（vehicle_claims）にする
+//    （車体番号は外から見える情報なので、入れただけで持ち主になれないように）
+//  - すでに自分が持ち主なら何もしない
+// created は findOrCreateVehicle() の戻り値をそのまま渡す。
 export async function assignOwnerOrClaim(
-  vehicle: { id: string; currentOwnerId: string | null },
+  vehicle: { id: string; currentOwnerId: string | null; created: boolean },
   ownerId: string,
   source: string,
   inquiryId: string | null = null
@@ -132,7 +140,8 @@ export async function assignOwnerOrClaim(
   const supabase = createAdminClient();
   if (vehicle.currentOwnerId === ownerId) return "ALREADY_MINE";
 
-  if (!vehicle.currentOwnerId) {
+  if (vehicle.created && !vehicle.currentOwnerId) {
+    // 持ち主が空のときだけ更新する（同時に同じ車体番号で作られた場合に、2人とも持ち主にならないように）
     const { data: claimed } = await supabase
       .from("vehicles")
       .update({ current_owner_id: ownerId })
@@ -149,7 +158,7 @@ export async function assignOwnerOrClaim(
       });
       return "ASSIGNED";
     }
-    // 同時にほかの会員が持ち主になった → 下の確認待ちへ
+    // 同時にほかの会員が持ち主になった → 下の確認待ちへ（作った側の判定がずれても、条件つき更新で1人に絞られる）
   }
 
   // 同じ会員の確認待ちがすでにあれば一意制約で弾かれる（それで良い）

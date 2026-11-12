@@ -116,7 +116,11 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
         ? [`★ 同じ車体番号の売りたい登録がほかに${l.vehicle.otherListings}件あります（重複・仲介の重なりを確認してください）。`]
         : []),
       ...(l.vehicle.ownerConflict
-        ? ["⚠ この車体番号は別の会員の車として登録済みです。持ち主の確認待ちにしました（管理画面の車両で判断してください）。"]
+        ? [
+            l.vehicle.conflictHadOwner
+              ? "⚠ この車体番号は別の会員の車として登録済みです。持ち主の確認待ちにしました（管理画面の車両で判断してください）。"
+              : "⚠ この車体番号の車の記録はすでにあり、持ち主は未設定です（仲介・業者・運営の登録などで作られたもの）。登録した会員を持ち主にする前に、確認待ちにしました（管理画面の車両で判断してください）。",
+          ]
         : []),
       `車の記録: ${site}/admin/vehicles/${l.vehicle.vehicleId}`
     );
@@ -185,6 +189,7 @@ export async function notifyGarageClaim(c: {
   manufacturer: string | null;
   model: string | null;
   email: string | null;
+  hadOwner: boolean; // その車に持ち主がいたか（いなければ「持ち主のいない既存の車への申請」）
 }): Promise<void> {
   const site = siteUrl();
   const car = [c.manufacturer, c.model].filter(Boolean).join(" ") || "（車名なし）";
@@ -192,8 +197,15 @@ export async function notifyGarageClaim(c: {
     adminRecipients(),
     `【持ち主確認】マイガレージ: ${car}`,
     [
-      "マイガレージに、別の会員の車として登録済みの車体番号で登録がありました。",
-      "持ち主は書き換えず、確認待ちにしています。両方の会員に確認してから判断してください。",
+      ...(c.hadOwner
+        ? [
+            "マイガレージに、別の会員の車として登録済みの車体番号で登録がありました。",
+            "持ち主は書き換えず、確認待ちにしています。両方の会員に確認してから判断してください。",
+          ]
+        : [
+            "マイガレージに、すでに車の記録がある車体番号で登録がありました（現在の持ち主: なし）。",
+            "車の記録は仲介・業者・運営の登録などで作られたものです。本人の車か確認してから判断してください。",
+          ]),
       "",
       `車両: ${car}`,
       `車体番号: ${c.vin}`,

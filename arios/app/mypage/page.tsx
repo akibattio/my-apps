@@ -162,9 +162,20 @@ export default async function MyPage({
   );
 
   // マイガレージ: 持ち主になっている車の数と、いちばん近い整備予定
-  const garage: { count: number; due: { car: string; date: string } | null } = { count: 0, due: null };
+  const garage: { count: number; due: { car: string; date: string } | null; pending: number } = {
+    count: 0,
+    due: null,
+    pending: 0,
+  };
   const { data: ownerRow } = await supabase.from("owners").select("id").eq("auth_user_id", user.id).maybeSingle();
   if (ownerRow) {
+    // 運営が持ち主を確認中の車（売りたい登録から確認待ちになった場合も、ここで分かるように）
+    const { count: pendingCount } = await supabase
+      .from("vehicle_claims")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", ownerRow.id)
+      .eq("status", "PENDING");
+    garage.pending = pendingCount ?? 0;
     const { data: cars } = await supabase
       .from("vehicles")
       .select("id, manufacturer, model")
@@ -267,6 +278,11 @@ export default async function MyPage({
           </span>
         </span>
         <span className="mt-1 block text-xs text-muted">{t("my_garage_body")}</span>
+        {garage.pending > 0 && (
+          <span className="mt-2 block text-xs text-amber-300">
+            {t("garage_pending_title")}（{garage.pending}）
+          </span>
+        )}
         {garage.due && (
           <span className={`mt-2 block text-xs ${garage.due.date < todayIso() ? "text-red-400" : "text-accent"}`}>
             {fill(t(garage.due.date < todayIso() ? "my_garage_overdue" : "my_garage_due"), {

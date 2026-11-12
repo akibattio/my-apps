@@ -50,9 +50,16 @@ export async function registerVehicle(
   const result = await assignOwnerOrClaim(vehicle, owner.ownerId, "MEMBER");
   if (result === "CLAIMED") {
     after(() =>
-      notifyGarageClaim({ vehicleId: vehicle.id, vin, manufacturer, model, email: owner.email })
+      notifyGarageClaim({
+        vehicleId: vehicle.id,
+        vin,
+        manufacturer,
+        model,
+        email: owner.email,
+        hadOwner: !!vehicle.currentOwnerId,
+      })
     );
-    redirect("/garage?pending=1");
+    redirect(`/garage?pending=${vehicle.currentOwnerId ? "1" : "2"}`);
   }
   if (result === "ALREADY_MINE") redirect(`/garage/${vehicle.id}`);
 

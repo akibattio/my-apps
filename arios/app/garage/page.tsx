@@ -98,7 +98,7 @@ export default async function GaragePage({
         <section className="mb-6 rounded-2xl border border-amber-700/60 bg-amber-950/30 p-4 text-sm">
           <p className="font-semibold text-amber-200">{pending ? t("reg_pending_title") : t("garage_pending_title")}</p>
           <p className="mt-1 leading-relaxed text-amber-100/80">
-            {pending ? t("reg_pending_body") : t("garage_pending_body")}
+            {pending === "2" ? t("reg_pending_body_unowned") : pending ? t("reg_pending_body") : t("garage_pending_body")}
           </p>
           {pendingVins.length > 0 && (
             <ul className="mt-2 space-y-0.5 font-mono text-xs text-amber-100/70">
