@@ -11,7 +11,7 @@ import { rateLimitDb } from "@/lib/ratelimit";
 
 const BUCKET = "vehicle-images";
 const MAX_PHOTOS = 10; // AddHistoryForm と同じ値
-const TYPES = ["MAINTENANCE", "REPAIR", "EVENT", "TRAVEL", "OTHER"];
+const TYPES = ["PURCHASE", "MAINTENANCE", "REPAIR", "EVENT", "TRAVEL", "OTHER"];
 const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 export type AddHistoryState = { error?: string };
@@ -37,7 +37,8 @@ export async function addHistory(_prev: AddHistoryState, formData: FormData): Pr
   const dateRaw = String(formData.get("eventDate") ?? "").trim();
   const eventDate = isDate(dateRaw) ? dateRaw : new Date().toISOString().slice(0, 10);
   const dueRaw = String(formData.get("nextDueDate") ?? "").trim();
-  const nextDueDate = isDate(dueRaw) ? dueRaw : null;
+  // 次回の予定日は整備・修理だけ
+  const nextDueDate = isDate(dueRaw) && (historyType === "MAINTENANCE" || historyType === "REPAIR") ? dueRaw : null;
   const mileageRaw = String(formData.get("mileage") ?? "").replace(/[,\s]/g, "");
   const mileage = /^\d{1,9}$/.test(mileageRaw) ? Number(mileageRaw) : null;
   const isPublic = String(formData.get("public") ?? "") === "on";

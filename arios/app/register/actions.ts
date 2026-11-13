@@ -61,29 +61,33 @@ export async function registerVehicle(
     );
     redirect(`/garage?pending=${vehicle.currentOwnerId ? "1" : "2"}`);
   }
-  if (result === "ALREADY_MINE") redirect(`/garage/${vehicle.id}`);
-
+  // ここに来るのは「新しく持ち主になった（ASSIGNED）」か「すでに自分の車だった（ALREADY_MINE）」とき。
+  // すでに自分の車（売りたい登録から作られた記録など）でも、入力された年式・写真は捨てずに反映する。
   const supabase = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  // 既存の記録（売りたい登録から作られたもの等）を引き継いだ場合は、車名を上書きしない。
+  // 既存の記録を引き継いだ場合は、車名を上書きしない。年式は空のときだけ埋める。
   if (!vehicle.created && year) {
     await supabase.from("vehicles").update({ year }).eq("id", vehicle.id).is("year", null);
   }
 
-  // この車の記録の起点（表示は「LIFE LINE GARAGE に登録」）
-  const { data: history } = await supabase
-    .from("histories")
-    .insert({
-      vehicle_id: vehicle.id,
-      owner_id: owner.ownerId,
-      history_type: "OTHER",
-      event_date: today,
-      source: "MEMBER_REGISTRATION",
-      visibility: "PRIVATE",
-    })
-    .select("id")
-    .single();
+  // この車の記録の起点（表示は「LIFE LINE GARAGE に登録」）。すでに自分の車なら重ねて作らない。
+  let history: { id: string } | null = null;
+  if (result === "ASSIGNED") {
+    const { data } = await supabase
+      .from("histories")
+      .insert({
+        vehicle_id: vehicle.id,
+        owner_id: owner.ownerId,
+        history_type: "OTHER",
+        event_date: today,
+        source: "MEMBER_REGISTRATION",
+        visibility: "PRIVATE",
+      })
+      .select("id")
+      .single();
+    history = data;
+  }
 
   // 写真（1枚失敗しても他は続行）。実バイトで画像か検証する。
   for (let i = 0; i < photos.length; i++) {

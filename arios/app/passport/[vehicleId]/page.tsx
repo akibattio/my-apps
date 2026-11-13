@@ -24,7 +24,7 @@ export default async function PassportPage({ params }: { params: Promise<{ vehic
 
   const { data: vehicle, error } = await supabase
     .from("vehicles")
-    .select("id, manufacturer, model, year, vin, is_public")
+    .select("id, manufacturer, model, year, vin, is_public, exterior_color, interior_color, appeal_points, factory_options")
     .eq("id", vehicleId)
     .maybeSingle();
 
@@ -76,6 +76,33 @@ export default async function PassportPage({ params }: { params: Promise<{ vehic
           {vehicle.year ? <span className="text-muted"> · {vehicle.year}</span> : null}
         </h1>
       </header>
+
+      {/* 車のプロフィール（事故歴は公開ページに出さない） */}
+      {(vehicle.exterior_color || vehicle.interior_color || vehicle.appeal_points || vehicle.factory_options) && (
+        <section className="mb-8 rounded-xl border border-neutral-800 p-5 text-sm">
+          <p className="mb-3 text-xs tracking-widest text-muted">{t("vp_title")}</p>
+          <dl className="grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-2">
+            {(vehicle.exterior_color || vehicle.interior_color) && (
+              <>
+                <dt className="text-muted">{t("vp_color")}</dt>
+                <dd>{[vehicle.exterior_color, vehicle.interior_color].filter(Boolean).join(" / ")}</dd>
+              </>
+            )}
+            {vehicle.appeal_points && (
+              <>
+                <dt className="text-muted">{t("vp_appeal")}</dt>
+                <dd className="whitespace-pre-wrap">{vehicle.appeal_points}</dd>
+              </>
+            )}
+            {vehicle.factory_options && (
+              <>
+                <dt className="text-muted">{t("vp_options")}</dt>
+                <dd className="whitespace-pre-wrap">{vehicle.factory_options}</dd>
+              </>
+            )}
+          </dl>
+        </section>
+      )}
 
       <section className="mb-8 rounded-xl border border-neutral-800 p-5">
         <div className="flex items-end justify-between">
