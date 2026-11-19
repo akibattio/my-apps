@@ -28,7 +28,7 @@ export async function decideClaim(formData: FormData): Promise<void> {
   if (decision === "APPROVED") {
     const { data: v } = await supabase
       .from("vehicles")
-      .select("current_owner_id")
+      .select("current_owner_id, is_public")
       .eq("id", claim.vehicle_id)
       .maybeSingle();
     const today = now.slice(0, 10);
@@ -38,7 +38,11 @@ export async function decideClaim(formData: FormData): Promise<void> {
       .update({ is_current: false, end_date: today })
       .eq("vehicle_id", claim.vehicle_id)
       .eq("is_current", true);
-    await supabase.from("vehicles").update({ current_owner_id: claim.owner_id }).eq("id", claim.vehicle_id);
+    // 持ち主が代わったら、公開ページはいったん出さない（新しい持ち主が改めて選ぶ）
+    await supabase
+      .from("vehicles")
+      .update({ current_owner_id: claim.owner_id, is_public: false })
+      .eq("id", claim.vehicle_id);
     await supabase.from("ownerships").insert({
       vehicle_id: claim.vehicle_id,
       owner_id: claim.owner_id,
@@ -60,8 +64,8 @@ export async function decideClaim(formData: FormData): Promise<void> {
       target_table: "vehicles",
       target_id: claim.vehicle_id,
       action: "OWNER_CHANGE",
-      before_json: { current_owner_id: v?.current_owner_id ?? null },
-      after_json: { current_owner_id: claim.owner_id, claim_id: claim.id },
+      before_json: { current_owner_id: v?.current_owner_id ?? null, is_public: v?.is_public ?? null },
+      after_json: { current_owner_id: claim.owner_id, is_public: false, claim_id: claim.id },
     });
   }
 
