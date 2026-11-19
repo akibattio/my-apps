@@ -16,16 +16,21 @@
 -- 前の持ち主が書いた空の行が新しい持ち主の物になってしまうので、1件でもあれば適用を止める。
 do $$
 declare
-  ended int; multi int; approved int; owner_changes int;
+  ended int; multi int; approved int; owner_changes int; mismatch int;
 begin
   select count(*) into ended from ownerships where end_date is not null or is_current = false;
   select count(*) into multi from (
     select vehicle_id from ownerships group by vehicle_id having count(distinct owner_id) > 1) x;
   select count(*) into approved from vehicle_claims where status = 'APPROVED';
   select count(*) into owner_changes from audit_logs where action = 'OWNER_CHANGE';
-  if ended + multi + approved + owner_changes > 0 then
-    raise exception '0022: 持ち主の付け替えの跡があるため止めました（終わった所有の記録 %、持ち主が2人以上の車 %、承認済みの確認待ち %、持ち主の変更の監査ログ %）。書いた人が空の行の埋め方を、車ごとに決めてから適用してください。',
-      ended, multi, approved, owner_changes;
+  -- 車の持ち主と、今の所有の記録の持ち主が食い違う車（付け替えの書き込みが途中で失敗した跡）
+  select count(*) into mismatch from vehicles v
+    where v.current_owner_id is not null
+      and not exists (select 1 from ownerships o
+                      where o.vehicle_id = v.id and o.is_current and o.owner_id = v.current_owner_id);
+  if ended + multi + approved + owner_changes + mismatch > 0 then
+    raise exception '0022: 持ち主の付け替えの跡があるため止めました（終わった所有の記録 %、持ち主が2人以上の車 %、承認済みの確認待ち %、持ち主の変更の監査ログ %、持ち主が所有の記録と食い違う車 %）。書いた人が空の行の埋め方を、車ごとに決めてから適用してください。',
+      ended, multi, approved, owner_changes, mismatch;
   end if;
 end $$;
 
