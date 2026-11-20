@@ -89,10 +89,56 @@ jobs:
           echo "MONTH=$MONTH" >> "$GITHUB_ENV"
           echo "対象月: $MONTH"
           RG="$GITHUB_WORKSPACE/report-glass"
-          AD_REPORT_DIR="$RG/pipeline/yahoo" python3 scripts/export_yahoo_for_adreport.py "$MONTH" \
-            || echo "!! Yahooエクスポート失敗（続行）"
-          AD_REPORT_DIR="$RG/pipeline/microsoft" python3 scripts/export_microsoft_for_adreport.py "$MONTH" \
-            || echo "!! Microsoftエクスポート失敗（続行）"
+          # 書き出しの記録は確かめの段（次）で数えるため、画面にも出しつつ一時ファイルにも残す（中身は件数・成否だけ）
+          set +e
+          AD_REPORT_DIR="$RG/pipeline/yahoo" python3 scripts/export_yahoo_for_adreport.py "$MONTH" 2>&1 | tee "$RUNNER_TEMP/export-yahoo.log"
+          echo "RC_YAHOO=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+          AD_REPORT_DIR="$RG/pipeline/microsoft" python3 scripts/export_microsoft_for_adreport.py "$MONTH" 2>&1 | tee "$RUNNER_TEMP/export-microsoft.log"
+          echo "RC_MICROSOFT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+          set -e
+          # 対応表（ファイル＋コンソールで足した分）で slug の付いている社の数。書き出しと同じ読み方（media_accounts.load）
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, "scripts")
+          from media_accounts import load
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              for media in ("yahoo", "microsoft"):
+                  n = len({e["slug"] for e in load(media) if e.get("slug") and e.get("accountId")})
+                  f.write(f"EXPECT_{media.upper()}={n}\n")
+          PY
+
+      # 取り込みの確かめ（2026-11-20 RG-7）。媒体ごとに、次のどれかに当たったら「外れ」とし、その媒体の今月分は report-glass に入れない。
+      #   書き出しが 0 以外で終わった／「取得失敗」の行がある／「出力」と「実績なしで省略」の合計が対応表の社数と合わない
+      # 取得失敗でもファイルが書き出されることがある（一部の項目が欠けたまま）ので、ファイルの有無では判定しない。
+      # 記録に出すのは件数と、どの段で外れたかだけ（公開リポジトリ。社名・slug・数字・アカウントの番号は出さない）。
+      - name: 取り込みの確かめ
+        working-directory: report-glass
+        run: |
+          BAD=""
+          for MEDIA in yahoo microsoft; do
+            UP=$(echo "$MEDIA" | tr a-z A-Z)
+            LOG="$RUNNER_TEMP/export-$MEDIA.log"
+            RC_VAR="RC_$UP"; EX_VAR="EXPECT_$UP"
+            RC="${!RC_VAR:-1}"; EXPECT="${!EX_VAR:-}"
+            OUT=$(grep -c "件目を出力" "$LOG" 2>/dev/null || true)
+            SKIP=$(grep -c "出力スキップ" "$LOG" 2>/dev/null || true)
+            FAIL=$(grep -c "取得失敗" "$LOG" 2>/dev/null || true)
+            NOTOUT=$(grep -c "出力しない" "$LOG" 2>/dev/null || true)
+            WHY=""
+            [ "$RC" = "0" ] || WHY="$WHY 書き出しの終了コード$RC"
+            [ "${FAIL:-0}" = "0" ] || WHY="$WHY 取得失敗${FAIL}行"
+            [ "${NOTOUT:-0}" = "0" ] || WHY="$WHY 出力しない${NOTOUT}件"
+            if [ -z "$EXPECT" ]; then WHY="$WHY 対応表の社数が読めない"
+            elif [ $(( ${OUT:-0} + ${SKIP:-0} )) -ne "$EXPECT" ]; then WHY="$WHY 件数が合わない（対応表${EXPECT}社・出力${OUT:-0}・省略${SKIP:-0}）"; fi
+            echo "$MEDIA: 対応表${EXPECT:-?}社・出力${OUT:-0}・実績なしで省略${SKIP:-0}・取得失敗${FAIL:-0}行 → ${WHY:-OK}"
+            if [ -n "$WHY" ]; then
+              BAD="$BAD $MEDIA"
+              # この媒体の今月分は入れない：新しく書いたファイルは消し、既にあったファイルは元に戻す
+              git ls-files --others --exclude-standard -- "pipeline/$MEDIA/*-$MONTH.json" | xargs -r rm -f
+              git checkout -- "pipeline/$MEDIA" 2>/dev/null || true
+            fi
+          done
+          echo "CHECK_BAD=${BAD# }" >> "$GITHUB_ENV"
 
       - name: report-glass へ commit/push
         working-directory: report-glass
@@ -105,7 +151,8 @@ jobs:
             echo "上書きしない既存ファイル: $(git diff --name-only -- pipeline/yahoo pipeline/microsoft | wc -l | tr -d ' ')件"
             git checkout -- pipeline/yahoo pipeline/microsoft
           fi
-          git add pipeline/yahoo/*-"$MONTH".json pipeline/microsoft/*-"$MONTH".json 2>/dev/null || true
+          # 媒体ごとに足す（確かめで外した媒体の今月分が無くても、もう片方は入るように）
+          for d in yahoo microsoft; do git add -- pipeline/"$d"/*-"$MONTH".json 2>/dev/null || true; done
           if git diff --cached --quiet; then
             echo "変更なし（push不要）"; exit 0
           fi
@@ -120,3 +167,27 @@ jobs:
             # 手動の確認実行：書き込み権限だけ確かめて、実際には送らない
             git push --dry-run -q origin master && echo "（確認のみ・push していません）"
           fi
+
+      # 外れた媒体があれば、ここで失敗にする（GitHub の失敗メールが届く）。Chat へは社内の決まった宛先（GOOGLE_CHAT_WEBHOOK_URL）だけに送る。
+      # 前の段で止まった（取得や push の失敗）ときも、ここで知らせる。文には件数と段の名前だけを入れる。
+      - name: 外れたら知らせる
+        if: always()
+        env:
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ] && [ -z "${CHECK_BAD:-}" ]; then
+            echo "取り込みの確かめ: すべて OK"; exit 0
+          fi
+          WHAT="${CHECK_BAD:+外れた媒体: $CHECK_BAD（この媒体の今月分は report-glass に入れていません）}"
+          [ "$JOB_STATUS" = "success" ] || WHAT="途中の段で止まりました${WHAT:+／$WHAT}"
+          MSG="REPORT GLASS の月次の取り込み（${MONTH:-月不明}）で問題がありました。${WHAT}。記録: $RUN_URL"
+          if [ -n "$GOOGLE_CHAT_WEBHOOK_URL" ]; then
+            python3 -c 'import json,os,sys,urllib.request as u; r=u.Request(os.environ["GOOGLE_CHAT_WEBHOOK_URL"], data=json.dumps({"text": sys.argv[1]}).encode(), headers={"Content-Type": "application/json; charset=UTF-8"}); u.urlopen(r, timeout=20)' "$MSG" \
+              && echo "Chat へ知らせました" || echo "Chat への通知に失敗しました"
+          else
+            echo "Chat の宛先が未設定のため、GitHub の失敗メールだけで知らせます"
+          fi
+          echo "$MSG"
+          exit 1
