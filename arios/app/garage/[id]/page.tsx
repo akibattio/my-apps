@@ -40,7 +40,9 @@ export default async function GarageVehiclePage({ params }: { params: Promise<{ 
   const supabase = await createClient();
   const { data: vehicle, error } = await supabase
     .from("vehicles")
-    .select("id, vin, manufacturer, model, year, is_public")
+    .select(
+      "id, vin, manufacturer, model, year, is_public, exterior_color, interior_color, appeal_points, factory_options, accident_history"
+    )
     .eq("id", id)
     .maybeSingle();
   throwIfDbError(error, "garage/[id]");
@@ -73,6 +75,9 @@ export default async function GarageVehiclePage({ params }: { params: Promise<{ 
   const docType = new Map<string, string>();
   for (const d of docs ?? []) if (d.history_id && d.document_type) docType.set(d.history_id, d.document_type);
   const today = todayIso();
+  const hasProfile = Boolean(
+    vehicle.exterior_color || vehicle.interior_color || vehicle.appeal_points || vehicle.factory_options || vehicle.accident_history
+  );
   const typeLabel = (h: History) =>
     h.source === "MEMBER_REGISTRATION"
       ? t("ht_registered")
@@ -113,6 +118,51 @@ export default async function GarageVehiclePage({ params }: { params: Promise<{ 
           ))}
         </section>
       )}
+
+      {/* 車のプロフィール（記録とは別の、車そのものの情報） */}
+      <section className="mb-8 rounded-2xl border border-border bg-card p-5 text-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">{t("vp_title")}</h2>
+          <Link href={`/garage/${id}/edit`} className="text-xs text-accent">
+            {hasProfile ? t("gd_edit") : t("vp_edit")}
+          </Link>
+        </div>
+        {hasProfile ? (
+          <dl className="mt-3 grid grid-cols-[6.5rem_1fr] gap-x-3 gap-y-2">
+            {(vehicle.exterior_color || vehicle.interior_color) && (
+              <>
+                <dt className="text-muted">{t("vp_color")}</dt>
+                <dd>
+                  {[vehicle.exterior_color, vehicle.interior_color].filter(Boolean).join(" / ")}
+                </dd>
+              </>
+            )}
+            {vehicle.appeal_points && (
+              <>
+                <dt className="text-muted">{t("vp_appeal")}</dt>
+                <dd className="whitespace-pre-wrap">{vehicle.appeal_points}</dd>
+              </>
+            )}
+            {vehicle.factory_options && (
+              <>
+                <dt className="text-muted">{t("vp_options")}</dt>
+                <dd className="whitespace-pre-wrap">{vehicle.factory_options}</dd>
+              </>
+            )}
+            {vehicle.accident_history && (
+              <>
+                <dt className="text-muted">{t("vp_accident")}</dt>
+                <dd>
+                  {t(`vp_accident_${vehicle.accident_history}`)}
+                  <span className="ml-2 text-[11px] text-neutral-500">{t("gd_rec_private")}</span>
+                </dd>
+              </>
+            )}
+          </dl>
+        ) : (
+          <p className="mt-2 text-xs leading-relaxed text-muted">{t("vp_empty")}</p>
+        )}
+      </section>
 
       <Link
         href={`/garage/${id}/add-history`}

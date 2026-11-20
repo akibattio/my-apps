@@ -28,7 +28,7 @@ export default async function EditVehiclePage({
   const supabase = await createClient();
   const { data: vehicle } = await supabase
     .from("vehicles")
-    .select("id, vin, manufacturer, model, year")
+    .select("id, vin, manufacturer, model, year, exterior_color, interior_color, appeal_points, factory_options, accident_history")
     .eq("id", id)
     .maybeSingle();
   if (!vehicle) notFound();
@@ -56,6 +56,11 @@ export default async function EditVehiclePage({
           manufacturer: vehicle.manufacturer ?? "",
           model: vehicle.model ?? "",
           year: vehicle.year ? String(vehicle.year) : "",
+          exteriorColor: vehicle.exterior_color ?? "",
+          interiorColor: vehicle.interior_color ?? "",
+          appealPoints: vehicle.appeal_points ?? "",
+          factoryOptions: vehicle.factory_options ?? "",
+          accidentHistory: vehicle.accident_history ?? "",
         }}
       />
     </main>

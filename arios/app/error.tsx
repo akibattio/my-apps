@@ -12,6 +12,9 @@ const TEXT = {
     body2: "少し時間をおいて、もう一度お試しください。",
     retry: "再読み込み",
     id: "エラーID",
+    staleTitle: "サイトが更新されました",
+    staleBody1: "画面を開いている間にサイトが新しくなったため、送信できませんでした。",
+    staleBody2: "再読み込みして、もう一度送信してください（入力内容は消えます）。",
   },
   en: {
     title: "A temporary error occurred",
@@ -19,6 +22,9 @@ const TEXT = {
     body2: "Please wait a moment and try again.",
     retry: "Reload",
     id: "Error ID",
+    staleTitle: "The site was updated",
+    staleBody1: "The site was updated while this page was open, so it couldn't be sent.",
+    staleBody2: "Please reload and send it again (your input will be cleared).",
   },
 };
 
@@ -34,15 +40,18 @@ export default function Error({
     if (/(?:^|;\s*)lang=en(?:;|$)/.test(document.cookie)) setLang("en");
   }, []);
   const t = TEXT[lang];
+  // 画面を開いたあとにサイトが更新されると、古い画面からの送信（サーバーアクション）が見つからずに失敗する。
+  // そのときは「更新されたので再読み込みを」と案内する（再読み込みすれば送れる）。
+  const stale = /Server Action|failed-to-find-server-action/i.test(error?.message ?? "");
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-5 px-6 text-center">
       <p className="text-xs tracking-[0.4em] text-accent">LIFE LINE GARAGE</p>
-      <h1 className="text-lg font-semibold">{t.title}</h1>
+      <h1 className="text-lg font-semibold">{stale ? t.staleTitle : t.title}</h1>
       <p className="text-sm leading-relaxed text-muted">
-        {t.body1}
+        {stale ? t.staleBody1 : t.body1}
         <br />
-        {t.body2}
+        {stale ? t.staleBody2 : t.body2}
       </p>
       {/* サーバー側の読み込み失敗は reset() だけでは再取得されないため、ページごと読み直す */}
       <button

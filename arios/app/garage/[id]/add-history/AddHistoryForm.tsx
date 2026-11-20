@@ -6,7 +6,7 @@ import { resizeImage } from "@/app/listings/resize";
 import { tr, fill, type Lang } from "@/lib/i18n";
 
 const MAX_PHOTOS = 10; // actions.ts と同じ値
-const TYPES = ["MAINTENANCE", "REPAIR", "EVENT", "TRAVEL", "OTHER"];
+const TYPES = ["PURCHASE", "MAINTENANCE", "REPAIR", "EVENT", "TRAVEL", "OTHER"];
 
 // 記録（整備・修理・イベント・旅・その他）の入力フォーム。整備・修理は次回予定日と走行距離も入れられる。
 export default function AddHistoryForm({
@@ -34,6 +34,8 @@ export default function AddHistoryForm({
   const [localError, setLocalError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isService = type === "MAINTENANCE" || type === "REPAIR";
+  // 走行距離は、整備・修理に加えて購入のときも残せる（購入時の距離）
+  const hasMileage = isService || type === "PURCHASE";
 
   async function onFilesChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
@@ -69,10 +71,8 @@ export default function AddHistoryForm({
     fd.set("eventDate", eventDate);
     fd.set("title", title);
     fd.set("memo", memo);
-    if (isService) {
-      fd.set("nextDueDate", nextDue);
-      fd.set("mileage", mileage);
-    }
+    if (isService) fd.set("nextDueDate", nextDue);
+    if (hasMileage) fd.set("mileage", mileage);
     fd.set("links", links);
     fd.set("public", isPublic ? "on" : "");
     for (const f of files) fd.append("photos", f);
@@ -115,12 +115,14 @@ export default function AddHistoryForm({
         <textarea className={`${field} min-h-24`} value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={t("ah_memo_ph")} maxLength={4000} />
       </div>
 
-      {isService && (
+      {hasMileage && (
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={label}>{t("ah_next_due")}{opt}</label>
-            <input type="date" className={field} value={nextDue} min={eventDate} onChange={(e) => setNextDue(e.target.value)} />
-          </div>
+          {isService && (
+            <div>
+              <label className={label}>{t("ah_next_due")}{opt}</label>
+              <input type="date" className={field} value={nextDue} min={eventDate} onChange={(e) => setNextDue(e.target.value)} />
+            </div>
+          )}
           <div>
             <label className={label}>{t("ah_mileage")}{opt}</label>
             <input
@@ -131,7 +133,7 @@ export default function AddHistoryForm({
               placeholder="52000"
             />
           </div>
-          <p className="col-span-2 -mt-1 text-xs text-muted">{t("ah_next_due_note")}</p>
+          {isService && <p className="col-span-2 -mt-1 text-xs text-muted">{t("ah_next_due_note")}</p>}
         </div>
       )}
 
