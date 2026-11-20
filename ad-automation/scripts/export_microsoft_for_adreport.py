@@ -66,6 +66,27 @@ def _months_ago_start(ym: str, n: int) -> str:
     return datetime.date(y, m, 1).isoformat()
 
 
+def _fault_codes(ex) -> str:
+    """WebFault の中にある Microsoft のエラー番号と名前だけを返す（秘密でない。文面は口座番号が入りうるので出さない）。"""
+    import re
+    det = getattr(getattr(ex, "fault", None), "detail", None)
+    out = []
+    for holder in ("AdApiFaultDetail", "ApiFaultDetail"):
+        d = getattr(det, holder, None)
+        if d is None:
+            continue
+        for lst in (getattr(getattr(d, "Errors", None), "AdApiError", None),
+                    getattr(getattr(d, "OperationErrors", None), "OperationError", None),
+                    getattr(getattr(d, "BatchErrors", None), "BatchError", None)):
+            for e in (lst or []):
+                code, name = str(getattr(e, "Code", "") or ""), str(getattr(e, "ErrorCode", "") or "")
+                code = code if re.fullmatch(r"\d{1,6}", code) else ""
+                name = name if re.fullmatch(r"[A-Za-z]{1,60}", name) else ""
+                if code or name:
+                    out.append(f"{code}:{name}")
+    return ",".join(out[:3])
+
+
 def _build_payload(slug, accs, ym, start, end):
     """スラッグ配下のアカウントを合算し report-glass契約のリッチJSONを組む。取れる項目だけ入れる。"""
     campaigns, dev, daily, monthly, kws, qrs = [], {}, {}, {}, {}, {}
@@ -78,7 +99,7 @@ def _build_payload(slug, accs, ym, start, end):
         e["cost"] += cost or 0; e["imp"] += imp or 0; e["clk"] += clk or 0; e["cv"] += cv or 0
 
     default_cid = os.environ.get("MS_ADS_CUSTOMER_ID", "")
-    for a in accs:
+    for i, a in enumerate(accs, 1):
         acct = str(a["accountId"])
         # 顧客IDはアカウントごと（コンソールから追加した社は別顧客のことがある）。無ければ .env の既定。
         # 前のアカウントの顧客IDが残らないよう、毎回設定し直す（ループの後で既定に戻す）
@@ -88,7 +109,9 @@ def _build_payload(slug, accs, ym, start, end):
             try:
                 return fn(*args)
             except Exception as ex:
-                print(f"  取得失敗 {fn.__name__}: {err(ex)}")
+                # 口座は番号を出さず、識別名の中の順番（口座1・口座2…）で示す。Microsoft のエラー番号は原因を突き止めるのに要るので残す
+                codes = _fault_codes(ex)
+                print(f"  取得失敗 {fn.__name__}（口座{i}）: {err(ex)}" + (f" 番号 {codes}" if codes else ""))
                 detail(f"    {slug}: {str(ex)[:60]}")
                 return []
 
