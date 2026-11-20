@@ -97,20 +97,27 @@ jobs:
           echo "RC_MICROSOFT=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
           set -e
           # 対応表（ファイル＋コンソールで足した分）で slug の付いている社の数。書き出しと同じ読み方（media_accounts.load）
-          python3 - <<'PY'
+          # 数えられなかったときは書き出しの段を止めず、EXPECT を空のままにする（次の段で両方の媒体を「外れ」にする）
+          python3 - <<'PY' || echo "対応表の社数を数えられず（次の段で外れにします）"
           import os, sys
           sys.path.insert(0, "scripts")
           from media_accounts import load
+          lines = []
+          for media in ("yahoo", "microsoft"):
+              # 書き出しと同じ絞り方（Microsoft は「<」で始まる仮の accountId を除く。export_microsoft_for_adreport.py）
+              es = [e for e in load(media) if e.get("slug") and e.get("accountId")
+                    and not (media == "microsoft" and str(e["accountId"]).startswith("<"))]
+              lines.append(f"EXPECT_{media.upper()}={len({e['slug'] for e in es})}\n")
           with open(os.environ["GITHUB_ENV"], "a") as f:
-              for media in ("yahoo", "microsoft"):
-                  n = len({e["slug"] for e in load(media) if e.get("slug") and e.get("accountId")})
-                  f.write(f"EXPECT_{media.upper()}={n}\n")
+              f.writelines(lines)
           PY
 
       # 取り込みの確かめ（2026-11-20 RG-7）。媒体ごとに、次のどれかに当たったら「外れ」とし、その媒体の今月分は report-glass に入れない。
       #   書き出しが 0 以外で終わった／「取得失敗」の行がある／「出力」と「実績なしで省略」の合計が対応表の社数と合わない
       # 取得失敗でもファイルが書き出されることがある（一部の項目が欠けたまま）ので、ファイルの有無では判定しない。
       # 記録に出すのは件数と、どの段で外れたかだけ（公開リポジトリ。社名・slug・数字・アカウントの番号は出さない）。
+      # 照らし合わせは書き出しの出力の文字（「件目を出力」「出力スキップ」「取得失敗」「出力しない」「読めず」）に頼っている。
+      # export_*_for_adreport.py・media_accounts.py のこれらの文字を変えるときは、この段も一緒に直すこと。
       - name: 取り込みの確かめ
         working-directory: report-glass
         run: |
@@ -124,21 +131,24 @@ jobs:
             SKIP=$(grep -c "出力スキップ" "$LOG" 2>/dev/null || true)
             FAIL=$(grep -c "取得失敗" "$LOG" 2>/dev/null || true)
             NOTOUT=$(grep -c "出力しない" "$LOG" 2>/dev/null || true)
+            # コンソールで足したアカウント（Cloudflare KV）が読めないと、ファイルの分だけで書き出しも件数も少なくそろってしまう
+            KVNG=$(grep -c "読めず" "$LOG" 2>/dev/null || true)
             WHY=""
             [ "$RC" = "0" ] || WHY="$WHY 書き出しの終了コード$RC"
             [ "${FAIL:-0}" = "0" ] || WHY="$WHY 取得失敗${FAIL}行"
             [ "${NOTOUT:-0}" = "0" ] || WHY="$WHY 出力しない${NOTOUT}件"
+            [ "${KVNG:-0}" = "0" ] || WHY="$WHY コンソール追加分のアカウントを読めず"
             if [ -z "$EXPECT" ]; then WHY="$WHY 対応表の社数が読めない"
             elif [ $(( ${OUT:-0} + ${SKIP:-0} )) -ne "$EXPECT" ]; then WHY="$WHY 件数が合わない（対応表${EXPECT}社・出力${OUT:-0}・省略${SKIP:-0}）"; fi
             echo "$MEDIA: 対応表${EXPECT:-?}社・出力${OUT:-0}・実績なしで省略${SKIP:-0}・取得失敗${FAIL:-0}行 → ${WHY:-OK}"
             if [ -n "$WHY" ]; then
-              BAD="$BAD $MEDIA"
+              BAD="${BAD:+$BAD,}$MEDIA"
               # この媒体の今月分は入れない：新しく書いたファイルは消し、既にあったファイルは元に戻す
               git ls-files --others --exclude-standard -- "pipeline/$MEDIA/*-$MONTH.json" | xargs -r rm -f
               git checkout -- "pipeline/$MEDIA" 2>/dev/null || true
             fi
           done
-          echo "CHECK_BAD=${BAD# }" >> "$GITHUB_ENV"
+          echo "CHECK_BAD=$BAD" >> "$GITHUB_ENV"
 
       - name: report-glass へ commit/push
         working-directory: report-glass
