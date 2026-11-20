@@ -146,6 +146,9 @@ jobs:
           OVERWRITE: ${{ inputs.overwrite }}
           DO_PUSH: ${{ github.event_name == 'schedule' || inputs.push }}
         run: |
+          # 入力は決まった値だけ通す（true / false / 空）。それ以外は何もせずに止める（2026-11-20 RG-8）
+          case "$OVERWRITE" in true|false|"") ;; *) echo "overwrite の値が不正です"; exit 1 ;; esac
+          case "$DO_PUSH" in true|false) ;; *) echo "push の値が不正です"; exit 1 ;; esac
           # 既にあるファイルは戻す＝新しい月だけ追加（手で補った分＝CSV から足した項目などを消さない）
           if [ "$OVERWRITE" != "true" ]; then
             echo "上書きしない既存ファイル: $(git diff --name-only -- pipeline/yahoo pipeline/microsoft | wc -l | tr -d ' ')件"
