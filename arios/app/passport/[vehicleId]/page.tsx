@@ -24,17 +24,20 @@ export default async function PassportPage({ params }: { params: Promise<{ vehic
 
   const { data: vehicle, error } = await supabase
     .from("vehicles")
-    .select("id, manufacturer, model, year, vin, is_public")
+    .select("id, manufacturer, model, year, vin, is_public, current_owner_id")
     .eq("id", vehicleId)
     .maybeSingle();
 
-  if (error || !vehicle || !vehicle.is_public) notFound();
+  if (error || !vehicle || !vehicle.is_public || !vehicle.current_owner_id) notFound();
+  // 出すのは今の持ち主が書いた物だけ（持ち主が代わっても、前の持ち主の記録・写真・書類は出さない）
+  const ownerId = vehicle.current_owner_id;
 
   const [{ data: histories }, { data: images }, { count: documentCount }] = await Promise.all([
     supabase
       .from("histories")
       .select("id, history_type, title, description, event_date, links, source, created_at")
       .eq("vehicle_id", vehicleId)
+      .eq("owner_id", ownerId)
       .eq("visibility", "PUBLIC")
       .order("event_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true }),
@@ -42,8 +45,13 @@ export default async function PassportPage({ params }: { params: Promise<{ vehic
       .from("images")
       .select("id, image_url, history_id, created_at")
       .eq("vehicle_id", vehicleId)
+      .eq("owner_id", ownerId)
       .order("created_at", { ascending: true }),
-    supabase.from("documents").select("*", { count: "exact", head: true }).eq("vehicle_id", vehicleId),
+    supabase
+      .from("documents")
+      .select("*", { count: "exact", head: true })
+      .eq("vehicle_id", vehicleId)
+      .eq("owner_id", ownerId),
   ]);
 
   const timeline = histories ?? [];

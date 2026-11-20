@@ -186,6 +186,7 @@ export default async function MyPage({
         .from("histories")
         .select("vehicle_id, next_due_date, event_date, created_at")
         .in("vehicle_id", (cars ?? []).map((c) => c.id))
+        .eq("owner_id", ownerRow.id) // 自分が書いた記録だけ（前の持ち主の予定は出さない）
         .neq("visibility", "ADMIN")
         .not("next_due_date", "is", null);
       for (const [vid, date] of nextDueByVehicle(dueRows ?? [])) {

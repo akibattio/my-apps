@@ -36,7 +36,8 @@ export async function setVehiclePublic(formData: FormData): Promise<void> {
   redirect(`/garage/${vehicleId}`);
 }
 
-// 記録1件の公開・非公開を切り替える。本人の車の記録のみ（運営だけの記録は対象外）。
+// 記録1件の公開・非公開を切り替える。今の持ち主で、かつその記録を書いた本人だけ（運営だけの記録は対象外）。
+// 持ち主が代わった車でも、前の持ち主が書いた記録は、新しい持ち主には変えられない。
 export async function setHistoryVisibility(formData: FormData): Promise<void> {
   const owner = await ensureOwner();
   if (!owner) redirect("/login");
@@ -47,11 +48,15 @@ export async function setHistoryVisibility(formData: FormData): Promise<void> {
   const admin = createAdminClient();
   const { data: h } = await admin
     .from("histories")
-    .select("id, vehicle_id, visibility, vehicle:vehicle_id(current_owner_id)")
+    .select("id, vehicle_id, owner_id, visibility, vehicle:vehicle_id(current_owner_id)")
     .eq("id", historyId)
     .maybeSingle();
   const v = h ? (Array.isArray(h.vehicle) ? h.vehicle[0] : h.vehicle) : null;
-  if (!h || (v as { current_owner_id: string | null } | null)?.current_owner_id !== owner.ownerId) {
+  if (
+    !h ||
+    h.owner_id !== owner.ownerId ||
+    (v as { current_owner_id: string | null } | null)?.current_owner_id !== owner.ownerId
+  ) {
     redirect("/garage");
   }
   if (h.visibility !== "ADMIN" && h.visibility !== visibility) {
