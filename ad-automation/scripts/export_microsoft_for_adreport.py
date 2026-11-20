@@ -69,21 +69,24 @@ def _months_ago_start(ym: str, n: int) -> str:
 def _fault_codes(ex) -> str:
     """WebFault の中にある Microsoft のエラー番号と名前だけを返す（秘密でない。文面は口座番号が入りうるので出さない）。"""
     import re
-    det = getattr(getattr(ex, "fault", None), "detail", None)
     out = []
-    for holder in ("AdApiFaultDetail", "ApiFaultDetail"):
-        d = getattr(det, holder, None)
-        if d is None:
-            continue
-        for lst in (getattr(getattr(d, "Errors", None), "AdApiError", None),
-                    getattr(getattr(d, "OperationErrors", None), "OperationError", None),
-                    getattr(getattr(d, "BatchErrors", None), "BatchError", None)):
-            for e in (lst or []):
-                code, name = str(getattr(e, "Code", "") or ""), str(getattr(e, "ErrorCode", "") or "")
-                code = code if re.fullmatch(r"\d{1,6}", code) else ""
-                name = name if re.fullmatch(r"[A-Za-z]{1,60}", name) else ""
-                if code or name:
-                    out.append(f"{code}:{name}")
+    try:  # 形の違う例外が来ても、書き出しは止めずに空を返す
+        det = getattr(getattr(ex, "fault", None), "detail", None)
+        for holder in ("AdApiFaultDetail", "ApiFaultDetail"):
+            d = getattr(det, holder, None)
+            if d is None:
+                continue
+            for lst in (getattr(getattr(d, "Errors", None), "AdApiError", None),
+                        getattr(getattr(d, "OperationErrors", None), "OperationError", None),
+                        getattr(getattr(d, "BatchErrors", None), "BatchError", None)):
+                for e in (lst or []):
+                    code, name = str(getattr(e, "Code", "") or ""), str(getattr(e, "ErrorCode", "") or "")
+                    code = code if re.fullmatch(r"\d{1,6}", code) else ""
+                    name = name if re.fullmatch(r"[A-Za-z]{1,60}", name) else ""
+                    if code or name:
+                        out.append(f"{code}:{name}")
+    except Exception:
+        return ""
     return ",".join(out[:3])
 
 
