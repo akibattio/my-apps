@@ -19,9 +19,16 @@ function adminRecipients(): string[] {
   return list;
 }
 
-function siteUrl(): string {
-  return (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://my-apps-akibattios-projects.vercel.app").replace(/\/+$/, "");
+// 公開先の URL は環境変数 NEXT_PUBLIC_SITE_URL。予備の値は置かない。
+// 未設定ならメールは送るが、リンクの行は出さず、サーバーのログに残す。
+function siteUrl(): string | null {
+  const url = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, "");
+  if (!url) console.warn("[notify] NEXT_PUBLIC_SITE_URL が未設定のため、メールにリンクを載せません。");
+  return url || null;
 }
+
+// リンクの行。公開先が未設定なら行ごと出さない。
+const linkLine = (site: string | null, label: string, path: string): string[] => (site ? [`${label}${site}${path}`] : []);
 
 // 件名に改行などが混ざらないようにする。
 const oneLine = (s: string) => s.replace(/[\r\n\t]+/g, " ").slice(0, 120);
@@ -104,7 +111,7 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
     `登録時の言語: ${l.lang === "en" ? "英語" : "日本語"}`,
     ...(l.message ? ["", "メモ:", l.message] : []),
     "",
-    `詳細: ${site}/admin/inquiries/${l.id}`,
+    ...linkLine(site, "詳細: ", `/admin/inquiries/${l.id}`),
   ];
   if (l.vehicle) {
     lines.push(
@@ -122,14 +129,14 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
               : "⚠ この車体番号の車の記録はすでにあり、持ち主は未設定です（仲介・業者・運営の登録などで作られたもの）。登録した会員を持ち主にする前に、確認待ちにしました（管理画面の車両で判断してください）。",
           ]
         : []),
-      `車の記録: ${site}/admin/vehicles/${l.vehicle.vehicleId}`
+      ...linkLine(site, "車の記録: ", `/admin/vehicles/${l.vehicle.vehicleId}`)
     );
   }
   if (matches.length > 0) {
     lines.push(
       "",
       `★ この登録は「${l.kind === "SELL" ? "買いたい" : "売りたい"}」${matches.length}件とマッチしています。`,
-      `マッチング: ${site}/admin/matching`
+      ...linkLine(site, "マッチング: ", "/admin/matching")
     );
   }
 
@@ -155,8 +162,7 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
               : "When a matching car is registered, our team will be in touch.",
             "Your contact details are never shown to the other party.",
             "",
-            `You can check or edit your registration on My Page: ${site}/mypage`,
-            "",
+            ...(site ? [`You can check or edit your registration on My Page: ${site}/mypage`, ""] : []),
             "— LIFE LINE GARAGE",
             "(This is an automated message. Replies to this address are not monitored.)",
           ].join("\n"),
@@ -173,8 +179,7 @@ export async function notifyNewListing(l: NewListing): Promise<void> {
               : "マッチした車が見つかったときは、運営からご連絡します。",
             "連絡先が相手に公開されることはありません。",
             "",
-            `登録内容の確認・修正はマイページから: ${site}/mypage`,
-            "",
+            ...(site ? [`登録内容の確認・修正はマイページから: ${site}/mypage`, ""] : []),
             "— LIFE LINE GARAGE",
             "（このメールは送信専用です。返信いただいても確認できません）",
           ].join("\n"),
@@ -211,7 +216,7 @@ export async function notifyGarageClaim(c: {
       `車体番号: ${c.vin}`,
       `登録しようとした会員: ${c.email ?? "—"}`,
       "",
-      `車の記録: ${site}/admin/vehicles/${c.vehicleId}`,
+      ...linkLine(site, "車の記録: ", `/admin/vehicles/${c.vehicleId}`),
     ].join("\n")
   );
 }
