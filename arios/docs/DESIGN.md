@@ -211,8 +211,7 @@ Step 1〜2 は手入力で完成させ、Step 3 でAIを被せて入力を楽に
 - ✅ Step 3(一部) AI下書き: 写真→車種推定でフォーム下書き、append-only保存、動作確認済み
 - ✅ Step 4(一部) 信頼と公開: 公開パスポートに証拠ベースTrust表示、動作確認済み
 
-地固め〜本番公開まで完了（2026-07-17）。ARIOSの主要機能が本番URLで稼働:
-https://my-apps-akibattios-projects.vercel.app/ （詳細はメモ arios-deployment）
+地固め〜本番公開まで完了（2026-07-17）。ARIOSの主要機能が本番URLで稼働。
 - ✅ 書類アップロードUI（Trust LEVEL_2到達）— 2026-07-05
 - ✅ migration 0003 適用（documents RLS）— 2026-07-12
 - ✅ マイページ `/account` + 管理者画面 `/admin`（サマリー/車両/オーナー、管理者判定は当時メール一致。2026-11-12 から ADMIN_USER_IDS のユーザー ID 一致に変更）— 2026-07-12
@@ -221,7 +220,7 @@ https://my-apps-akibattios-projects.vercel.app/ （詳細はメモ arios-deploym
 - ✅ メールログイン稼働（マジックリンク方式・Resend SMTP）— 2026-07-17
 
 残りの宿題:
-- Resend のドメイン検証（sofcom.co.jp のDNS）→ 依頼者など**他人のメアドにも**ログインメール送信可に（今は自分のメアド限定）
+- Resend のドメイン検証（送信ドメインのDNS）→ 依頼者など**他人のメアドにも**ログインメール送信可に（今は自分のメアド限定）
 - owner なし車両の「あとから紐付け(claim)」/ trust_scores永続化 / 管理者機能の拡充（AIレビュー/信頼度/取引）/
   メーターOCR / AIコスト監視 / DB直結のIPv4化（Session pooler）。
 - Step 5以降（後で）: Marketplace / Dream Garage / Partner / Notification / Global。

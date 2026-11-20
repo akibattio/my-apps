@@ -10,8 +10,6 @@
 - AI: AI Architecture v1.0（文書5）
 - 実装順: Development Guide v1.0（文書10）
 
-実務向け抜粋: `/Users/som-013/Desktop/Claude code/arios-summary/spec.html`
-
 ## 技術スタック（決定済み 2026-06-23）
 
 - フロント: Next.js（App Router）+ TypeScript
@@ -70,12 +68,10 @@ Vehicle is permanent. Owner changes. History grows. Trust accumulates.
 - [x] 地固め: 登録内容の修正機能（2026-07-13）: `/garage/[id]/edit` でメーカー/モデル/年式を編集。
   変更は `audit_logs` に before/after で記録。
 - [x] 本番デプロイ（2026-07-13）: **Vercel** で公開。Netlify はアカウント403で断念。
-  公開URL https://my-apps-akibattios-projects.vercel.app/ 。GitHub push で自動デプロイ。
-  Vercelプロジェクト "my-apps"（Root=arios）、env設定済み、Deployment Protection無効。
+  GitHub push で自動デプロイ。
 - [x] メールログイン稼働（2026-07-17）: マジックリンク方式（`/login`→メール→`/auth/callback` の
   `?code` を exchangeCodeForSession）。SMTP=Resend。※Resendドメイン未検証のため送信先は
-  Resend アカウントの登録アドレス限定。他人にも送るには sofcom.co.jp のDNS検証が必要。
-- 詳細な本番/運用メモは個人メモ `arios-deployment` を参照。
+  Resend アカウントの登録アドレス限定。他人にも送るには送信ドメインのDNS検証が必要。
 
 ### 開発コマンド
 
