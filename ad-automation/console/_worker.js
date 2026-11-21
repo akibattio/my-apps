@@ -51,6 +51,9 @@ function jsonRes(obj, status) {
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/; // 識別名：英小文字・数字・ハイフン（ファイル名の一部になる）
 const ID_RE = /^[0-9]{1,20}$/;
 const MEDIA = ["yahoo_search", "yahoo_display", "microsoft"];
+// 媒体ごとの番号の桁。2026-11-21 に、名簿の実物（Yahoo!検索7桁・ディスプレイ10桁）と Microsoft の API の口座一覧（口座・顧客とも9桁）で確かめた形に、少し幅を持たせた。
+// 別の媒体の番号の入れ間違い（例: Yahoo!検索の7桁を Microsoft の顧客IDに入れる）を保存の前に止める。
+const ID_SHAPE = { yahoo_search: /^[0-9]{7,8}$/, yahoo_display: /^[0-9]{10}$/, microsoft: /^[0-9]{8,10}$/ };
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const str = (v, max) => typeof v === "string" && v.length <= max;
 
@@ -82,6 +85,8 @@ function checkMediaAccounts(next, prev, confirmSlug) {
   if (next.list.length > 200) return "too_many";
   const allowed = new Set(["client", "media", "accountId", "customerId", "slug", "addedBy", "addedAt"]);
   const keys = new Set();
+  // 桁の形は、新しく足す口座にだけ当てる（前からある口座で一覧ごと保存できなくなり、外すこともできなくなるのを避ける）
+  const prevKeys = new Set((isObj(prev) && Array.isArray(prev.list) ? prev.list : []).filter(isObj).map((x) => `${x.media}|${x.accountId}|${x.customerId || ""}`));
   for (const e of next.list) {
     if (!isObj(e)) return "bad_entry";
     for (const k of Object.keys(e)) if (!allowed.has(k)) return `unknown_field:${k}`.slice(0, 40);
@@ -96,6 +101,10 @@ function checkMediaAccounts(next, prev, confirmSlug) {
     const key = `${e.media}|${e.accountId}`;
     if (keys.has(key)) return "duplicate_account";
     keys.add(key);
+    if (!prevKeys.has(`${key}|${e.customerId || ""}`)) {
+      if (!ID_SHAPE[e.media].test(e.accountId)) return "account_id_shape";
+      if (e.media === "microsoft" && !ID_SHAPE.microsoft.test(e.customerId)) return "customer_id_shape";
+    }
   }
   // 識別名の結び付け：すでにある識別名に、別のアカウントIDを新しく結び付ける変更は、明示の操作（confirmSlug）のときだけ。
   // 同じ識別名は同じ取引先名でなければならない（別の取引先の数字がレポートに混ざるのを防ぐ）。

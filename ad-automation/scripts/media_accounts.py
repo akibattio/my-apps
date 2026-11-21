@@ -26,15 +26,38 @@ MEDIA_KINDS = {"yahoo": ("yahoo_search", "yahoo_display"), "microsoft": ("micros
 # 管理画面の保存の入口（console/_worker.js）と同じ決まり。識別名はファイル名の一部になるので、英小文字・数字・ハイフンだけ。
 SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$")
 ID_RE = re.compile(r"^[0-9]{1,20}$")
+# 媒体ごとの番号の桁。console/_worker.js の ID_SHAPE・console/ad_ops_console.jsx の MEDIA_ID_SHAPE と同じ
+# （ずれは scripts/check_id_shape_sync.py で確かめる）。合わない口座は取りに行かない（1件の入れ間違いで媒体まるごと外れるのを防ぐ）。
+ID_SHAPE = {"yahoo_search": r"^[0-9]{7,8}$", "yahoo_display": r"^[0-9]{10}$", "microsoft": r"^[0-9]{8,10}$"}
+
+
+def id_shape_ok(m: str, acct: str, cid: str = "", need_cid: bool = True) -> bool:
+    """m = yahoo_search | yahoo_display | microsoft。Microsoft は顧客IDも同じ形で確かめる。
+    need_cid=False のときは、顧客IDが空なら確かめない（ファイル側は空なら既定の顧客IDで取る作り）。"""
+    pat = ID_SHAPE.get(m)
+    if not pat or not re.fullmatch(pat, str(acct)):  # fullmatch: 末尾の改行も通さない
+        return False
+    if m != "microsoft" or (not need_cid and not str(cid or "").strip()):
+        return True
+    return bool(re.fullmatch(ID_SHAPE["microsoft"], str(cid)))
+
+
+# 直近の load() で、番号の桁が媒体と合わずに使わなかった口座の数（媒体ごと・ファイル側と管理画面の追加分の合計）。
+# 日次の build_console_data.py が運用コンソールの知らせ（connectionIssues）に出す。
+SHAPE_SKIPPED: dict[str, int] = {}
+# 直近の load() で、管理画面の追加分のうち形の検査（項目・識別名の重複）に落ちて使わなかった数（媒体ごと）
+FORM_SKIPPED: dict[str, int] = {}
+# 直近の load("microsoft") で、Microsoft の側に見当たらず使わなかった口座の数と、一覧を引けなかったか（案A・2026-11-21）
+MS_CHECK: dict = {}
 YM_RE = re.compile(r"^20[0-9]{2}-(0[1-9]|1[0-2])$")
 
 
 def valid_slug(s) -> bool:
-    return isinstance(s, str) and bool(SLUG_RE.match(s))
+    return isinstance(s, str) and bool(SLUG_RE.fullmatch(s))  # fullmatch: 末尾の改行も通さない
 
 
 def valid_ym(s) -> bool:
-    return isinstance(s, str) and bool(YM_RE.match(s))
+    return isinstance(s, str) and bool(YM_RE.fullmatch(s))
 _kv_cache: list | None = None
 
 
@@ -75,9 +98,16 @@ def load(media: str) -> list[dict]:
     if bad:  # ファイル側でも、ファイル名に使えない識別名は使わない
         print(f"  {media}: 識別名の形が正しくない {len(bad)}件をファイル側から除外")
         base = [e for e in base if e not in bad]
+    kind_of = lambda e: "microsoft" if media == "microsoft" else ("yahoo_display" if e.get("kind") == "display" else "yahoo_search")
+    # 「<」で始まる仮の番号は、書き出しの側で除く決まり（export_microsoft_for_adreport.py）なので、ここでは触らない
+    bad = [e for e in base if not str(e.get("accountId", "")).startswith("<")
+           and not id_shape_ok(kind_of(e), e.get("accountId", ""), e.get("customerId", ""), need_cid=False)]
+    if bad:  # ファイル側でも、番号の桁が媒体と合わない口座は取りに行かない
+        print(f"  {media}: 番号の桁が媒体と合わない {len(bad)}件をファイル側から除外")
+        base = [e for e in base if e not in bad]
     seen = {str(e["accountId"]) for e in base}
     slug_owner = {e["slug"]: e.get("client", "") for e in base if e.get("slug")}
-    skipped = 0
+    skipped = shape_bad = 0
     for e in _kv_entries():
         if not isinstance(e, dict):
             skipped += 1; continue
@@ -93,6 +123,8 @@ def load(media: str) -> list[dict]:
             ok = False
         if not ok:
             skipped += 1; continue
+        if not id_shape_ok(m, acct, cid):  # 別の媒体の番号の入れ間違い（2026-11-12 の例）は取りに行かない
+            shape_bad += 1; continue
         if acct in seen:
             continue
         row = {"client": client, "accountId": acct, "slug": slug, "_from": "console"}
@@ -105,7 +137,42 @@ def load(media: str) -> list[dict]:
             slug_owner.setdefault(slug, client)
     if skipped:
         print(f"  {media}: 管理画面の追加分のうち {skipped}件は検査に通らず使わない（形の誤り・識別名の重複）")
+    if shape_bad:
+        print(f"  {media}: 管理画面の追加分のうち {shape_bad}件は番号の桁が媒体と合わないので使わない（別の媒体の番号の入れ間違いの見込み）")
+    SHAPE_SKIPPED[media] = len(bad) + shape_bad
+    FORM_SKIPPED[media] = skipped
+    if media == "microsoft":
+        base = _drop_ms_missing(base)
     return base
+
+
+def _drop_ms_missing(base: list[dict]) -> list[dict]:
+    """Microsoft の側に (顧客ID, 口座ID) の組が見当たらない口座は取りに行かない（案A）。
+    一覧を引けなかったときは外さずに返し、その旨を記録する（月次の確かめの段が、取得失敗で従来どおり止める）。
+    顧客IDが空の行（ファイル側）は、既定の顧客ID（MS_ADS_CUSTOMER_ID）との組で照らす。"""
+    MS_CHECK.clear()
+    try:
+        import fetch_microsoft_insights as F
+        F.load_env()
+        if not F.ms_enabled():
+            return base  # 接続情報が無い所（手元の試験など）では確かめない
+        default_cid = F.ms_id(os.environ.get("MS_ADS_CUSTOMER_ID", ""))
+        pairs = F.ms_visible_pairs()
+    except Exception:
+        pairs = None
+    if pairs is None:
+        MS_CHECK["list_failed"] = True
+        print("  microsoft: Microsoft の口座の一覧を引けず（口座を確かめずに取りに行く）")
+        return base
+    def seen(e):
+        acct = F.ms_id(e.get("accountId"))
+        cid = F.ms_id(e.get("customerId")) or default_cid
+        return (cid, acct) in pairs or ("*", acct) in pairs  # "*" は代理店とのリンクの口座
+    keep = [e for e in base if str(e.get("accountId", "")).startswith("<") or seen(e)]
+    MS_CHECK["missing"] = len(base) - len(keep)
+    if MS_CHECK["missing"]:
+        print(f"  microsoft: Microsoft の側に見当たらない口座 {MS_CHECK['missing']}件は取りに行かない（番号の入れ間違いか、閲覧の権限が無い見込み）")
+    return keep
 
 
 if __name__ == "__main__":

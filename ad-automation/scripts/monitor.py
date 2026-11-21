@@ -298,9 +298,49 @@ def main():
         alerts += check_account(a)
 
     # 接続/トークン失効（build_console_data が記録）→ 媒体全体の重大アラート化（サイレント障害を防ぐ）
-    _MJP = {"meta": "Meta広告", "google": "Google広告", "yahoo": "Yahoo!広告"}
+    _MJP = {"meta": "Meta広告", "google": "Google広告", "yahoo": "Yahoo!広告", "microsoft": "Microsoft広告", "console": "運用コンソール"}
     for ci in (data.get("connectionIssues") or []):
         mj = _MJP.get(ci.get("media"), ci.get("media") or "媒体")
+        if ci.get("kind") == "id_shape":  # 番号の桁が媒体と合わない口座（build_console_data.py・media_accounts.py）
+            alerts.append({
+                "client": f"{mj}（口座の一覧）", "media": ci.get("media") or "",
+                "severity": "critical", "kind": "口座の番号の桁",
+                "fact": f"{mj}の口座のうち{ci.get('detail', '')}は、番号の桁が媒体と合わないので取りに行っていません（別の媒体の番号の入れ間違いの見込み）。このままだと、月次ではこの1件のために、この媒体の今月分が全社ともレポートに入りません（直したあと、月次を手でやり直す手番が要ります）。",
+                "approve": "運用コンソールの「Yahoo!・Microsoft広告アカウントの追加」で番号を確かめ、違っていれば外して正しい番号で足し直す",
+            })
+            continue
+        if ci.get("kind") == "form_skipped":  # 管理画面の追加分で、形の検査に落ちた行（media_accounts.py）
+            alerts.append({
+                "client": f"{mj}（口座の一覧）", "media": ci.get("media") or "",
+                "severity": "critical", "kind": "口座の形の誤り",
+                "fact": f"運用コンソールで足した{mj}の口座のうち{ci.get('detail', '')}は、項目の形の誤りか識別名の重複で使っていません。このままだと、月次ではこの1件のために、この媒体の今月分が全社ともレポートに入りません（直したあと、月次を手でやり直す手番が要ります）。",
+                "approve": "運用コンソールの「Yahoo!・Microsoft広告アカウントの追加」で、その行の取引先名・識別名・番号を確かめ、直して足し直す",
+            })
+            continue
+        if ci.get("kind") == "ms_missing":  # Microsoft の側に見当たらない口座（案A）
+            alerts.append({
+                "client": "Microsoft広告（口座の一覧）", "media": "microsoft",
+                "severity": "critical", "kind": "口座が見当たらない",
+                "fact": f"名簿の Microsoft広告の口座のうち{ci.get('detail', '')}が、Microsoft広告の側に見当たらないので取りに行っていません（番号の入れ間違いか、閲覧の権限が無い見込み）。このままだと、月次ではMicrosoft広告の今月分が全社ともレポートに入りません（直したあと、月次を手でやり直す手番が要ります）。",
+                "approve": "運用コンソールの一覧で番号（顧客IDと口座ID）を確かめる。正しければ、Microsoft広告の側で、取得用のユーザーにその口座の閲覧の権限を付ける",
+            })
+            continue
+        if ci.get("kind") == "ms_list_failed":  # 口座の一覧を引けなかった（案A・A-1：外さずに取りに行く）
+            alerts.append({
+                "client": "Microsoft広告（口座の一覧）", "media": "microsoft",
+                "severity": "critical", "kind": "口座の一覧を引けず",
+                "fact": "Microsoft広告の口座の一覧を引けなかったので、口座があるかを確かめずに取りに行きました。取得に失敗した口座があれば、月次ではMicrosoft広告の今月分が全社ともレポートに入りません（直したあと、月次を手でやり直す手番が要ります）。",
+                "approve": "接続担当：Microsoft広告の接続（トークン・権限）を確かめる",
+            })
+            continue
+        if ci.get("kind") == "id_shape_rules":  # 桁の決まりの3か所のずれ（check_id_shape_sync.py）
+            alerts.append({
+                "client": "運用コンソール（口座の番号の決まり）", "media": "",
+                "severity": "critical", "kind": "口座の番号の桁の決まり",
+                "fact": f"口座の番号の桁の決まりが、画面・保存の入口・取得の側でそろっていません（{ci.get('detail', '')}）。画面で足せる口座と、取りに行く口座が食い違うおそれがあります。",
+                "approve": "接続担当：3か所の桁の決まりをそろえる（scripts/check_id_shape_sync.py で確かめる）",
+            })
+            continue
         alerts.append({
             "client": f"{mj}（媒体全体）", "media": ci.get("media") or "",
             "severity": "critical", "kind": "接続/トークン失効",
