@@ -114,7 +114,7 @@ def _authorization_data(account_id: str):
                                        GoogleOAuthDesktopMobileAuthCodeGrant)
     dev_token = os.environ["MS_ADS_DEVELOPER_TOKEN"].strip()
     customer_id = int(str(os.environ["MS_ADS_CUSTOMER_ID"]).replace("-", "").strip())
-    acct = int(str(account_id).replace("-", "").strip())
+    acct = int(str(account_id).replace("-", "").strip()) if account_id else None  # 口座の一覧を引くときは口座を決めない
 
     g_refresh = os.environ.get("MS_ADS_GOOGLE_REFRESH_TOKEN", "").strip()
     if g_refresh:
@@ -139,6 +139,38 @@ def _authorization_data(account_id: str):
     from bingads.authorization import AuthorizationData
     return AuthorizationData(account_id=acct, customer_id=customer_id,
                              developer_token=dev_token, authentication=auth)
+
+
+_VISIBLE: set | None = None  # API のユーザーが見られる (顧客ID, 口座ID) の組。1回の実行で1度だけ引く
+
+
+def ms_visible_pairs() -> set | None:
+    """API のユーザーが見られる (顧客ID, 口座ID) の組（どちらも数字の文字列）を返す。読み取りのみ。
+    CustomerManagement の GetUser で役割（顧客と、口座の絞り）を引き、顧客ごとに GetAccountsInfo で口座を引く。
+    引けなかったときは None（呼ぶ側は口座を外さずに今までどおり取りに行く。2026-11-21 裁定 A-1）。"""
+    global _VISIBLE
+    if _VISIBLE is not None:
+        return _VISIBLE
+    try:
+        from bingads.service_client import ServiceClient
+        cm = ServiceClient(service="CustomerManagementService", version=13,
+                           authorization_data=_authorization_data(None), environment=ENVIRONMENT)
+        roles = getattr(getattr(cm.GetUser(UserId=None), "CustomerRoles", None), "CustomerRole", None) or []
+        pairs = set()
+        for r in roles:
+            cid = str(r.CustomerId)
+            only = getattr(getattr(r, "AccountIds", None), "long", None)  # 口座を絞った役割なら、その口座だけ
+            if only:
+                pairs |= {(cid, str(a)) for a in only}
+                continue
+            infos = getattr(cm.GetAccountsInfo(CustomerId=int(cid), OnlyParentAccounts=False), "AccountInfo", None) or []
+            pairs |= {(cid, str(a.Id)) for a in infos}
+        if not pairs:
+            return None  # 0件は「見えない」ではなく「確かめられない」として扱う
+        _VISIBLE = pairs
+        return _VISIBLE
+    except Exception:
+        return None
 
 
 def _reporting_service(auth_data):

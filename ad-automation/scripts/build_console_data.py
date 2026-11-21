@@ -407,6 +407,13 @@ def main():
         for m in ("yahoo", "microsoft"):
             if _ma.SHAPE_SKIPPED.get(m):
                 conn_issues.append({"media": m, "kind": "id_shape", "detail": f"{_ma.SHAPE_SKIPPED[m]}件"})
+            if _ma.FORM_SKIPPED.get(m):  # 管理画面の追加分で、形の検査（項目・識別名の重複）に落ちた行
+                conn_issues.append({"media": m, "kind": "form_skipped", "detail": f"{_ma.FORM_SKIPPED[m]}件"})
+        # Microsoft の側に見当たらない口座・口座の一覧を引けなかった（案A・2026-11-21）
+        if _ma.MS_CHECK.get("missing"):
+            conn_issues.append({"media": "microsoft", "kind": "ms_missing", "detail": f"{_ma.MS_CHECK['missing']}件"})
+        if _ma.MS_CHECK.get("list_failed"):
+            conn_issues.append({"media": "microsoft", "kind": "ms_list_failed", "detail": ""})
         from check_id_shape_sync import mismatches
         ng = mismatches()
         if ng:
