@@ -399,6 +399,22 @@ def main():
     proposals += y_proposals
     yahoo_n = len(y_accounts)
 
+    # 口座の番号の桁（2026-11-21）：桁が媒体と合わずに取りに行かなかった口座と、桁の決まりの3か所のずれを知らせる。
+    # どちらも取得は止めない（monitor が運用コンソールと朝の社内通知に出す）。記録に出すのは件数だけ。
+    try:
+        import media_accounts as _ma
+        _ma.load("microsoft")  # Microsoft は日次のデータに入らないが、名簿の件数だけ数える（Yahoo は pull_yahoo で読み済み）
+        for m in ("yahoo", "microsoft"):
+            if _ma.SHAPE_SKIPPED.get(m):
+                conn_issues.append({"media": m, "kind": "id_shape", "detail": f"{_ma.SHAPE_SKIPPED[m]}件"})
+        from check_id_shape_sync import mismatches
+        ng = mismatches()
+        if ng:
+            conn_issues.append({"media": "console", "kind": "id_shape_rules", "detail": ",".join(ng)})
+    except Exception as e:
+        print("番号の桁の確かめに失敗（取得は継続）:", err(e))
+        conn_issues.append({"media": "console", "kind": "id_shape_rules", "detail": "確かめられず"})
+
     out = {
         "label": "Meta＋Google＋Yahoo 実データ" if yahoo_n else "Meta＋Google 実データ",
         "period": "直近30日",

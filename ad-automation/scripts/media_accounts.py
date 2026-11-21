@@ -31,12 +31,20 @@ ID_RE = re.compile(r"^[0-9]{1,20}$")
 ID_SHAPE = {"yahoo_search": r"^[0-9]{7,8}$", "yahoo_display": r"^[0-9]{10}$", "microsoft": r"^[0-9]{8,10}$"}
 
 
-def id_shape_ok(m: str, acct: str, cid: str = "") -> bool:
-    """m = yahoo_search | yahoo_display | microsoft。Microsoft は顧客IDも同じ形で確かめる。"""
+def id_shape_ok(m: str, acct: str, cid: str = "", need_cid: bool = True) -> bool:
+    """m = yahoo_search | yahoo_display | microsoft。Microsoft は顧客IDも同じ形で確かめる。
+    need_cid=False のときは、顧客IDが空なら確かめない（ファイル側は空なら既定の顧客IDで取る作り）。"""
     pat = ID_SHAPE.get(m)
     if not pat or not re.match(pat, str(acct)):
         return False
-    return m != "microsoft" or bool(re.match(ID_SHAPE["microsoft"], str(cid)))
+    if m != "microsoft" or (not need_cid and not str(cid or "").strip()):
+        return True
+    return bool(re.match(ID_SHAPE["microsoft"], str(cid)))
+
+
+# 直近の load() で、番号の桁が媒体と合わずに使わなかった口座の数（媒体ごと・ファイル側と管理画面の追加分の合計）。
+# 日次の build_console_data.py が運用コンソールの知らせ（connectionIssues）に出す。
+SHAPE_SKIPPED: dict[str, int] = {}
 YM_RE = re.compile(r"^20[0-9]{2}-(0[1-9]|1[0-2])$")
 
 
@@ -87,7 +95,9 @@ def load(media: str) -> list[dict]:
         print(f"  {media}: 識別名の形が正しくない {len(bad)}件をファイル側から除外")
         base = [e for e in base if e not in bad]
     kind_of = lambda e: "microsoft" if media == "microsoft" else ("yahoo_display" if e.get("kind") == "display" else "yahoo_search")
-    bad = [e for e in base if not id_shape_ok(kind_of(e), e.get("accountId", ""), e.get("customerId", ""))]
+    # 「<」で始まる仮の番号は、書き出しの側で除く決まり（export_microsoft_for_adreport.py）なので、ここでは触らない
+    bad = [e for e in base if not str(e.get("accountId", "")).startswith("<")
+           and not id_shape_ok(kind_of(e), e.get("accountId", ""), e.get("customerId", ""), need_cid=False)]
     if bad:  # ファイル側でも、番号の桁が媒体と合わない口座は取りに行かない
         print(f"  {media}: 番号の桁が媒体と合わない {len(bad)}件をファイル側から除外")
         base = [e for e in base if e not in bad]
@@ -125,6 +135,7 @@ def load(media: str) -> list[dict]:
         print(f"  {media}: 管理画面の追加分のうち {skipped}件は検査に通らず使わない（形の誤り・識別名の重複）")
     if shape_bad:
         print(f"  {media}: 管理画面の追加分のうち {shape_bad}件は番号の桁が媒体と合わないので使わない（別の媒体の番号の入れ間違いの見込み）")
+    SHAPE_SKIPPED[media] = len(bad) + shape_bad
     return base
 
 

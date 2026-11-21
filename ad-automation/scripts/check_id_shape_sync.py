@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """番号の桁の決まりが3か所（media_accounts.py・console/_worker.js・console/ad_ops_console.jsx）で同じかを確かめる。
-ずれていたら終了コード1。日次のデプロイの前に動かす（画面・保存の入口・取得の側で、通す口座が食い違うのを防ぐ）。"""
+手で動かすと、ずれていたら終了コード1。日次では build_console_data.py が mismatches() を呼び、取得は止めずに運用コンソールの知らせに出す
+（決まりのずれは、画面と取得で通す口座が食い違うだけの問題で、全部の取得を止める理由にならないため）。"""
 import re, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -17,10 +18,15 @@ def _shapes(text: str, start: str) -> dict:
     return {k: "^" + v + "$" for k, v in re.findall(r"(\w+):\s*(?:\{\s*re:\s*)?/\^(.+?)\$/", block)}
 
 
-def main() -> int:
+def mismatches() -> list[str]:
+    """media_accounts.py とずれているファイルの名前を返す。日次の build_console_data.py も使う（ずれても取得は止めずに知らせる）。"""
     worker = _shapes((CONSOLE / "_worker.js").read_text(encoding="utf-8"), "const ID_SHAPE")
     screen = _shapes((CONSOLE / "ad_ops_console.jsx").read_text(encoding="utf-8"), "const MEDIA_ID_SHAPE")
-    ng = [name for name, got in (("_worker.js", worker), ("ad_ops_console.jsx", screen)) if got != ID_SHAPE]
+    return [name for name, got in (("_worker.js", worker), ("ad_ops_console.jsx", screen)) if got != ID_SHAPE]
+
+
+def main() -> int:
+    ng = mismatches()
     if ng:
         print("番号の桁の決まりが media_accounts.py とずれている:", ", ".join(ng))
         return 1

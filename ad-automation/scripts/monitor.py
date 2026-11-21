@@ -298,9 +298,25 @@ def main():
         alerts += check_account(a)
 
     # 接続/トークン失効（build_console_data が記録）→ 媒体全体の重大アラート化（サイレント障害を防ぐ）
-    _MJP = {"meta": "Meta広告", "google": "Google広告", "yahoo": "Yahoo!広告"}
+    _MJP = {"meta": "Meta広告", "google": "Google広告", "yahoo": "Yahoo!広告", "microsoft": "Microsoft広告", "console": "運用コンソール"}
     for ci in (data.get("connectionIssues") or []):
         mj = _MJP.get(ci.get("media"), ci.get("media") or "媒体")
+        if ci.get("kind") == "id_shape":  # 番号の桁が媒体と合わない口座（build_console_data.py・media_accounts.py）
+            alerts.append({
+                "client": f"{mj}（口座の一覧）", "media": ci.get("media") or "",
+                "severity": "critical", "kind": "口座の番号の桁",
+                "fact": f"{mj}の口座のうち{ci.get('detail', '')}は、番号の桁が媒体と合わないので取りに行っていません（別の媒体の番号の入れ間違いの見込み）。月次では、この媒体の今月分がレポートに入りません。",
+                "approve": "運用コンソールの「Yahoo!・Microsoft広告アカウントの追加」で番号を確かめ、違っていれば外して正しい番号で足し直す",
+            })
+            continue
+        if ci.get("kind") == "id_shape_rules":  # 桁の決まりの3か所のずれ（check_id_shape_sync.py）
+            alerts.append({
+                "client": "運用コンソール（口座の番号の決まり）", "media": "",
+                "severity": "critical", "kind": "口座の番号の桁の決まり",
+                "fact": f"口座の番号の桁の決まりが、画面・保存の入口・取得の側でそろっていません（{ci.get('detail', '')}）。画面で足せる口座と、取りに行く口座が食い違うおそれがあります。",
+                "approve": "接続担当：3か所の桁の決まりをそろえる（scripts/check_id_shape_sync.py で確かめる）",
+            })
+            continue
         alerts.append({
             "client": f"{mj}（媒体全体）", "media": ci.get("media") or "",
             "severity": "critical", "kind": "接続/トークン失効",
