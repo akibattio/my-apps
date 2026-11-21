@@ -156,7 +156,7 @@ def _drop_ms_missing(base: list[dict]) -> list[dict]:
         F.load_env()
         if not F.ms_enabled():
             return base  # 接続情報が無い所（手元の試験など）では確かめない
-        default_cid = re.sub(r"\D", "", os.environ.get("MS_ADS_CUSTOMER_ID", ""))
+        default_cid = F.ms_id(os.environ.get("MS_ADS_CUSTOMER_ID", ""))
         pairs = F.ms_visible_pairs()
     except Exception:
         pairs = None
@@ -164,8 +164,11 @@ def _drop_ms_missing(base: list[dict]) -> list[dict]:
         MS_CHECK["list_failed"] = True
         print("  microsoft: Microsoft の口座の一覧を引けず（口座を確かめずに取りに行く）")
         return base
-    keep = [e for e in base if str(e.get("accountId", "")).startswith("<")
-            or ((str(e.get("customerId") or "").strip() or default_cid), str(e.get("accountId"))) in pairs]
+    def seen(e):
+        acct = F.ms_id(e.get("accountId"))
+        cid = F.ms_id(e.get("customerId")) or default_cid
+        return (cid, acct) in pairs or ("*", acct) in pairs  # "*" は代理店とのリンクの口座
+    keep = [e for e in base if str(e.get("accountId", "")).startswith("<") or seen(e)]
     MS_CHECK["missing"] = len(base) - len(keep)
     if MS_CHECK["missing"]:
         print(f"  microsoft: Microsoft の側に見当たらない口座 {MS_CHECK['missing']}件は取りに行かない（番号の入れ間違いか、閲覧の権限が無い見込み）")

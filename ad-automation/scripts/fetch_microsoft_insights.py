@@ -142,29 +142,47 @@ def _authorization_data(account_id: str):
 
 
 _VISIBLE: set | None = None  # API のユーザーが見られる (顧客ID, 口座ID) の組。1回の実行で1度だけ引く
+LIST_TIMEOUT_SEC = 60  # 一覧の呼び出し1回あたりの上限（引けなければ A-1 で今までどおり取りに行く）
+
+
+def ms_id(v) -> str:
+    """番号を数字の文字列にそろえる（先頭の0・ハイフン・型の違いで別物にならないように）。数字でなければ空。"""
+    s = re.sub(r"[-\s]", "", str(v if v is not None else ""))
+    return str(int(s)) if s.isdigit() else ""
 
 
 def ms_visible_pairs() -> set | None:
     """API のユーザーが見られる (顧客ID, 口座ID) の組（どちらも数字の文字列）を返す。読み取りのみ。
-    CustomerManagement の GetUser で役割（顧客と、口座の絞り）を引き、顧客ごとに GetAccountsInfo で口座を引く。
-    引けなかったときは None（呼ぶ側は口座を外さずに今までどおり取りに行く。2026-11-21 裁定 A-1）。"""
+    CustomerManagement の GetUser で役割を引き、役割ごとに:
+      - 口座を絞った役割（AccountIds）はその口座だけ
+      - 代理店とのリンクでつながった口座（LinkedAccountIds）は、顧客IDを問わない組 ("*", 口座ID) として入れる
+        （リンクの口座は、名簿の顧客IDが自社の顧客でも相手の顧客でもありうるため）
+      - それ以外は GetAccountsInfo で、その顧客の口座を全部
+    どこか1つの顧客で口座が空で返った・呼び出しが失敗した・時間の上限を超えたときは None
+    （呼ぶ側は口座を外さずに今までどおり取りに行く。2026-11-21 裁定 A-1）。"""
     global _VISIBLE
     if _VISIBLE is not None:
         return _VISIBLE
     try:
         from bingads.service_client import ServiceClient
         cm = ServiceClient(service="CustomerManagementService", version=13,
-                           authorization_data=_authorization_data(None), environment=ENVIRONMENT)
+                           authorization_data=_authorization_data(None), environment=ENVIRONMENT,
+                           timeout=LIST_TIMEOUT_SEC)
         roles = getattr(getattr(cm.GetUser(UserId=None), "CustomerRoles", None), "CustomerRole", None) or []
         pairs = set()
         for r in roles:
-            cid = str(r.CustomerId)
+            cid = ms_id(r.CustomerId)
+            linked = getattr(getattr(r, "LinkedAccountIds", None), "long", None) or []
+            pairs |= {("*", ms_id(a)) for a in linked}
             only = getattr(getattr(r, "AccountIds", None), "long", None)  # 口座を絞った役割なら、その口座だけ
             if only:
-                pairs |= {(cid, str(a)) for a in only}
+                pairs |= {(cid, ms_id(a)) for a in only}
                 continue
             infos = getattr(cm.GetAccountsInfo(CustomerId=int(cid), OnlyParentAccounts=False), "AccountInfo", None) or []
-            pairs |= {(cid, str(a.Id)) for a in infos}
+            if not infos and not linked:
+                return None  # 例外でなく空で返った顧客がある＝確かめられない
+            pairs |= {(cid, ms_id(a.Id)) for a in infos}
+        pairs = {p for p in pairs if p[1]}
         if not pairs:
             return None  # 0件は「見えない」ではなく「確かめられない」として扱う
         _VISIBLE = pairs
