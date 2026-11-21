@@ -26,6 +26,17 @@ MEDIA_KINDS = {"yahoo": ("yahoo_search", "yahoo_display"), "microsoft": ("micros
 # 管理画面の保存の入口（console/_worker.js）と同じ決まり。識別名はファイル名の一部になるので、英小文字・数字・ハイフンだけ。
 SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$")
 ID_RE = re.compile(r"^[0-9]{1,20}$")
+# 媒体ごとの番号の桁。console/_worker.js の ID_SHAPE・console/ad_ops_console.jsx の MEDIA_ID_SHAPE と同じ
+# （ずれは scripts/check_id_shape_sync.py で確かめる）。合わない口座は取りに行かない（1件の入れ間違いで媒体まるごと外れるのを防ぐ）。
+ID_SHAPE = {"yahoo_search": r"^[0-9]{7,8}$", "yahoo_display": r"^[0-9]{10}$", "microsoft": r"^[0-9]{8,10}$"}
+
+
+def id_shape_ok(m: str, acct: str, cid: str = "") -> bool:
+    """m = yahoo_search | yahoo_display | microsoft。Microsoft は顧客IDも同じ形で確かめる。"""
+    pat = ID_SHAPE.get(m)
+    if not pat or not re.match(pat, str(acct)):
+        return False
+    return m != "microsoft" or bool(re.match(ID_SHAPE["microsoft"], str(cid)))
 YM_RE = re.compile(r"^20[0-9]{2}-(0[1-9]|1[0-2])$")
 
 
@@ -75,9 +86,14 @@ def load(media: str) -> list[dict]:
     if bad:  # ファイル側でも、ファイル名に使えない識別名は使わない
         print(f"  {media}: 識別名の形が正しくない {len(bad)}件をファイル側から除外")
         base = [e for e in base if e not in bad]
+    kind_of = lambda e: "microsoft" if media == "microsoft" else ("yahoo_display" if e.get("kind") == "display" else "yahoo_search")
+    bad = [e for e in base if not id_shape_ok(kind_of(e), e.get("accountId", ""), e.get("customerId", ""))]
+    if bad:  # ファイル側でも、番号の桁が媒体と合わない口座は取りに行かない
+        print(f"  {media}: 番号の桁が媒体と合わない {len(bad)}件をファイル側から除外")
+        base = [e for e in base if e not in bad]
     seen = {str(e["accountId"]) for e in base}
     slug_owner = {e["slug"]: e.get("client", "") for e in base if e.get("slug")}
-    skipped = 0
+    skipped = shape_bad = 0
     for e in _kv_entries():
         if not isinstance(e, dict):
             skipped += 1; continue
@@ -93,6 +109,8 @@ def load(media: str) -> list[dict]:
             ok = False
         if not ok:
             skipped += 1; continue
+        if not id_shape_ok(m, acct, cid):  # 別の媒体の番号の入れ間違い（2026-11-12 の例）は取りに行かない
+            shape_bad += 1; continue
         if acct in seen:
             continue
         row = {"client": client, "accountId": acct, "slug": slug, "_from": "console"}
@@ -105,6 +123,8 @@ def load(media: str) -> list[dict]:
             slug_owner.setdefault(slug, client)
     if skipped:
         print(f"  {media}: 管理画面の追加分のうち {skipped}件は検査に通らず使わない（形の誤り・識別名の重複）")
+    if shape_bad:
+        print(f"  {media}: 管理画面の追加分のうち {shape_bad}件は番号の桁が媒体と合わないので使わない（別の媒体の番号の入れ間違いの見込み）")
     return base
 
 
