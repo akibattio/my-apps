@@ -186,7 +186,7 @@ export default function AdOpsConsole() {
   // 媒体アカウントの追加/削除（共有KVのみ。localStorageには持たない＝全員で同じ一覧）
   // 担当者が追加した Yahoo!/Microsoft のアカウント。保存の入口（_worker.js）が形と識別名の結び付けを検査するので、
   // 結果を見てから画面に反映する（拒否されたら理由を出し、画面は元のまま）。confirmSlug＝既存の識別名への明示の結び付け。
-  const MEDIA_SAVE_ERR = { slug_bound: "この識別名には別のアカウントが結び付いています", slug_other_client: "この識別名は別のクライアント名で使われています", bad_slug: "識別名の形が正しくありません", duplicate_account: "同じアカウントがすでに登録されています" };
+  const MEDIA_SAVE_ERR = { slug_bound: "この識別名には別のアカウントが結び付いています", slug_other_client: "この識別名は別のクライアント名で使われています", bad_slug: "識別名の形が正しくありません", duplicate_account: "同じアカウントがすでに登録されています", account_id_shape: "アカウントIDの桁がこの媒体の形と合いません", customer_id_shape: "Microsoftの顧客IDの桁が合いません" };
   const saveMediaAccounts = (list, confirmSlug) => {
     const next = { list };
     const q = confirmSlug ? `?confirmSlug=${encodeURIComponent(confirmSlug)}` : "";
@@ -1973,6 +1973,12 @@ const MEDIA_ACCOUNT_KINDS = [
   { v: "yahoo_display", label: "Yahoo!ディスプレイ" },
   { v: "microsoft", label: "Microsoft広告" },
 ];
+// 媒体ごとの番号の桁（2026-11-21 に、名簿の実物と Microsoft の API の口座一覧で確かめた形。_worker.js の ID_SHAPE と揃える）
+const MEDIA_ID_SHAPE = {
+  yahoo_search: { re: /^[0-9]{7,8}$/, digits: "7〜8桁" },
+  yahoo_display: { re: /^[0-9]{10}$/, digits: "10桁" },
+  microsoft: { re: /^[0-9]{8,10}$/, digits: "8〜10桁" },
+};
 function MediaAccountsPanel({ list, clients, operator, onSave }) {
   const empty = { client: "", media: "yahoo_search", accountId: "", customerId: "", slug: "" };
   const [f, setF] = useState(empty);
@@ -1984,6 +1990,10 @@ function MediaAccountsPanel({ list, clients, operator, onSave }) {
     if (!row.client) return setMsg("クライアント名を入れてください（Google広告のMCC表示名と同じ書き方）");
     if (!row.accountId) return setMsg("アカウントIDを数字で入れてください");
     if (isMs && !row.customerId) return setMsg("Microsoftは顧客ID（Customer ID）も必要です");
+    // 媒体ごとの桁の形（サーバー側の ID_SHAPE と同じ）。別の媒体の番号の入れ間違いを、保存の前に止める
+    const shape = MEDIA_ID_SHAPE[row.media];
+    if (shape && !shape.re.test(row.accountId)) return setMsg(`${label(row.media)}のアカウントIDは${shape.digits}の数字です。別の媒体の番号が入っていないか、管理画面で確かめてください`);
+    if (isMs && !MEDIA_ID_SHAPE.microsoft.re.test(row.customerId)) return setMsg(`Microsoftの顧客IDは${MEDIA_ID_SHAPE.microsoft.digits}の数字です。アカウントIDやYahoo!の番号が入っていないか、管理画面で確かめてください`);
     if (row.slug && !/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/.test(row.slug)) return setMsg("REPORT GLASS識別子は半角英小文字・数字・ハイフンのみです（例: tenjikai）");
     if (list.some((x) => x.accountId === row.accountId && x.media === row.media)) return setMsg("同じアカウントがすでに登録されています");
     const sameSlug = row.slug ? list.filter((x) => x.slug === row.slug) : [];
