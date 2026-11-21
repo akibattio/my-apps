@@ -30,7 +30,7 @@ const SAMPLES = [
     party_type: "OWNER", vin: "WDB4632761X234567", name: "田中花子",
     contact: "line_tanaka", contact_method: "LINE", status: "NEW" },
   { kind: "SELL", manufacturer: "メルセデス・ベンツ", model: "Gクラス", price: 26000000,
-    party_type: "DEALER", vin: "WDB4632761X765432", name: "AMG大阪",
+    party_type: "DEALER", vin: "WDB4632761X765432", name: "見本ガレージ大阪",
     contact: "06-3333-4444", contact_method: "PHONE", status: "CONTACTED" },
 ];
 

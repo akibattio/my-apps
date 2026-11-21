@@ -113,7 +113,7 @@ Lead / Deal / Partner / Notification（DBに追加するのは各フェーズで
 - - `/dream-garage` `/notifications` `/messages`
 
 管理者
-- - `/admin/*`（ダッシュボード等）は当面、既存の Deal OS（/dev/carmatching-apps）で代替し、段階的に統合
+- - `/admin/*`（ダッシュボード等）は当面、既存の Deal OS で代替し、段階的に統合
 
 ---
 

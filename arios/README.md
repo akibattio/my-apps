@@ -14,7 +14,7 @@
 
 - フロント: Next.js（App Router）+ TypeScript
 - データ: Supabase（Postgres / Auth / Storage）
-- 既存の「ARIOS Deal OS」（/dev/carmatching-apps, Next.js+SQLite）は段階的にこの上の
+- 既存の「ARIOS Deal OS」（Next.js+SQLite）は段階的にこの上の
   admin として統合する。当面は参照用に残す。
 
 ## 絶対に守るDB原則（Database Design v1.0）
