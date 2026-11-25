@@ -1656,6 +1656,7 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
   const [range, setRange] = useState(null);
   const [cmp, setCmp] = useState("prev");
   const [scope, setScope] = useState("");
+  const [off, setOff] = useState({}); // 手法のスイッチ（修正依頼#17）。true のものを集計から外す
   const box = { background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)" };
   if (!history) {
     return <div style={{ ...box, padding: "14px 16px", fontSize: 12.5, color: "#94a3b8", marginBottom: 22 }}>期間集計のデータ（過去13か月の日次）はまだありません。翌朝の自動取得後に表示されます。</div>;
@@ -1669,13 +1670,26 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
   if (cmp === "yoy") { cs = yearAgo(r.s); ce = yearAgo(r.e); }
   const cmpOk = !!cs && cs >= from;
 
+  // 手法：Google は手法別（検索/P-MAX/デマンドジェン等・history.json の t）、ほかの媒体は媒体ごと。
+  // 全部オンの口座は従来どおり合計（a.d）を使う＝スイッチを触らなければ数字は今までと同じ。
+  const methodsOf = (a) => (a.t && Object.keys(a.t).length
+    ? Object.keys(a.t).map((lab) => ({ k: `google:${lab}`, label: `Google ${lab}`, rows: a.t[lab] }))
+    : [{ k: a.media, label: platformLabel(a.media), rows: a.d }]);
+  const methodList = [];
+  for (const a of accs) for (const m of methodsOf(a)) if (!methodList.some((x) => x.k === m.k)) methodList.push(m);
+  methodList.sort((x, y) => x.label.localeCompare(y.label, "ja"));
+  const partsOf = (a) => { const ms = methodsOf(a); return ms.some((m) => off[m.k]) ? ms.filter((m) => !off[m.k]).map((m) => m.rows) : [a.d]; };
+  const offCount = methodList.filter((m) => off[m.k]).length;
+
   const groups = {};
   for (const a of accs) {
     const key = target ? `${a.media}|${a.acct}` : a.client;
     const g = groups[key] || (groups[key] = { key, client: a.client, acct: a.acct, medias: [], cur: zeroT(), prev: zeroT(), err: false });
     if (!g.medias.includes(a.media)) g.medias.push(a.media);
-    g.cur = addT(g.cur, sumRows(a.d, r.s, r.e));
-    if (cmpOk) g.prev = addT(g.prev, sumRows(a.d, cs, ce));
+    for (const rows of partsOf(a)) {
+      g.cur = addT(g.cur, sumRows(rows, r.s, r.e));
+      if (cmpOk) g.prev = addT(g.prev, sumRows(rows, cs, ce));
+    }
     if (a.error) g.err = true;
   }
   const all = Object.values(groups);
@@ -1687,7 +1701,7 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
 
   // 日別の費用（グラフ用）
   const dayMap = {};
-  for (const a of accs) for (const x of a.d) { if (x[0] < r.s || x[0] > r.e) continue; dayMap[x[0]] = (dayMap[x[0]] || 0) + x[1]; }
+  for (const a of accs) for (const rows of partsOf(a)) for (const x of rows) { if (x[0] < r.s || x[0] > r.e) continue; dayMap[x[0]] = (dayMap[x[0]] || 0) + x[1]; }
   const days = []; for (let i = 0; i < n && i < 800; i++) { const d = addDays(r.s, i); days.push([d, dayMap[d] || 0]); }
   const maxDay = Math.max(1, ...days.map((x) => x[1]));
 
@@ -1747,6 +1761,25 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
               border: "1px solid " + (on ? "#0891b2" : "#e2e8f0"), background: on ? "#0891b2" : "#fff", color: on ? "#fff" : "#475569" }}>{p.label}</button>;
           })}
         </div>
+        {methodList.length > 1 && (
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: "#475569" }}>手法</span>
+            {methodList.map((m) => {
+              const on = !off[m.k];
+              return (
+                <button key={m.k} role="switch" aria-checked={on} onClick={() => setOff((cur) => ({ ...cur, [m.k]: !cur[m.k] }))}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px 3px 4px", borderRadius: 999, cursor: "pointer", fontSize: 11.5, fontWeight: 600,
+                    border: "1px solid " + (on ? "#0891b2" : "#e2e8f0"), background: on ? "#e6f5f8" : "#f8fafc", color: on ? "#0e7490" : "#94a3b8" }}>
+                  <span style={{ width: 26, height: 14, borderRadius: 999, background: on ? "#0891b2" : "#cbd5e1", position: "relative", flexShrink: 0 }}>
+                    <span style={{ position: "absolute", top: 2, left: on ? 14 : 2, width: 10, height: 10, borderRadius: 999, background: "#fff" }} />
+                  </span>{m.label}
+                </button>
+              );
+            })}
+            {offCount > 0 && <button onClick={() => setOff({})} style={{ fontSize: 11, color: "#0891b2", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>すべてオン</button>}
+            {offCount > 0 && <span style={{ fontSize: 11, color: "#b45309" }}>（{offCount}件の手法を集計から外しています）</span>}
+          </div>
+        )}
         <div style={{ fontSize: 11.5, color: "#64748b", marginBottom: 12 }}>
           集計期間 <b style={{ color: "#0e3a46" }}>{r.s}〜{r.e}</b>
           {cmp !== "none" && (cmpOk ? <> ／ 比較 {cs}〜{ce}</> : <span style={{ color: "#b45309" }}> ／ 比較期間がデータ範囲（{from}〜）外のため比較なし</span>)}
