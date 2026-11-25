@@ -1,8 +1,12 @@
 // Cloudflare Pages アドバンスドモード Worker。
 // console/ 直下に置くと、全リクエストがこの Worker を通る（静的配信も env.ASSETS 経由）。
-// Basic 認証を全リクエスト（index.html / data.json 等）に要求し、機密データを保護する。
-// 認証情報は Pages 環境変数 BASIC_USER / BASIC_PASS から読む（コードに実値は置かない）。
-// フェイルクローズ：環境変数が未設定なら全拒否。
+// 全リクエスト（index.html / data.json 等）に認証を要求し、機密データを保護する。
+// - 人（ブラウザ）：Google ログイン（@ALLOWED_HD のアカウントだけ）。ログイン状態は署名付きクッキーで SESSION_TTL_H 時間保つ
+//   （修正依頼#16「ベーシック認証が毎回出るのをなくしたい」→ 2026-11-25 秋葉さん判断で Google ログイン）。
+//   Pages 環境変数 GOOGLE_LOGIN_CLIENT_ID / GOOGLE_LOGIN_CLIENT_SECRET / SESSION_SECRET が揃ったときだけ有効。
+// - 仕組み（手元のスクリプト等）：共有の BASIC_USER / BASIC_PASS を Authorization ヘッダーで送れば通す（裏口・画面では聞かない）。
+//   Google ログインの設定が無い間は、従来どおりブラウザにもベーシック認証を出す。
+// 秘密の実値はコードに置かない。フェイルクローズ：BASIC_USER / BASIC_PASS が未設定なら全拒否。
 
 function unauthorized() {
   return new Response("認証が必要です / Authentication required", {
@@ -170,6 +174,91 @@ async function handleState(request, env, url) {
   return jsonRes({ error: "method" }, 405);
 }
 
+// ---- Google ログイン（Report GLASS と同じ作り）----
+const b64u = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const b64uStr = (str) => b64u(new TextEncoder().encode(str));
+const fromB64u = (s) => { const t = s.replace(/-/g, "+").replace(/_/g, "/"); return decodeURIComponent(escape(atob(t + "===".slice((t.length + 3) % 4)))); };
+async function hmac(secret, msg) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return b64u(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(msg)));
+}
+function cookies(request) {
+  const o = {};
+  (request.headers.get("Cookie") || "").split(";").forEach((kv) => { const i = kv.indexOf("="); if (i > 0) o[kv.slice(0, i).trim()] = kv.slice(i + 1).trim(); });
+  return o;
+}
+const COOKIE_FLAGS = "Path=/; HttpOnly; SameSite=Lax; Secure";
+function googleLoginOn(env) { return !!(env.GOOGLE_LOGIN_CLIENT_ID && env.GOOGLE_LOGIN_CLIENT_SECRET && env.SESSION_SECRET); }
+const allowedHd = (env) => String(env.ALLOWED_HD || "sofcom.co.jp").toLowerCase();
+async function readSession(request, env) {
+  const c = cookies(request).adops_sess;
+  if (!c || !c.includes(".")) return null;
+  const [body, sig] = c.split(".");
+  if (!(await safeEqual(sig, await hmac(env.SESSION_SECRET, "sess." + body)))) return null;
+  try {
+    const o = JSON.parse(fromB64u(body));
+    return typeof o.e === "string" && o.e.toLowerCase().endsWith("@" + allowedHd(env)) && typeof o.x === "number" && o.x > Date.now() ? o : null;
+  } catch (e) { return null; }
+}
+function loginPage(env, err) {
+  const hd = allowedHd(env);
+  const msg = err === "domain" ? `@${hd} のアカウントでログインしてください。` : err ? "ログインに失敗しました。もう一度お試しください。" : "";
+  return new Response(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>広告運用コンソール ログイン</title>
+<style>body{margin:0;font-family:system-ui,-apple-system,"Hiragino Sans",sans-serif;background:#eef4f7;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.box{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(16,42,31,.08);padding:36px 40px;text-align:center;max-width:360px}
+h1{font-size:20px;margin:0 0 6px;color:#0e3a46}.sub{color:#64748b;font-size:13px;margin:0 0 22px}.err{color:#b91c1c;font-size:13px;margin-bottom:14px}
+.btn{display:inline-block;background:#0891b2;color:#fff;text-decoration:none;font-weight:700;padding:11px 22px;border-radius:10px}.dom{color:#94a3b8;font-size:12px;margin-top:14px}</style></head>
+<body><div class="box"><h1>広告運用コンソール</h1><p class="sub">ソフトコミュニケーションズ 社内用</p>${msg ? `<div class="err">${msg}</div>` : ""}<a class="btn" href="/auth/google">Googleでログイン</a><p class="dom">@${hd} のアカウント限定</p></div></body></html>`,
+    { status: 401, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+}
+const redirect = (to, setCookies) => {
+  const h = new Headers({ Location: to, "Cache-Control": "no-store" });
+  (setCookies || []).forEach((c) => h.append("Set-Cookie", c));
+  return new Response(null, { status: 302, headers: h });
+};
+async function handleAuth(request, env, url) {
+  const origin = url.origin;
+  if (url.pathname === "/auth/google") {
+    const nonce = b64u(crypto.getRandomValues(new Uint8Array(18)));
+    const au = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    au.searchParams.set("client_id", env.GOOGLE_LOGIN_CLIENT_ID);
+    au.searchParams.set("redirect_uri", origin + "/auth/callback");
+    au.searchParams.set("response_type", "code");
+    au.searchParams.set("scope", "openid email");
+    au.searchParams.set("hd", allowedHd(env));
+    au.searchParams.set("prompt", "select_account");
+    au.searchParams.set("state", nonce);
+    return redirect(au.toString(), [`adops_state=${nonce}.${await hmac(env.SESSION_SECRET, "state." + nonce)}; ${COOKIE_FLAGS}; Max-Age=600`]);
+  }
+  if (url.pathname === "/auth/callback") {
+    const state = url.searchParams.get("state") || "", code = url.searchParams.get("code") || "";
+    const [n, sig] = String(cookies(request).adops_state || "").split(".");
+    const clear = `adops_state=; ${COOKIE_FLAGS}; Max-Age=0`;
+    if (!code || !n || n !== state || !(await safeEqual(sig || "", await hmac(env.SESSION_SECRET, "state." + n)))) return loginPage(env, "fail");
+    let claims = null;
+    try {
+      const tr = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({ code, client_id: env.GOOGLE_LOGIN_CLIENT_ID, client_secret: env.GOOGLE_LOGIN_CLIENT_SECRET,
+          redirect_uri: origin + "/auth/callback", grant_type: "authorization_code" }),
+      });
+      const tj = await tr.json();
+      // id_token は Google のトークン窓口から TLS で直接受け取ったもの（第三者を経由しない）なので、中身の項目を確かめて使う
+      if (tr.ok && tj.id_token) claims = JSON.parse(fromB64u(tj.id_token.split(".")[1]));
+    } catch (e) { claims = null; }
+    if (!claims) return loginPage(env, "fail");
+    const email = String(claims.email || "").toLowerCase(), hd = allowedHd(env);
+    const okIss = claims.iss === "https://accounts.google.com" || claims.iss === "accounts.google.com";
+    if (!okIss || claims.aud !== env.GOOGLE_LOGIN_CLIENT_ID || !(claims.exp * 1000 > Date.now())) return loginPage(env, "fail");
+    if (claims.email_verified !== true || !email.endsWith("@" + hd) || String(claims.hd || "").toLowerCase() !== hd) return loginPage(env, "domain");
+    const ttlH = Number(env.SESSION_TTL_H || 168);
+    const body = b64uStr(JSON.stringify({ e: email, x: Date.now() + ttlH * 3600 * 1000 }));
+    return redirect("/", [clear, `adops_sess=${body}.${await hmac(env.SESSION_SECRET, "sess." + body)}; ${COOKIE_FLAGS}; Max-Age=${ttlH * 3600}`]);
+  }
+  if (url.pathname === "/auth/logout") return redirect("/auth/login", [`adops_sess=; ${COOKIE_FLAGS}; Max-Age=0`]);
+  return loginPage(env, url.searchParams.get("err") || "");
+}
+
 export default {
   async fetch(request, env) {
     const USER = env.BASIC_USER;
@@ -183,8 +272,18 @@ export default {
       });
     }
 
+    const url = new URL(request.url);
+    const gl = googleLoginOn(env);
+    if (gl) {
+      if (url.pathname.startsWith("/auth/")) return handleAuth(request, env, url);
+      if (await readSession(request, env)) {
+        if (url.pathname.startsWith("/api/state")) return handleState(request, env, url);
+        return env.ASSETS.fetch(request);
+      }
+    }
     const header = request.headers.get("Authorization") || "";
-    if (!header) return unauthorized(); // 初回（ブラウザが認証の入力欄を出す）は失敗に数えない
+    // ヘッダーが無い＝ブラウザ。Google ログインが有効ならログイン画面へ、無効なら従来どおりベーシック認証の入力欄を出す（失敗に数えない）
+    if (!header) return gl ? (url.pathname.startsWith("/api/") ? jsonRes({ error: "login_required" }, 401) : redirect("/auth/login")) : unauthorized();
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const fails = await failCount(env, ip);
     if (fails >= FAIL_LIMIT) {
@@ -207,13 +306,13 @@ export default {
         const p = decoded.slice(idx + 1);
         const okU = await safeEqual(u, USER), okP = await safeEqual(p, PASS);
         if (okU && okP) {
-          const url = new URL(request.url);
           if (url.pathname.startsWith("/api/state")) return handleState(request, env, url);
           return env.ASSETS.fetch(request); // 認証OK → 静的アセットを配信
         }
       }
     }
     await addFail(env, ip, fails);
-    return unauthorized();
+    // Google ログインが有効なら、ベーシック認証の入力欄は出さない（仕組み用の裏口なので 401 だけ返す）
+    return gl ? jsonRes({ error: "unauthorized" }, 401) : unauthorized();
   },
 };
