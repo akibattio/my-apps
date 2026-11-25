@@ -240,6 +240,7 @@ export default function AdOpsConsole() {
   const [keywords, setKeywords] = useState(null);
   const [breakdowns, setBreakdowns] = useState(null);
   const [creatives, setCreatives] = useState(null);
+  const [assetPerf, setAssetPerf] = useState(null); // アセット別の成果（Google・assets.json）修正依頼#11・#15
   const [periodData, setPeriodData] = useState(null); // 過去13か月の日次（期間集計用・history.json）
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
@@ -275,6 +276,10 @@ export default function AdOpsConsole() {
     fetch("./creatives_weekly.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && j.byAccount) setCreatives(j); })
+      .catch(() => {});
+    fetch("./assets.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.byAccount) setAssetPerf(j); })
       .catch(() => {});
     fetch("./history.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -739,6 +744,9 @@ export default function AdOpsConsole() {
 
               {clientTab === "seika" && (<>
               <RgReport slug={(cl.accts.find((a) => a.reportSlug) || {}).reportSlug} />
+              {assetPerf && assetPerf.byAccount[`${cl.client}|google`] && (
+                <AssetPerformance byMonth={assetPerf.byAccount[`${cl.client}|google`]} months={assetPerf.months || []} generated={assetPerf.generated} />
+              )}
               <div className="no-print"><PeriodSummary key={cl.client} history={periodData} client={cl.client} /></div>
               <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="媒体別の成果" note="この社の各アカウントの成果。手法別（検索/PMax等）・月次推移も表示。接続/トークンは『アカウント管理』タブへ。" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
@@ -2180,6 +2188,69 @@ function RgReport({ slug }) {
       </div>
       <iframe ref={ref} key={`${slug}-${month}`} title="Report GLASS" src={`./rg/${slug}/index.html?month=${month}&embed=1`} onLoad={onLoad}
         style={{ width: "100%", height: h, border: `1px solid ${RG.line}`, borderRadius: 10, background: "#fff", display: "block" }} />
+    </div>
+  );
+}
+
+// アセット別の成果（Google）：画像・動画はサムネイル、見出し・説明文は文字で。表示・クリック・費用・CV と、キーイベントごとの CV。
+// 修正依頼 #11（サムネイルでパッと見でわかるように）・#15（アセットごと・画像や動画・キーイベント1つ1つの数値）。
+// データは fetch_asset_performance.py の assets.json（当月＝月初〜昨日・先月）。P-MAX のアセットグループの中の素材は、Google が素材ごとの数値を出していないため入らない。
+const ASSET_KINDS = [["all", "すべて"], ["img", "画像"], ["video", "動画"], ["head", "見出し"], ["desc", "説明文"], ["other", "その他"]];
+const assetKind = (a) => a.img ? "img" : a.video ? "video" : /見出し/.test(a.field) ? "head" : /説明文/.test(a.field) ? "desc" : "other";
+function AssetPerformance({ byMonth, months, generated }) {
+  const ms = (months || []).filter((m) => byMonth[m]);
+  const [m, setM] = useState(ms[0] || "");
+  const [kind, setKind] = useState("all");
+  const [sort, setSort] = useState("imp");
+  const cur = byMonth[ms.includes(m) ? m : ms[0]];
+  if (!cur) return null;
+  const rows = (cur.assets || []).filter((a) => kind === "all" || assetKind(a) === kind)
+    .slice().sort((x, y) => (y[sort] || 0) - (x[sort] || 0));
+  const evs = (cur.events || []).slice(0, 6);
+  const yen = (v) => "¥" + Math.round(v || 0).toLocaleString();
+  const n = (v) => (v || 0).toLocaleString();
+  const cvf = (v) => (v ? (Math.round(v * 100) / 100).toLocaleString() : "—");
+  const tmpl = `64px minmax(180px,2.2fr) 0.8fr 0.7fr 0.55fr 0.8fr 0.6fr 0.8fr ${evs.map(() => "0.7fr").join(" ")}`;
+  const R = (v) => <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{v}</span>;
+  const pill = (on) => ({ padding: "4px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+    border: "1px solid " + (on ? "#0891b2" : "#e2e8f0"), background: on ? "#e6f5f8" : "#fff", color: on ? "#0e7490" : "#475569" });
+  const head = (k, label) => <button onClick={() => setSort(k)} style={{ all: "unset", cursor: "pointer", textAlign: "right", color: sort === k ? "#0891b2" : TH_FG }}>{label}{sort === k ? " ▼" : ""}</button>;
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="アセット別の成果（Google）"
+        note={`画像・動画・見出し・説明文ごとの数値。キーイベントごとの CV つき。P-MAX のアセットグループの中の素材は、Google が素材ごとの数値を出していないため入りません（上の Google広告のタブの P-MAX 欄を参照）。取得 ${generated || ""}`} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 8 }}>
+        {ms.map((x) => <button key={x} onClick={() => setM(x)} style={pill(x === (ms.includes(m) ? m : ms[0]))}>{x.replace("-", "年")}月{x === ms[0] && ms.length > 1 ? "（昨日まで）" : ""}</button>)}
+        <span style={{ width: 12 }} />
+        {ASSET_KINDS.map(([k, label]) => <button key={k} onClick={() => setKind(k)} style={pill(kind === k)}>{label}</button>)}
+      </div>
+      {cur.eventsError && <div style={{ fontSize: 11.5, color: "#b45309", marginBottom: 6 }}>この口座はキーイベントごとの数値を取れませんでした（アセットの数値は出ています）。</div>}
+      <div style={{ border: "1px solid #eaeeec", borderRadius: 12, overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 8, padding: "8px 12px", background: TH_BG, color: TH_FG, fontSize: 11, fontWeight: 700, minWidth: 820 + evs.length * 80, alignItems: "center" }}>
+          <span /> <span>アセット</span>{head("imp", "表示")}{head("clk", "クリック")}<span style={{ textAlign: "right" }}>CTR</span>
+          {head("cost", "費用")}{head("cv", "CV")}<span style={{ textAlign: "right" }}>CPA</span>
+          {evs.map((e) => <span key={e} title={e} style={{ textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e}</span>)}
+        </div>
+        {!rows.length && <div style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>この種類のアセットはありません。</div>}
+        {rows.map((a) => {
+          const thumb = a.img || (a.video ? `https://i.ytimg.com/vi/${a.video}/mqdefault.jpg` : "");
+          const link = a.video ? `https://www.youtube.com/watch?v=${a.video}` : a.img || "";
+          return (
+            <div key={a.id} style={{ display: "grid", gridTemplateColumns: tmpl, gap: 8, padding: "7px 12px", borderTop: "1px solid #f1f5f4", fontSize: 12, alignItems: "center", minWidth: 820 + evs.length * 80 }}>
+              {thumb ? <a href={link} target="_blank" rel="noopener noreferrer"><img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 6, background: "#f1f5f4", display: "block" }} /></a>
+                : <span style={{ width: 64, height: 40, borderRadius: 6, background: "#f1f5f4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94a3b8" }}>文字</span>}
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 600, color: "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.text || a.title}>{a.text || a.title || `アセット #${a.id}`}</span>
+                <span style={{ fontSize: 10.5, color: "#94a3b8" }}>{a.field}{a.channel ? `・${a.channel}` : ""}</span>
+              </span>
+              {R(n(a.imp))}{R(n(a.clk))}{R(a.imp ? (a.clk / a.imp * 100).toFixed(1) + "%" : "—")}
+              {R(yen(a.cost))}{R(cvf(a.cv))}{R(a.cv ? yen(a.cost / a.cv) : "—")}
+              {evs.map((e) => <span key={e} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{cvf((a.ev || {})[e])}</span>)}
+            </div>
+          );
+        })}
+      </div>
+      {(cur.events || []).length > evs.length && <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 4 }}>キーイベントは CV の多い6種類まで表示（全{cur.events.length}種類）。</div>}
     </div>
   );
 }

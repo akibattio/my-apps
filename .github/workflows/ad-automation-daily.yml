@@ -113,6 +113,8 @@ jobs:
           python3 scripts/fetch_search_diagnostics.py
           # クリエイティブ別の週次推移(Google/Meta・直近8週＋今週)→ console/creatives_weekly.json
           python3 scripts/fetch_creative_weekly.py || true
+          # アセット別の成果（Google・当月と先月・キーイベントごとの CV・サムネイル用の URL）→ console/assets.json（修正依頼#11・#15）
+          python3 scripts/fetch_asset_performance.py || true
           # 月次時系列(最大14ヶ月・前年同月比/長期トレンド用)→ console/monthly.json
           python3 scripts/fetch_monthly_series.py || true
           # 月次キーワード別(直近4ヶ月・レポートタブのキーワード分析用)→ console/keywords.json
