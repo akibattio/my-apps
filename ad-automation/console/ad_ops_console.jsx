@@ -2218,7 +2218,7 @@ function AssetPerformance({ byMonth, months, generated }) {
   return (
     <div style={{ marginBottom: 22 }}>
       <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="アセット別の成果（Google）"
-        note={`画像・動画・見出し・説明文ごとの数値。キーイベントごとの CV つき。P-MAX のアセットグループの中の素材は、Google が素材ごとの数値を出していないため入りません（上の Google広告のタブの P-MAX 欄を参照）。取得 ${generated || ""}`} />
+        note={`画像・動画・見出し・説明文ごとの数値（同じアセットでも、使われているキャンペーン・広告グループごとに分けて表示）。キーイベントごとの CV つき。P-MAX のアセットグループの中の素材は、Google が素材ごとの数値を出していないため入りません（上の Google広告のタブの P-MAX 欄を参照）。取得 ${generated || ""}`} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 8 }}>
         {ms.map((x) => <button key={x} onClick={() => setM(x)} style={pill(x === (ms.includes(m) ? m : ms[0]))}>{x.replace("-", "年")}月{x === ms[0] && ms.length > 1 ? "（昨日まで）" : ""}</button>)}
         <span style={{ width: 12 }} />
@@ -2236,12 +2236,13 @@ function AssetPerformance({ byMonth, months, generated }) {
           const thumb = a.img || (a.video ? `https://i.ytimg.com/vi/${a.video}/mqdefault.jpg` : "");
           const link = a.video ? `https://www.youtube.com/watch?v=${a.video}` : a.img || "";
           return (
-            <div key={a.id} style={{ display: "grid", gridTemplateColumns: tmpl, gap: 8, padding: "7px 12px", borderTop: "1px solid #f1f5f4", fontSize: 12, alignItems: "center", minWidth: 820 + evs.length * 80 }}>
+            <div key={`${a.id}-${a.agId || ""}`} style={{ display: "grid", gridTemplateColumns: tmpl, gap: 8, padding: "7px 12px", borderTop: "1px solid #f1f5f4", fontSize: 12, alignItems: "center", minWidth: 820 + evs.length * 80 }}>
               {thumb ? <a href={link} target="_blank" rel="noopener noreferrer"><img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 6, background: "#f1f5f4", display: "block" }} /></a>
                 : <span style={{ width: 64, height: 40, borderRadius: 6, background: "#f1f5f4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94a3b8" }}>文字</span>}
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontWeight: 600, color: "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.text || a.title}>{a.text || a.title || `アセット #${a.id}`}</span>
-                <span style={{ fontSize: 10.5, color: "#94a3b8" }}>{a.field}{a.channel ? `・${a.channel}` : ""}</span>
+                <span style={{ display: "block", fontSize: 10.5, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  title={`${a.campaign || ""} ／ ${a.adGroup || ""}`}>{a.field}{a.campaign ? `・${a.campaign}` : ""}{a.adGroup ? ` ／ ${a.adGroup}` : ""}</span>
               </span>
               {R(n(a.imp))}{R(n(a.clk))}{R(a.imp ? (a.clk / a.imp * 100).toFixed(1) + "%" : "—")}
               {R(yen(a.cost))}{R(cvf(a.cv))}{R(a.cv ? yen(a.cost / a.cv) : "—")}

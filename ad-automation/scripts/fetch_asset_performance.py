@@ -4,6 +4,7 @@
 修正依頼 #15（2026-11-12 今井）「アセットごとに数値を見れるように。画像や動画、キーイベント1つ1つの数値が確認できると」・
 #11（ノノミヤ）「サムネイルなどで表示してパッと見でどれのことかわかるように」への対応。
 - 当月（月初〜昨日）と先月の2か月分。口座ごとに、画像・動画・見出し・説明文などのアセットの表示・クリック・費用・CV。
+  同じアセットでも、使われているキャンペーン・広告グループごとに分けて出す（足し合わせない。2026-11-25 秋葉さん指示）。
 - キーイベント（コンバージョンの種類）ごとの CV は別の問い合わせで取る（公式の説明では、キーイベントの区切りと
   表示・クリック・費用は同じ問い合わせで選べない可能性が高いため）。取れない口座は、キーイベントの欄なしで出す。
 - P-MAX のアセットグループの中の素材は、Google が素材ごとの数値を出していないため入らない（Report GLASS の P-MAX 欄を参照）。
@@ -19,7 +20,7 @@ from adops_log import detail, err  # noqa: E402  記録に取引先の情報を�
 
 PROJ = Path(__file__).resolve().parent.parent
 OUT = PROJ / "console" / "assets.json"
-TOP = 150  # 1口座・1か月あたり（表示回数の多い順）
+TOP = 400  # 1口座・1か月あたり（表示回数の多い順・広告グループごとの行）
 
 FIELD_JP = {"HEADLINE": "見出し", "LONG_HEADLINE": "長い見出し", "DESCRIPTION": "説明文", "MARKETING_IMAGE": "画像",
             "SQUARE_MARKETING_IMAGE": "画像（正方形）", "PORTRAIT_MARKETING_IMAGE": "画像（縦長）", "LOGO": "ロゴ",
@@ -48,14 +49,15 @@ def account_assets(ga, cid: str, start: str, end: str) -> dict:
     """1口座・1期間。{"assets":[...], "events":[キーイベント名…], "eventsError": bool}"""
     q1 = ("SELECT asset.resource_name, asset.type, asset.name, asset.text_asset.text, asset.image_asset.full_size.url, "
           "asset.youtube_video_asset.youtube_video_id, asset.youtube_video_asset.youtube_video_title, "
-          "ad_group_ad_asset_view.field_type, campaign.advertising_channel_type, "
+          "ad_group_ad_asset_view.field_type, campaign.advertising_channel_type, campaign.name, ad_group.id, ad_group.name, "
           "metrics.impressions, metrics.clicks, metrics.cost_micros, metrics.conversions "
           "FROM ad_group_ad_asset_view "
           f"WHERE segments.date BETWEEN '{start}' AND '{end}' AND metrics.impressions > 0")
     m = {}
     for r in ga.search(customer_id=cid, query=q1):
         a = r.asset
-        e = m.setdefault(a.resource_name, {
+        e = m.setdefault((a.resource_name, str(r.ad_group.id)), {
+            "campaign": r.campaign.name or "", "adGroup": r.ad_group.name or "", "agId": str(r.ad_group.id),
             "id": a.resource_name.split("/")[-1], "type": _name(a.type_), "fields": set(), "channels": set(),
             "text": a.text_asset.text or "", "img": a.image_asset.full_size.url or "",
             "video": a.youtube_video_asset.youtube_video_id or "", "title": a.youtube_video_asset.youtube_video_title or a.name or "",
@@ -67,12 +69,12 @@ def account_assets(ga, cid: str, start: str, end: str) -> dict:
         e["cost"] += (mt.cost_micros or 0) / 1e6; e["cv"] += float(mt.conversions or 0)
 
     ev_err = False
-    q2 = ("SELECT asset.resource_name, segments.conversion_action_name, metrics.conversions "
+    q2 = ("SELECT asset.resource_name, ad_group.id, segments.conversion_action_name, metrics.conversions "
           "FROM ad_group_ad_asset_view "
           f"WHERE segments.date BETWEEN '{start}' AND '{end}' AND metrics.conversions > 0")
     try:
         for r in ga.search(customer_id=cid, query=q2):
-            e = m.get(r.asset.resource_name)
+            e = m.get((r.asset.resource_name, str(r.ad_group.id)))
             if e is None:
                 continue
             nm = r.segments.conversion_action_name or "（名前なし）"
@@ -90,7 +92,7 @@ def account_assets(ga, cid: str, start: str, end: str) -> dict:
     out = []
     for x in rows:
         fields = sorted(x["fields"])
-        out.append({"id": x["id"], "type": x["type"], "field": " / ".join(FIELD_JP.get(f, f) for f in fields),
+        out.append({"id": x["id"], "agId": x["agId"], "campaign": x["campaign"][:120], "adGroup": x["adGroup"][:120], "type": x["type"], "field": " / ".join(FIELD_JP.get(f, f) for f in fields),
                     "channel": " / ".join(sorted(x["channels"])), "text": x["text"][:200], "img": x["img"],
                     "video": x["video"], "title": x["title"][:120], "imp": x["imp"], "clk": x["clk"],
                     "cost": round(x["cost"]), "cv": round(x["cv"], 2),
