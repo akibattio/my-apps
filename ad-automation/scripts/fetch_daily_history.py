@@ -37,7 +37,7 @@ def window_start(today: datetime.date) -> datetime.date:
 
 
 def target_accounts() -> list[dict]:
-    """[{client, media, acct}]。Microsoft はコンソールの data.json に無いので口座表から足す。"""
+    """[{client, media, acct}]。Microsoft は口座表（media_accounts）から足す（data.json の Microsoft とは二重にしない）。"""
     out = []
     dpath = PROJ / "console" / "data.json"
     if dpath.exists():

@@ -211,7 +211,7 @@ def search_check(a: dict, cadence, today) -> list[dict]:
 
 
 MEDIA_JP = {"google": "Google", "meta": "Meta",
-            "yahoo_search": "Yahoo!検索", "yahoo_display": "Yahoo!ディスプレイ"}
+            "yahoo_search": "Yahoo!検索", "yahoo_display": "Yahoo!ディスプレイ", "microsoft": "Microsoft"}
 
 
 def build_message(alerts: list[dict], period: str, generated: str, n_proposals: int = 0) -> str:
