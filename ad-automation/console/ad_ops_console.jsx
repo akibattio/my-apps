@@ -412,10 +412,12 @@ export default function AdOpsConsole() {
   // 対応管理で「確認済み/様子見(期限内)」は主リストから外す
   const alertActive = serverAlerts.filter((a) => {
     if (approvals["alert:" + a.key]) return false; // 承認/却下済みは未対応から外す
+    // 止めたアラート（2026-11-25 秋葉さん判断 D）。決まりは monitor.py の snooze_filter と同じ（Chat の通知からも外れる）
     const op = alertOps[a.key];
     if (!op) return true;
-    if (op.status === "ack") return false;
-    if (op.status === "snooze" && op.until && new Date(op.until).getTime() > Date.now()) return false;
+    if (op.status === "snooze" && op.until && new Date(op.until).getTime() > Date.now()) return false; // 7日・30日止める
+    if (op.status === "untilWorse") return (SEVRANK[a.severity] ?? 9) < (SEVRANK[op.sev] ?? -1);      // 止めた時より重くなったら出す
+    if (op.status === "ack") return a.severity !== "info";  // 以前の「確認済み」（期限なし）：重大・悪化はもう一度出す
     return true;
   });
   const alertHandled = serverAlerts.filter((a) => !alertActive.includes(a));
@@ -551,7 +553,8 @@ export default function AdOpsConsole() {
             {/* ① 今日の要対応（画面トップ固定・最優先）— 運用者はまずここだけ見れば良い */}
             <TodayActions items={alertActive} handled={alertHandled} ops={alertOps} approvals={approvals} onClient={goClient}
               onAck={(k) => setAlertOp(k, { status: "ack" })}
-              onSnooze={(k) => setAlertOp(k, { status: "snooze", until: new Date(Date.now() + 3 * 864e5).toISOString() })}
+              onSnooze={(k, days) => setAlertOp(k, { status: "snooze", until: new Date(Date.now() + days * 864e5).toISOString() })}
+              onUntilWorse={(k, sev) => setAlertOp(k, { status: "untilWorse", sev, until: undefined })}
               onMemo={(k, v) => setAlertOp(k, { memo: v })}
               onClear={clearAlertOp}
               onDecide={decideAlert}
@@ -1380,7 +1383,7 @@ function PortfolioGrid({ clients, onOpen }) {
   );
 }
 // ① 今日の要対応：運用者がまず見るパネル。重要度順・事実+推奨対応つき・確認済み/様子見/メモで対応管理。
-function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooze, onMemo, onClear, onDecide, onUndo, generatedAt }) {
+function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooze, onUntilWorse, onMemo, onClear, onDecide, onUndo, generatedAt }) {
   const [editKey, setEditKey] = useState(null);
   const [draft, setDraft] = useState("");
   const [showHandled, setShowHandled] = useState(false);
@@ -1418,7 +1421,9 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
             <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
               <button style={{ ...btn, background: "linear-gradient(180deg,#06b6d4,#0891b2)", color: "#fff", border: "none", boxShadow: "0 1px 2px rgba(8,145,178,.3)" }} onClick={() => onDecide && onDecide(a, "approved")}><Check size={12} style={{ verticalAlign: "-2px" }} /> 承認</button>
               <button style={{ ...btn, color: "#b91c1c", borderColor: "#f0c9c9" }} onClick={() => onDecide && onDecide(a, "rejected")}><X size={12} style={{ verticalAlign: "-2px" }} /> 却下</button>
-              <button style={btn} onClick={() => onSnooze(a.key)}>様子見3日</button>
+              <button style={btn} title="7日間、画面と朝の通知に出さない" onClick={() => onSnooze(a.key, 7)}>7日止める</button>
+              <button style={btn} title="30日間、画面と朝の通知に出さない" onClick={() => onSnooze(a.key, 30)}>30日止める</button>
+              <button style={btn} title="今より重くなったら（注意→悪化→重大）また出す" onClick={() => onUntilWorse(a.key, a.severity)}>悪化したら出す</button>
               <button style={btn} onClick={() => { setEditKey(a.key); setDraft(op.memo || ""); }}>メモ</button>
               {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ ...btn, textDecoration: "none", color: platformColor(a.media), borderColor: "#c7d2fe" }}>↗ {platformLabel(a.media)}を開く</a>}
             </div>
@@ -1470,7 +1475,8 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
                 const op = (ops && ops[a.key]) || {};
                 const dec = approvals && approvals["alert:" + a.key];
                 const st = dec ? ((dec.decision === "approved" ? "✅ 承認" : "🚫 却下") + (dec.reason ? `・${dec.reason}` : ""))
-                  : op.status === "ack" ? "確認済み" : op.status === "snooze" ? `様子見〜${(op.until || "").slice(0, 10)}` : "";
+                  : op.status === "ack" ? "確認済み" : op.status === "snooze" ? `止め中〜${(op.until || "").slice(0, 10)}`
+                  : op.status === "untilWorse" ? "悪化したら出す" : "";
                 const by = dec ? dec.by : op.by;
                 return (
                   <div key={a.key} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", border: "1px solid #f1f5f4", borderRadius: 8, background: "#fafbfa", opacity: 0.85 }}>
