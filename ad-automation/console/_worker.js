@@ -259,6 +259,24 @@ async function handleAuth(request, env, url) {
   return loginPage(env, url.searchParams.get("err") || "");
 }
 
+// ---- Report GLASS のレポートの読み取り（各社ページの「成果」に、Report GLASS と同じレポートをチャネルのタブで出す）----
+// ログイン済みの人にだけ、Report GLASS の読み取り口（/console-export/・合言葉 RG_CONSOLE_TOKEN）から読んだものを /rg/... として返す。
+// 同じサイトの中に置くので、画面側から枠の中のタブを押せる。読めるのは各社レポートの画面・月のデータ・月の一覧だけ。
+async function handleRg(request, env, url) {
+  if (request.method !== "GET") return jsonRes({ error: "method" }, 405);
+  const m = url.pathname.match(/^\/rg\/([a-z0-9-]+)\/(index\.html|months|data\/\d{4}-\d{2}\.js)$/);
+  if (!m || !SLUG_RE.test(m[1])) return jsonRes({ error: "not_found" }, 404);
+  if (!env.RG_CONSOLE_TOKEN) return jsonRes({ error: "rg_not_configured" }, 503);
+  const base = String(env.RG_URL || "https://report-glass.onrender.com").replace(/\/+$/, "");
+  let r;
+  try {
+    r = await fetch(`${base}/console-export/${m[1]}/${m[2]}`, { headers: { "x-adops-console-token": env.RG_CONSOLE_TOKEN }, redirect: "manual" });
+  } catch (e) { return jsonRes({ error: "rg_unreachable" }, 502); }
+  if (r.status !== 200) return jsonRes({ error: "rg_" + r.status }, r.status === 404 ? 404 : 502);
+  const type = m[2] === "index.html" ? "text/html; charset=utf-8" : m[2] === "months" ? "application/json" : "text/javascript; charset=utf-8";
+  return new Response(r.body, { status: 200, headers: { "Content-Type": type, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+}
+
 export default {
   async fetch(request, env) {
     const USER = env.BASIC_USER;
@@ -278,6 +296,7 @@ export default {
       if (url.pathname.startsWith("/auth/")) return handleAuth(request, env, url);
       if (await readSession(request, env)) {
         if (url.pathname.startsWith("/api/state")) return handleState(request, env, url);
+        if (url.pathname.startsWith("/rg/")) return handleRg(request, env, url);
         return env.ASSETS.fetch(request);
       }
     }
@@ -307,6 +326,7 @@ export default {
         const okU = await safeEqual(u, USER), okP = await safeEqual(p, PASS);
         if (okU && okP) {
           if (url.pathname.startsWith("/api/state")) return handleState(request, env, url);
+          if (url.pathname.startsWith("/rg/")) return handleRg(request, env, url);
           return env.ASSETS.fetch(request); // 認証OK → 静的アセットを配信
         }
       }
