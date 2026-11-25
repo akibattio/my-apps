@@ -64,6 +64,8 @@ const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
 // 顧客レポート（Report GLASS / Netlify）へのリンク。クライアント提出レポートはReport GLASSに一本化。
 // コンソールの「簡易分析」タブは社内確認用（混同回避のため"レポート"表記を避ける）。
+// 表の見出し行の色（修正依頼 2026-11-12 #13「表の上のまとまりを背景色で分かりやすく」）。本文の行と見分けがつく濃さにする
+const TH_BG = "#dbe9ef", TH_FG = "#1e3a46";
 const AD_REPORT_URL = "https://report-glass.onrender.com/";
 // 社別レポート（Render版・Googleログイン）。slug は data.json の reportSlug（REPORT GLASSの対応表由来）。無ければ管理画面トップ。
 const reportGlassUrl = (client, accts) => {
@@ -614,7 +616,7 @@ export default function AdOpsConsole() {
                   </button>
                   {showLog && (
                     <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden", marginTop: 8 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.9fr 1.4fr 0.8fr 0.5fr", padding: "8px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.9fr 1.4fr 0.8fr 0.5fr", padding: "8px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                         <span>クライアント</span><span>媒体</span><span>提案</span><span>判断・理由</span><span>担当・日時</span><span></span>
                       </div>
                       {approvalLog.map((l, i) => (
@@ -865,7 +867,7 @@ export default function AdOpsConsole() {
                 <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>今月の予算 合計 <b style={{ color: "#0e3a46" }}>{fmtYen(totBudget)}</b>{totActual ? ` ／ 実消化 ${fmtYen(totActual)}（${Math.round(totActual / totBudget * 100)}%）` : ""}</span>
               </div>
               <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 10, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 10, padding: "9px 14px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                   <span>クライアント</span><span>契約（媒体別）＋追加</span><span style={{ textAlign: "right" }}>今月の予算</span><span style={{ textAlign: "right" }}>実消化 / 消化率</span>
                 </div>
                 {rows.map((r, i) => {
@@ -995,7 +997,7 @@ export default function AdOpsConsole() {
                     {/* 媒体別内訳 */}
                     <SectionTitle icon={<Table2 size={15} color="#0891b2" />} title="媒体別内訳" />
                     <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden", marginBottom: 22 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "8px 13px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "8px 13px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                         <span>媒体</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span><span style={{ textAlign: "right" }}>CTR / CPC</span>
                       </div>
                       {accts.map((c, i) => {
@@ -1036,7 +1038,7 @@ export default function AdOpsConsole() {
                                 <Empty text={`この月のキーワードデータがありません（毎日の取得で反映）。`} />
                               ) : (
                                 <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden" }}>
-                                  <div style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
                                     <span>キーワード</span><span style={{ textAlign: "center" }}>品質</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>クリック</span><span style={{ textAlign: "right" }}>CTR</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span>
                                   </div>
                                   {kws.map((k, i) => (
@@ -1128,7 +1130,7 @@ export default function AdOpsConsole() {
             .filter((c) => flagFilter === "all" || acctHk(c) === flagFilter)
             .sort((x, y) => (RANK[acctHk(y)] - RANK[acctHk(x)]) || ((y.spend || 0) - (x.spend || 0)));
           const sel = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff", color: "#0f172a" };
-          const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
+          const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG };
           return (
             <>
               <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="費用・成果一覧（媒体別）" note="アカウント（媒体）単位の一覧。クライアント・状態・媒体で絞り込み。行クリックで社別詳細へ。" />
@@ -1779,7 +1781,7 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
         ) : (
           <div style={{ overflowX: "auto", border: "1px solid #eef1f0", borderRadius: 10 }}>
             <div style={{ minWidth: 880 }}>
-              <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "8px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+              <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "8px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                 <span>{target ? "口座（媒体）" : "クライアント"}</span>
                 {PERIOD_COLS.map((c) => <span key={c.k} style={{ textAlign: "right" }}>{c.label}</span>)}
               </div>
@@ -1822,7 +1824,7 @@ function SectionTitle({ icon, title, note }) {
 }
 function TableHead({ cols, which }) {
   const tmpl = which === "conn" ? "1.4fr 0.8fr 1fr 0.9fr 0.9fr 0.6fr 0.8fr" : "1.4fr 0.7fr 0.9fr 0.9fr 1.1fr 0.6fr 0.5fr 0.7fr";
-  return (<div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.3 }}>{cols.map((c) => <span key={c}>{c}</span>)}</div>);
+  return (<div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG, letterSpacing: 0.3 }}>{cols.map((c) => <span key={c}>{c}</span>)}</div>);
 }
 function MediaPill({ m }) {
   // ゴースト（白地＋細い同色枠）でスタイリッシュに。ベタ塗りの色ブロックを避け情報密度を上げる
@@ -1926,7 +1928,7 @@ function CreativeWeekly({ rows, weeks, media, generated }) {
         </div>
       </div>
       <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflowX: "auto", overflowY: "hidden" }}>
-        <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+        <div style={{ ...hd, background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
           <span>広告</span>
           {ws.map((w) => <span key={w.start} style={{ textAlign: "right" }} title={`${w.start}〜${w.end}`}>{md(w.start)}〜{w.partial ? "（途中）" : ""}</span>)}
           <span style={{ textAlign: "right" }}>期間計</span><span style={{ textAlign: "right" }}>傾向</span>
@@ -2031,7 +2033,7 @@ function MediaAccountsPanel({ list, clients, operator, onSave }) {
         </div>
         {list.length > 0 && (
           <div style={{ marginTop: 12, border: "1px solid #eaeeec", borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.9fr 0.9fr 50px", gap: 8, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.9fr 0.9fr 50px", gap: 8, padding: "7px 12px", background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
               <span>クライアント</span><span>媒体</span><span>アカウントID</span><span>顧客ID</span><span>識別子</span><span>追加</span><span />
             </div>
             {list.map((x, i) => (
@@ -2064,7 +2066,7 @@ function BreakdownTable({ title, rows, col }) {
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0e3a46", margin: "0 0 6px" }}>{title}</div>
       <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflowX: "auto", overflowY: "hidden" }}>
-        <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+        <div style={{ ...hd, background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
           <span>{col}</span>{["表示", "クリック", "CTR", "CPC", "費用", "CV", "CVR", "CPA"].map((h) => <span key={h} style={{ textAlign: "right" }}>{h}</span>)}
         </div>
         {rows.map((r, i) => (
@@ -2236,7 +2238,7 @@ function TargetEditor({ clients, targets, onSave }) {
   };
   const inp = { width: "90%", maxWidth: 120, padding: "6px 8px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const tmpl = "1.35fr 0.6fr 0.35fr 0.8fr 0.8fr 0.8fr 0.75fr";
-  const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
+  const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG };
   const sel = { padding: "5px 6px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12, background: "#fff" };
   return (
     <div>
@@ -2300,7 +2302,7 @@ function TargetHistory({ history }) {
       </div>
       {history.length > 0 && (
         <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+          <div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
             <span>日時</span><span>クライアント</span><span>項目</span><span>変更前 → 変更後</span><span>担当</span>
           </div>
           {history.slice(0, 100).map((h, i) => (
@@ -2381,7 +2383,7 @@ function BenchmarkChecks({ c }) {
   }
 
   const cell = { padding: "7px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4", textAlign: "left" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4", textAlign: "left" };
   return (
     <div style={{ marginTop: 4, marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>
@@ -2581,7 +2583,7 @@ function AccountReport({ c, days, byType }) {
     { k: "CPA", a: d7.cpa ? yen(d7.cpa) : "—", b: lm.cpa ? yen(lm.cpa) : "—", d: chg(d7.cpa, lm.cpa, true), dir: -1 },
   ];
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div>
       {/* 予算消化（直近7日） */}
@@ -2676,7 +2678,7 @@ function WeeklyBreakdown({ days, target, bench }) {
   if (!rows.length) return null;
   const maxW = Math.max(1, ...rows.map((r) => r.cost));
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div>
       <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>週次分解（当月 {+curM.slice(5, 7)}月）</div>
@@ -2728,7 +2730,7 @@ function MonthlyReport({ c, days, byType }) {
   };
   const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
   const cell = { padding: "6px 10px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11 };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11 };
   return (
     <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
@@ -2837,7 +2839,7 @@ function MethodBreakdown({ days, byType }) {
   const tot = sumSet(days, dset7), totp = sumSet(days, dsetp7);
   rows.push({ label: "合計", cost: tot.cost, cv: tot.cv, cpa: tot.cpa, cpc: tot.cpc, costD: pct(tot.cost, totp.cost), cpaD: pct(tot.cpa, totp.cpa), total: true });
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>手法別（直近7日／前7日比）</div>
@@ -2887,7 +2889,7 @@ function TrendReport({ days, byType, bench }) {
     { k: "CPA", get: (o) => o.cpa, fmt: cpafmt, dir: -1 },
   ];
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0e3a46", marginBottom: 2 }}>
