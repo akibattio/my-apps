@@ -2156,7 +2156,9 @@ function RgReport({ slug }) {
   const box = { background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05)", marginBottom: 22, overflow: "hidden" };
   const note = (t) => <div style={{ ...box, padding: "14px 16px", fontSize: 12.5, color: "#64748b" }}>{t}</div>;
   if (!slug) return note("この社は Report GLASS の識別名が未設定のため、レポートを出せません（Report GLASS の対応表に登録すると出ます）。");
-  if (err) return note(err === "rg_not_configured" ? "Report GLASS との接続が未設定です（RG_CONSOLE_TOKEN）。" : `Report GLASS のレポートを読めませんでした（${err}）。`);
+  if (err) return note(err === "rg_not_configured" ? "Report GLASS との接続が未設定です（RG_CONSOLE_TOKEN）。"
+    : err === "rg_google_login_required" ? "Report GLASS のレポートは、会社の Google アカウントでログインした人だけが読めます。"
+    : `Report GLASS のレポートを読めませんでした（${err}）。`);
   if (!months) return note("Report GLASS のレポートを読み込み中…");
   if (!months.length) return note("この社の Report GLASS のレポートはまだありません（Report GLASS で作成すると出ます）。");
   return (

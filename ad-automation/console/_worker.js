@@ -326,7 +326,9 @@ export default {
         const okU = await safeEqual(u, USER), okP = await safeEqual(p, PASS);
         if (okU && okP) {
           if (url.pathname.startsWith("/api/state")) return handleState(request, env, url);
-          if (url.pathname.startsWith("/rg/")) return handleRg(request, env, url);
+          // Report GLASS のレポート（全社の会社名・広告費・コメント）は、会社の Google ログインの人だけ（2026-11-25 秋葉さん裁定）。
+          // 共有のパスワード（仕組み用の裏口）では中継しない。Report GLASS 自体も Google ログインでしか読めないのに合わせる。
+          if (url.pathname.startsWith("/rg/")) return jsonRes({ error: "rg_google_login_required", message: "Report GLASS のレポートは、会社の Google アカウントでログインした人だけが読めます。" }, 403);
           return env.ASSETS.fetch(request); // 認証OK → 静的アセットを配信
         }
       }
