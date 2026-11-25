@@ -2119,8 +2119,9 @@ function SearchTermsPanel({ byMonth }) {
 // 各社ページの「成果」：Report GLASS と同じレポートを、チャネルのタブ（全体/Google/Yahoo!/Microsoft/Meta）で出す（2026-11-25 秋葉さん指示）。
 // レポートは Worker の /rg/<識別名>/ 経由（Report GLASS が作ったものをそのまま読む＝数字が一致する）。同じサイトの中なので、
 // 外のタブから枠の中のタブを押して切り替える（Report GLASS の管理画面と同じ作り）。中の編集ボタンは Report GLASS 向けなので隠す。
-const RG_TAB_ORDER = { total: 0, google: 1, yahoo: 2, ms: 3, meta: 4 };
-const RG_TAB_LABEL = { total: "全体", google: "Google広告", yahoo: "Yahoo!広告", ms: "Microsoft広告", meta: "Meta広告" };
+// 出し方は Report GLASS の管理画面に合わせる（2026-11-25 秋葉さん指示）：タブの名前・並びはレポート自身のもの、
+// 灰色の台に並べて選んだタブを紺で塗る、右上に「月」の選択。色は Report GLASS の管理画面の値。
+const RG = { ink: "#1a1d24", sub: "#5b616e", line: "#e4e7ec", bg: "#f6f7f9", brand: "#0f3d5c" };
 function RgReport({ slug }) {
   const [months, setMonths] = useState(null);
   const [month, setMonth] = useState("");
@@ -2142,8 +2143,7 @@ function RgReport({ slug }) {
   const onLoad = () => {
     const d = doc(); if (!d) return;
     const st = d.createElement("style"); st.textContent = ".edit-tools{display:none!important}"; d.head.appendChild(st);
-    const ts = [...d.querySelectorAll("#tabs .tab")].map((t) => ({ t: t.dataset.t, active: t.classList.contains("active") }))
-      .sort((a, b) => (RG_TAB_ORDER[a.t] ?? 9) - (RG_TAB_ORDER[b.t] ?? 9));
+    const ts = [...d.querySelectorAll("#tabs .tab")].map((t) => ({ t: t.dataset.t, label: t.textContent.trim(), active: t.classList.contains("active") }));
     setTabs(ts);
     setTimeout(fit, 300); setTimeout(fit, 1200);
   };
@@ -2153,8 +2153,8 @@ function RgReport({ slug }) {
     setTabs((ts) => ts.map((x) => ({ ...x, active: x.t === t })));
     setTimeout(fit, 120);
   };
-  const box = { background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05)", marginBottom: 22, overflow: "hidden" };
-  const note = (t) => <div style={{ ...box, padding: "14px 16px", fontSize: 12.5, color: "#64748b" }}>{t}</div>;
+  const box = { background: "#fff", border: `1px solid ${RG.line}`, borderRadius: 10, marginBottom: 22 };
+  const note = (t) => <div style={{ ...box, padding: "14px 16px", fontSize: 12.5, color: RG.sub }}>{t}</div>;
   if (!slug) return note("この社は Report GLASS の識別名が未設定のため、レポートを出せません（Report GLASS の対応表に登録すると出ます）。");
   if (err) return note(err === "rg_not_configured" ? "Report GLASS との接続が未設定です（RG_CONSOLE_TOKEN）。"
     : err === "rg_google_login_required" ? "Report GLASS のレポートは、会社の Google アカウントでログインした人だけが読めます。"
@@ -2162,21 +2162,24 @@ function RgReport({ slug }) {
   if (!months) return note("Report GLASS のレポートを読み込み中…");
   if (!months.length) return note("この社の Report GLASS のレポートはまだありません（Report GLASS で作成すると出ます）。");
   return (
-    <div style={box}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 12px", borderBottom: "1px solid #eef1f4", flexWrap: "wrap" }}>
-        {tabs.map((x) => (
-          <button key={x.t} onClick={() => show(x.t)} style={{ padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
-            border: "1px solid " + (x.active ? "#0891b2" : "#e2e8f0"), background: x.active ? "#0891b2" : "#fff", color: x.active ? "#fff" : "#475569" }}>{RG_TAB_LABEL[x.t] || x.t}</button>
-        ))}
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 0 8px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 4, background: RG.bg, padding: 3, borderRadius: 10 }}>
+          {tabs.map((x) => (
+            <button key={x.t} onClick={() => show(x.t)} style={{ fontSize: 12.5, fontWeight: 700, border: "none", borderRadius: 8, padding: "7px 18px", cursor: "pointer",
+              background: x.active ? RG.brand : "transparent", color: x.active ? "#fff" : RG.sub }}>{x.label}</button>
+          ))}
+        </div>
         <span style={{ flex: 1 }} />
-        <label style={{ fontSize: 12, color: "#64748b" }}>対象月{" "}
-          <select value={month} onChange={(e) => { setTabs([]); setMonth(e.target.value); }} style={{ padding: "5px 8px", borderRadius: 8, border: "1px solid #d7e0db", fontSize: 12.5 }}>
+        <label style={{ fontSize: 11.5, color: RG.sub, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>月
+          <select value={month} onChange={(e) => { setTabs([]); setMonth(e.target.value); }}
+            style={{ fontSize: 12.5, fontWeight: 700, border: `1px solid ${RG.line}`, borderRadius: 7, padding: "5px 9px", background: "#fff", color: RG.ink, cursor: "pointer" }}>
             {months.map((m) => <option key={m} value={m}>{m.replace("-", "年")}月</option>)}
           </select>
         </label>
       </div>
       <iframe ref={ref} key={`${slug}-${month}`} title="Report GLASS" src={`./rg/${slug}/index.html?month=${month}&embed=1`} onLoad={onLoad}
-        style={{ width: "100%", height: h, border: "none", display: "block" }} />
+        style={{ width: "100%", height: h, border: `1px solid ${RG.line}`, borderRadius: 10, background: "#fff", display: "block" }} />
     </div>
   );
 }
