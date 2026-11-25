@@ -78,13 +78,13 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
   if (!contact) return { error: t("signup_err_contact") };
   if (!email) return { error: t("listing_err_email") };
 
-  // 売りたい側のゲート: 区分と車体番号は必須。仲介・業者はオーナー本人からの依頼確認と本人名（非公開）が必須。
+  // 売りたい側のゲート: 区分と車体番号は必須。仲介・業者はオーナー本人からの依頼確認が必須。
+  // 本人名（非公開）は任意（仲介では前の持ち主・本人の名前が分からないことがあるため）。空なら運営が後から確かめて書き足す。
   const isAgent = partyType === "BROKER" || partyType === "DEALER";
   if (kind === "SELL") {
     if (!partyType) return { error: t("sell_party_err") };
     if (!isValidVin(vin)) return { error: t("sell_vin_err") };
     if (isAgent && !ownerConsent) return { error: t("sell_consent_err") };
-    if (isAgent && !ownerName) return { error: t("sell_owner_name_err") };
   }
 
   const photos =
@@ -110,7 +110,7 @@ async function submit(kind: "SELL" | "BUY", formData: FormData): Promise<Listing
         party_type: partyType,
         vin: vin || null,
         owner_consent: kind === "SELL" && isAgent ? ownerConsent : false,
-        owner_name: kind === "SELL" && isAgent ? ownerName : null,
+        owner_name: kind === "SELL" && isAgent ? ownerName || null : null,
         submit_lang: lang,
         name: name || null,
         contact: contact || null,

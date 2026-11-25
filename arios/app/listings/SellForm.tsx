@@ -85,10 +85,6 @@ export default function SellForm({
       setLocalError(t("sell_consent_err"));
       return;
     }
-    if (isAgent && !ownerName.trim()) {
-      setLocalError(t("sell_owner_name_err"));
-      return;
-    }
     if (!manufacturer.trim() || !model.trim()) {
       setLocalError(t("form_err_makermodel"));
       return;
@@ -169,7 +165,7 @@ export default function SellForm({
               </span>
             </label>
             <div>
-              <label className={label}>{t("sell_owner_name")}{req}</label>
+              <label className={label}>{t("sell_owner_name")}{t("optional_paren")}</label>
               <input className={field} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} autoComplete="off" />
               <p className="mt-1.5 text-xs text-muted">{t("sell_owner_name_note")}</p>
             </div>

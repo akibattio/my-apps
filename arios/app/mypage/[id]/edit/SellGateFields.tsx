@@ -64,7 +64,7 @@ export default function SellGateFields({
               </span>
             </label>
             <div>
-              <label className={label}>{t("sell_owner_name")}{req}</label>
+              <label className={label}>{t("sell_owner_name")}{t("optional_paren")}</label>
               <input className={field} name="ownerName" defaultValue={ownerName ?? ""} autoComplete="off" />
               <p className="mt-1.5 text-xs text-muted">{t("sell_owner_name_note")}</p>
             </div>

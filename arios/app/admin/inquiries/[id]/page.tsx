@@ -94,7 +94,7 @@ export default async function InquiryDetailPage({
     ...(inq.party_type === "BROKER" || inq.party_type === "DEALER"
       ? ([
           ["本人からの依頼", inq.owner_consent ? "あり（登録時に確認済み）" : "未確認"],
-          ["オーナー本人の名前（非公開）", inq.owner_name],
+          ["オーナー本人の名前（非公開）", inq.owner_name || "未入力（運営で確かめて、下の「登録者情報を修正」で書き足す）"],
         ] as [string, string | null][])
       : []),
     ["登録時の言語", inq.submit_lang === "en" ? "英語" : inq.submit_lang === "ja" ? "日本語" : null],
@@ -208,6 +208,20 @@ export default async function InquiryDetailPage({
               className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-2.5 text-foreground"
             />
           </label>
+          {(inq.party_type === "BROKER" || inq.party_type === "DEALER") && (
+            <label className="block">
+              <span className="mb-1 block text-sm text-muted">
+                オーナー本人の名前（非公開・運営の確認用）
+                {!inq.owner_name && <span className="ml-2 text-amber-300">未入力</span>}
+              </span>
+              <input
+                name="owner_name"
+                defaultValue={inq.owner_name ?? ""}
+                maxLength={100}
+                className="w-full rounded-lg border border-neutral-700 bg-transparent px-4 py-2.5 text-foreground"
+              />
+            </label>
+          )}
           <label className="block">
             <span className="mb-1 block text-sm text-muted">メールアドレス</span>
             <input

@@ -143,7 +143,7 @@ export async function updateMyListing(formData: FormData): Promise<void> {
   const contact = String(formData.get("contact") ?? "").trim().slice(0, LIMITS.contact) || null;
   const name = String(formData.get("name") ?? "").trim().slice(0, LIMITS.name) || null;
 
-  // 売りたい: 区分・車体番号は必須。仲介・業者はオーナー本人からの依頼確認と本人名（非公開）が必須。
+  // 売りたい: 区分・車体番号は必須。仲介・業者はオーナー本人からの依頼確認が必須。本人名（非公開）は任意。
   let sellFields: Record<string, unknown> = {};
   if (row.kind === "SELL") {
     const partyRaw = String(formData.get("partyType") ?? "").trim().toUpperCase();
@@ -155,12 +155,11 @@ export async function updateMyListing(formData: FormData): Promise<void> {
     if (!partyType) back("sell_party_err");
     if (!isValidVin(vin)) back("sell_vin_err");
     if (isAgent && !ownerConsent) back("sell_consent_err");
-    if (isAgent && !ownerName) back("sell_owner_name_err");
     sellFields = {
       party_type: partyType,
       vin,
       owner_consent: isAgent ? ownerConsent : false,
-      owner_name: isAgent ? ownerName : null,
+      owner_name: isAgent ? ownerName || null : null,
     };
   }
 

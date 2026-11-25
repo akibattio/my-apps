@@ -147,7 +147,7 @@ export async function saveFollowup(formData: FormData): Promise<void> {
   redirect(`/admin/inquiries/${id}`);
 }
 
-// 登録者情報（名前・会社名・連絡先・メール）を管理者が修正する。
+// 登録者情報（名前・会社名・連絡先・メール、仲介・業者ならオーナー本人の名前）を管理者が修正する。
 export async function updateInquiryContact(formData: FormData): Promise<void> {
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/");
@@ -165,6 +165,12 @@ export async function updateInquiryContact(formData: FormData): Promise<void> {
       : null
     : null;
 
+  // オーナー本人の名前（非公開）。仲介・業者の登録で空のまま来た物を、運営が確かめて書き足す。
+  // 欄がある（仲介・業者の登録の）ときだけ書き換える。
+  const ownerNamePatch = formData.has("owner_name")
+    ? { owner_name: String(formData.get("owner_name") ?? "").trim().slice(0, 100) || null }
+    : {};
+
   const supabase = createAdminClient();
   await supabase
     .from("inquiries")
@@ -174,6 +180,7 @@ export async function updateInquiryContact(formData: FormData): Promise<void> {
       contact,
       contact_method: contactMethod,
       email,
+      ...ownerNamePatch,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
