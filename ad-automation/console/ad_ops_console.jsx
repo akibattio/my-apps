@@ -766,6 +766,7 @@ export default function AdOpsConsole() {
                       )}
                       {((monthlyMap[`${c.client}|${c.media}`] || []).length > 0) && <MonthlyTrend series={monthlyMap[`${c.client}|${c.media}`]} generated={monthlyGen} target={c.target || (c.bench && c.bench.targetCpa)} bench={c.bench} />}
                       {auditMap[`${c.client}|${c.media}`] && <AuditReport a={auditMap[`${c.client}|${c.media}`]} />}
+                      {c.media === "google" && <SearchTermsPanel byMonth={breakdownMap[`${c.client}|google`]} />}
                       {(creativeMap[`${c.client}|${c.media}`] || []).length > 0 && <CreativeWeekly rows={creativeMap[`${c.client}|${c.media}`]} weeks={creatives.weeks} media={c.media} generated={creatives.generated} />}
                     </div>
                   );
@@ -2051,6 +2052,27 @@ function MediaAccountsPanel({ list, clients, operator, onSave }) {
         )}
       </div>
     </div>
+  );
+}
+
+// 媒体別の成果の各口座に、検索語句（月別・費用上位）を開いて見られる欄（修正依頼#18「効果測定のため検索語句も見たい」）。
+// データは fetch_report_breakdowns.py の breakdowns.json（Google・直近3か月）。開くまでは閉じておく（カードを長くしない）。
+function SearchTermsPanel({ byMonth }) {
+  const months = Object.keys(byMonth || {}).filter((m) => ((byMonth[m] || {}).searchTerm || []).length).sort().reverse();
+  const [m, setM] = useState(months[0] || "");
+  if (!months.length) return null;
+  const cur = months.includes(m) ? m : months[0];
+  return (
+    <details className="no-print" style={{ marginTop: 12 }}>
+      <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: "#0e3a46" }}>検索語句（費用上位・{cur.replace("-", "年")}月）</summary>
+      <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
+        {months.map((x) => (
+          <button key={x} onClick={() => setM(x)} style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid " + (x === cur ? "#0891b2" : "#d7e0db"),
+            background: x === cur ? "#e6f5f8" : "#fff", color: x === cur ? "#0e7490" : "#475569", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>{x.replace("-", "年")}月</button>
+        ))}
+      </div>
+      <BreakdownTable title="" rows={byMonth[cur].searchTerm} col="検索語句" />
+    </details>
   );
 }
 
