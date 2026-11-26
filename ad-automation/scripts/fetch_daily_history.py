@@ -37,7 +37,7 @@ def window_start(today: datetime.date) -> datetime.date:
 
 
 def target_accounts() -> list[dict]:
-    """[{client, media, acct}]。Microsoft はコンソールの data.json に無いので口座表から足す。"""
+    """[{client, media, acct}]。Microsoft は口座表（media_accounts）から足す（data.json の Microsoft とは二重にしない）。"""
     out = []
     dpath = PROJ / "console" / "data.json"
     if dpath.exists():
@@ -61,8 +61,9 @@ def fetch(a: dict, start: str, end: str):
     media, acct = a["media"], a["acct"]
     try:
         if media == "google":
-            series, _ = google_daily(acct, start, end)
-            return series
+            # 手法別（検索/PMax/デマンドジェン等）も残す＝コンソールの期間集計で手法ごとにオン・オフ（修正依頼#17）
+            series, by_type = google_daily(acct, start, end)
+            return {"series": series, "types": by_type}
         if media == "meta":
             tok = os.environ.get("SOFCOM_META_SYSTEM_USER_TOKEN", "").strip()
             if not tok:
@@ -108,7 +109,9 @@ def main():
         prev = accts.get(key) or {}
         rows = prev.get("rows", {})
         # 13か月分そろっていない口座（初回・新規）はまとめて取得、そろっていれば直近だけ取り直す
-        backfill = full or not prev or (prev.get("from") or "9999") > w_start.isoformat()
+        backfill = (full or not prev or (prev.get("from") or "9999") > w_start.isoformat()
+                    # Google で手法別がまだ蓄積に無い口座は、一度だけ13か月分を取り直して手法別も埋める
+                    or (a["media"] == "google" and "types" not in prev))
         f_start = w_start if backfill else max(w_start, today - datetime.timedelta(days=REFRESH_DAYS))
         series = fetch(a, f_start.isoformat(), end)
         if isinstance(series, dict) and "__error__" in series:
@@ -118,17 +121,28 @@ def main():
             if prev:
                 accts[key] = {**prev, "client": a["client"], "error": series["__error__"]}
             continue
-        # 取り直した範囲は丸ごと置き換える（実績0の日が返らない媒体でも古い値が残らないように）
-        rows = {d: v for d, v in rows.items() if not (f_start.isoformat() <= d <= end)}
-        for r in series:
-            d = str(r.get("date") or "")[:10]
-            if d:
-                rows[d] = [round(r.get("cost") or 0), int(r.get("imp") or 0), int(r.get("clk") or 0),
-                           round(float(r.get("cv") or 0), 1)]
-        rows = {d: v for d, v in rows.items() if d >= w_start.isoformat()}
+        new_types = None
+        if isinstance(series, dict):  # Google：合計＋手法別
+            series, new_types = series["series"], series["types"]
+
+        def merge(old: dict, items: list) -> dict:
+            # 取り直した範囲は丸ごと置き換える（実績0の日が返らない媒体でも古い値が残らないように）
+            out = {d: v for d, v in (old or {}).items() if not (f_start.isoformat() <= d <= end)}
+            for r in items:
+                d = str(r.get("date") or "")[:10]
+                if d:
+                    out[d] = [round(r.get("cost") or 0), int(r.get("imp") or 0), int(r.get("clk") or 0),
+                              round(float(r.get("cv") or 0), 1)]
+            return {d: v for d, v in out.items() if d >= w_start.isoformat()}
+
+        rows = merge(rows, series)
         accts[key] = {"client": a["client"], "media": a["media"], "acct": a["acct"],
                       "from": w_start.isoformat() if backfill else (prev.get("from") or w_start.isoformat()),
                       "updated": end, "rows": rows}
+        if new_types is not None:
+            old_types = prev.get("types") or {}
+            labels = set(old_types) | set(new_types)
+            accts[key]["types"] = {lab: merge(old_types.get(lab), new_types.get(lab, [])) for lab in labels}
         ok += 1
         detail(f"  {a['client'][:22]:24}[{a['media']}] {'13か月取得' if backfill else '直近更新'} "
               f"{f_start.isoformat()}〜{end} / 蓄積{len(rows)}日")
@@ -136,6 +150,8 @@ def main():
     # 13か月より古い日を落とす（口座ごと）
     for v in accts.values():
         v["rows"] = {d: x for d, x in (v.get("rows") or {}).items() if d >= w_start.isoformat()}
+        if "types" in v:
+            v["types"] = {lab: {d: x for d, x in r.items() if d >= w_start.isoformat()} for lab, r in v["types"].items()}
 
     STORE.parent.mkdir(exist_ok=True)
     STORE.write_text(json.dumps({"generated": end, "from": w_start.isoformat(), "to": end, "accounts": accts},
@@ -145,8 +161,12 @@ def main():
     light = []
     for v in accts.values():
         d = [[day, *x] for day, x in sorted((v.get("rows") or {}).items()) if any(x)]
-        light.append({"client": v.get("client"), "media": v.get("media"), "acct": v.get("acct"),
-                      "updated": v.get("updated"), "error": v.get("error"), "d": d})
+        row = {"client": v.get("client"), "media": v.get("media"), "acct": v.get("acct"),
+               "updated": v.get("updated"), "error": v.get("error"), "d": d}
+        if v.get("types"):  # Google の手法別（実績がある日だけ・同じ列）
+            t = {lab: [[day, *x] for day, x in sorted(r.items()) if any(x)] for lab, r in v["types"].items()}
+            row["t"] = {lab: xs for lab, xs in t.items() if xs}
+        light.append(row)
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps({"generated": end, "from": w_start.isoformat(), "to": end,
                                "cols": ["date", "cost", "imp", "clk", "cv"], "accounts": light},

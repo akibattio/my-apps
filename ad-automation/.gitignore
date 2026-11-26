@@ -44,6 +44,7 @@ console/breakdowns.json
 console/history.json
 console/creatives_weekly.json
 console/ga4.json
+console/assets.json
 
 # 実行ログ
 logs/

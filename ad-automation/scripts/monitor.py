@@ -211,7 +211,7 @@ def search_check(a: dict, cadence, today) -> list[dict]:
 
 
 MEDIA_JP = {"google": "Google", "meta": "Meta",
-            "yahoo_search": "Yahoo!検索", "yahoo_display": "Yahoo!ディスプレイ"}
+            "yahoo_search": "Yahoo!検索", "yahoo_display": "Yahoo!ディスプレイ", "microsoft": "Microsoft"}
 
 
 def build_message(alerts: list[dict], period: str, generated: str, n_proposals: int = 0) -> str:
@@ -284,6 +284,79 @@ def notify(msg: str) -> str:
         return f"未知の通知先: {ch}"
     except Exception as e:
         return f"送信失敗（{ch}）: {err(e)}"
+
+
+# ---- アラートを減らす決まり（2026-11-25 秋葉さん判断：C＋D）----
+# C：小さい口座・止まっている口座・始めたばかりの口座では、成果のアラートを出さない（接続・口座の異常は出す）。
+#    少額の基準は直近30日の費用（既定 1万円・環境変数 ADOPS_ALERT_MIN_SPEND で変えられる）。
+#    停止中＝直近7日の費用も表示も0。始めたばかり＝最初に費用が出た日から14日以内（日次の範囲内で判定）。
+# D：運用者が画面で「7日・30日止める／悪化したらまた出す」にしたアラートは、Chat の通知から外す
+#    （画面はコンソールが同じ決まりで隠す。決まりを変えるときは ad_ops_console.jsx の alertActive も合わせる）。
+SYSTEM_KINDS = {"接続/トークン失効", "トークン失効接近", "口座の番号の桁", "口座の形の誤り", "口座が見当たらない",
+                "口座の一覧を引けず", "口座の番号の桁の決まり"}
+SEV_RANK_UI = {"critical": 0, "warning": 1, "info": 2}  # コンソールの呼び名（warn→warning）
+
+
+def quiet_filter(alerts: list, data: dict, today) -> tuple[list, int]:
+    """C の決まりで外すアラートを除いて返す。(残すアラート, 外した件数)"""
+    try:
+        min_spend = int(os.environ.get("ADOPS_ALERT_MIN_SPEND", "10000"))
+    except ValueError:
+        min_spend = 10000
+    accts = {(a.get("client"), a.get("media")): a for a in data.get("accounts", [])}
+    first_spend = {}
+    dp = PROJ / "data" / "daily.json"
+    if dp.exists():
+        try:
+            for x in json.loads(dp.read_text(encoding="utf-8")).get("accounts", []):
+                days = [d.get("date") for d in (x.get("days") or []) if (d.get("cost") or 0) > 0]
+                rng = [d.get("date") for d in (x.get("days") or [])]
+                # 日次の範囲の初日から費用が出ているなら「以前から配信」＝始めたばかりではない
+                if days and rng and min(days) > min(rng):
+                    first_spend[(x.get("client"), x.get("media"))] = min(days)
+        except Exception as e:
+            print("daily.json（始めたばかりの判定）読めず:", err(e))
+    keep, dropped = [], 0
+    for x in alerts:
+        a = accts.get((x.get("client"), x.get("media")))
+        if x.get("kind") in SYSTEM_KINDS or a is None:
+            keep.append(x); continue
+        d7 = (a.get("metrics") or {}).get("d7") or {}
+        paused = "spend" in d7 and not (d7.get("spend") or 0) and not (d7.get("imp") or 0)
+        small = (a.get("spend") or 0) < min_spend
+        fs = first_spend.get((x.get("client"), x.get("media")))
+        new = bool(fs) and (today - datetime.fromisoformat(fs).date()).days < 14
+        if paused or small or new:
+            dropped += 1
+        else:
+            keep.append(x)
+    return keep, dropped
+
+
+def snooze_filter(alerts: list, ops: dict | None, now=None) -> tuple[list, int]:
+    """D の決まりで、運用者が止めたアラートを除いて返す。(送るアラート, 止めた件数)"""
+    if not ops:
+        return alerts, 0
+    now = now or datetime.now(timezone.utc)
+    out, held = [], 0
+    for x in alerts:
+        sev = "warning" if x["severity"] == "warn" else x["severity"]
+        op = ops.get(f"{x['client']}|{x['media']}|{x['kind']}") or {}
+        st, hide = op.get("status"), False
+        if st == "snooze" and op.get("until"):
+            try:
+                hide = datetime.fromisoformat(str(op["until"]).replace("Z", "+00:00")) > now
+            except ValueError:
+                hide = False
+        elif st == "untilWorse":
+            hide = SEV_RANK_UI.get(sev, 9) >= SEV_RANK_UI.get(op.get("sev"), -1)
+        elif st == "ack":  # 以前の「確認済み」（期限なし）：重大・悪化はもう一度出す
+            hide = sev == "info"
+        if hide:
+            held += 1
+        else:
+            out.append(x)
+    return out, held
 
 
 def main():
@@ -382,8 +455,19 @@ def main():
         except Exception as e:
             print("search_diag.json 判定失敗:", err(e))
 
+    # C：小さい・止まっている・始めたばかりの口座のアラートは、画面にも通知にも出さない
+    alerts, quiet_n = quiet_filter(alerts, data, tdy)
+    # D：運用者が止めたアラートは通知から外す（画面はコンソールが同じ決まりで隠す）
+    ops = None
+    try:
+        import media_accounts as _ma
+        ops = _ma.kv_get_json("alertOps")
+    except Exception as e:
+        print("止めたアラートの一覧を読めず（全件を通知）:", err(e))
+    send_alerts, held_n = snooze_filter(alerts, ops if isinstance(ops, dict) else None)
+
     generated = datetime.now(JST).strftime("%Y-%m-%d %H:%M JST")
-    msg = build_message(alerts, data.get("period", "直近30日"), generated, n_proposals=len(data.get("proposals") or []))
+    msg = build_message(send_alerts, data.get("period", "直近30日"), generated, n_proposals=len(data.get("proposals") or []))
 
     # 1) ログ
     (PROJ / "logs").mkdir(exist_ok=True)
@@ -403,7 +487,8 @@ def main():
 
     detail(msg)  # 通知の本文（社内宛て）は記録に出さない
     crit = sum(1 for x in alerts if x["severity"] == "critical")
-    print(f"[monitor] アラート{len(alerts)}件（うち重大 {crit}） / 通知: {result}")
+    print(f"[monitor] アラート{len(alerts)}件（うち重大 {crit}）・小さい/停止/開始直後の口座で出さない {quiet_n}件"
+          f"・運用者が止めて通知しない {held_n}件 / 通知: {result}")
 
 
 if __name__ == "__main__":

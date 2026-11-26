@@ -64,6 +64,8 @@ const rankToHk = (r) => (r >= 3 ? "critical" : r === 2 ? "warning" : r === 1 ? "
 const deliveryOf = (c) => { const m = (c.metrics && c.metrics.d7) || {}; return ((m.imp || 0) > 0 || (m.spend || 0) > 0) ? "active" : "paused"; };
 // 顧客レポート（Report GLASS / Netlify）へのリンク。クライアント提出レポートはReport GLASSに一本化。
 // コンソールの「簡易分析」タブは社内確認用（混同回避のため"レポート"表記を避ける）。
+// 表の見出し行の色（修正依頼 2026-11-12 #13「表の上のまとまりを背景色で分かりやすく」）。本文の行と見分けがつく濃さにする
+const TH_BG = "#dbe9ef", TH_FG = "#1e3a46";
 const AD_REPORT_URL = "https://report-glass.onrender.com/";
 // 社別レポート（Render版・Googleログイン）。slug は data.json の reportSlug（REPORT GLASSの対応表由来）。無ければ管理画面トップ。
 const reportGlassUrl = (client, accts) => {
@@ -238,6 +240,7 @@ export default function AdOpsConsole() {
   const [keywords, setKeywords] = useState(null);
   const [breakdowns, setBreakdowns] = useState(null);
   const [creatives, setCreatives] = useState(null);
+  const [assetPerf, setAssetPerf] = useState(null); // アセット別の成果（Google・assets.json）修正依頼#11・#15
   const [periodData, setPeriodData] = useState(null); // 過去13か月の日次（期間集計用・history.json）
   useEffect(() => {
     fetch("./data.json", { cache: "no-store" })
@@ -273,6 +276,10 @@ export default function AdOpsConsole() {
     fetch("./creatives_weekly.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (j && j.byAccount) setCreatives(j); })
+      .catch(() => {});
+    fetch("./assets.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j && j.byAccount) setAssetPerf(j); })
       .catch(() => {});
     fetch("./history.json", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
@@ -410,10 +417,12 @@ export default function AdOpsConsole() {
   // 対応管理で「確認済み/様子見(期限内)」は主リストから外す
   const alertActive = serverAlerts.filter((a) => {
     if (approvals["alert:" + a.key]) return false; // 承認/却下済みは未対応から外す
+    // 止めたアラート（2026-11-25 秋葉さん判断 D）。決まりは monitor.py の snooze_filter と同じ（Chat の通知からも外れる）
     const op = alertOps[a.key];
     if (!op) return true;
-    if (op.status === "ack") return false;
-    if (op.status === "snooze" && op.until && new Date(op.until).getTime() > Date.now()) return false;
+    if (op.status === "snooze" && op.until && new Date(op.until).getTime() > Date.now()) return false; // 7日・30日止める
+    if (op.status === "untilWorse") return (SEVRANK[a.severity] ?? 9) < (SEVRANK[op.sev] ?? -1);      // 止めた時より重くなったら出す
+    if (op.status === "ack") return a.severity !== "info";  // 以前の「確認済み」（期限なし）：重大・悪化はもう一度出す
     return true;
   });
   const alertHandled = serverAlerts.filter((a) => !alertActive.includes(a));
@@ -549,7 +558,8 @@ export default function AdOpsConsole() {
             {/* ① 今日の要対応（画面トップ固定・最優先）— 運用者はまずここだけ見れば良い */}
             <TodayActions items={alertActive} handled={alertHandled} ops={alertOps} approvals={approvals} onClient={goClient}
               onAck={(k) => setAlertOp(k, { status: "ack" })}
-              onSnooze={(k) => setAlertOp(k, { status: "snooze", until: new Date(Date.now() + 3 * 864e5).toISOString() })}
+              onSnooze={(k, days) => setAlertOp(k, { status: "snooze", until: new Date(Date.now() + days * 864e5).toISOString() })}
+              onUntilWorse={(k, sev) => setAlertOp(k, { status: "untilWorse", sev, until: undefined })}
               onMemo={(k, v) => setAlertOp(k, { memo: v })}
               onClear={clearAlertOp}
               onDecide={decideAlert}
@@ -614,7 +624,7 @@ export default function AdOpsConsole() {
                   </button>
                   {showLog && (
                     <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden", marginTop: 8 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.9fr 1.4fr 0.8fr 0.5fr", padding: "8px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 0.7fr 0.9fr 1.4fr 0.8fr 0.5fr", padding: "8px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                         <span>クライアント</span><span>媒体</span><span>提案</span><span>判断・理由</span><span>担当・日時</span><span></span>
                       </div>
                       {approvalLog.map((l, i) => (
@@ -733,6 +743,10 @@ export default function AdOpsConsole() {
               </div>
 
               {clientTab === "seika" && (<>
+              <RgReport slug={(cl.accts.find((a) => a.reportSlug) || {}).reportSlug} />
+              {assetPerf && assetPerf.byAccount[`${cl.client}|google`] && (
+                <AssetPerformance byMonth={assetPerf.byAccount[`${cl.client}|google`]} months={assetPerf.months || []} generated={assetPerf.generated} />
+              )}
               <div className="no-print"><PeriodSummary key={cl.client} history={periodData} client={cl.client} /></div>
               <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="媒体別の成果" note="この社の各アカウントの成果。手法別（検索/PMax等）・月次推移も表示。接続/トークンは『アカウント管理』タブへ。" />
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 22 }}>
@@ -764,6 +778,7 @@ export default function AdOpsConsole() {
                       )}
                       {((monthlyMap[`${c.client}|${c.media}`] || []).length > 0) && <MonthlyTrend series={monthlyMap[`${c.client}|${c.media}`]} generated={monthlyGen} target={c.target || (c.bench && c.bench.targetCpa)} bench={c.bench} />}
                       {auditMap[`${c.client}|${c.media}`] && <AuditReport a={auditMap[`${c.client}|${c.media}`]} />}
+                      {c.media === "google" && <SearchTermsPanel byMonth={breakdownMap[`${c.client}|google`]} />}
                       {(creativeMap[`${c.client}|${c.media}`] || []).length > 0 && <CreativeWeekly rows={creativeMap[`${c.client}|${c.media}`]} weeks={creatives.weeks} media={c.media} generated={creatives.generated} />}
                     </div>
                   );
@@ -865,7 +880,7 @@ export default function AdOpsConsole() {
                 <span style={{ marginLeft: "auto", fontSize: 12, color: "#64748b" }}>今月の予算 合計 <b style={{ color: "#0e3a46" }}>{fmtYen(totBudget)}</b>{totActual ? ` ／ 実消化 ${fmtYen(totActual)}（${Math.round(totActual / totBudget * 100)}%）` : ""}</span>
               </div>
               <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
-                <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 10, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 10, padding: "9px 14px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                   <span>クライアント</span><span>契約（媒体別）＋追加</span><span style={{ textAlign: "right" }}>今月の予算</span><span style={{ textAlign: "right" }}>実消化 / 消化率</span>
                 </div>
                 {rows.map((r, i) => {
@@ -995,7 +1010,7 @@ export default function AdOpsConsole() {
                     {/* 媒体別内訳 */}
                     <SectionTitle icon={<Table2 size={15} color="#0891b2" />} title="媒体別内訳" />
                     <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden", marginBottom: 22 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "8px 13px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.9fr 0.7fr 0.7fr 0.9fr", gap: 8, padding: "8px 13px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                         <span>媒体</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span><span style={{ textAlign: "right" }}>CTR / CPC</span>
                       </div>
                       {accts.map((c, i) => {
@@ -1036,7 +1051,7 @@ export default function AdOpsConsole() {
                                 <Empty text={`この月のキーワードデータがありません（毎日の取得で反映）。`} />
                               ) : (
                                 <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflow: "hidden" }}>
-                                  <div style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1.7fr 0.5fr 0.7fr 0.6fr 0.6fr 0.6fr 0.6fr", gap: 6, padding: "7px 12px", background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
                                     <span>キーワード</span><span style={{ textAlign: "center" }}>品質</span><span style={{ textAlign: "right" }}>費用</span><span style={{ textAlign: "right" }}>クリック</span><span style={{ textAlign: "right" }}>CTR</span><span style={{ textAlign: "right" }}>CV</span><span style={{ textAlign: "right" }}>CPA</span>
                                   </div>
                                   {kws.map((k, i) => (
@@ -1128,7 +1143,7 @@ export default function AdOpsConsole() {
             .filter((c) => flagFilter === "all" || acctHk(c) === flagFilter)
             .sort((x, y) => (RANK[acctHk(y)] - RANK[acctHk(x)]) || ((y.spend || 0) - (x.spend || 0)));
           const sel = { padding: "6px 10px", border: "1px solid #d7e0db", borderRadius: 8, fontSize: 12.5, background: "#fff", color: "#0f172a" };
-          const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
+          const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG };
           return (
             <>
               <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="費用・成果一覧（媒体別）" note="アカウント（媒体）単位の一覧。クライアント・状態・媒体で絞り込み。行クリックで社別詳細へ。" />
@@ -1376,7 +1391,7 @@ function PortfolioGrid({ clients, onOpen }) {
   );
 }
 // ① 今日の要対応：運用者がまず見るパネル。重要度順・事実+推奨対応つき・確認済み/様子見/メモで対応管理。
-function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooze, onMemo, onClear, onDecide, onUndo, generatedAt }) {
+function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooze, onUntilWorse, onMemo, onClear, onDecide, onUndo, generatedAt }) {
   const [editKey, setEditKey] = useState(null);
   const [draft, setDraft] = useState("");
   const [showHandled, setShowHandled] = useState(false);
@@ -1414,7 +1429,9 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
             <div onClick={stop} style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
               <button style={{ ...btn, background: "linear-gradient(180deg,#06b6d4,#0891b2)", color: "#fff", border: "none", boxShadow: "0 1px 2px rgba(8,145,178,.3)" }} onClick={() => onDecide && onDecide(a, "approved")}><Check size={12} style={{ verticalAlign: "-2px" }} /> 承認</button>
               <button style={{ ...btn, color: "#b91c1c", borderColor: "#f0c9c9" }} onClick={() => onDecide && onDecide(a, "rejected")}><X size={12} style={{ verticalAlign: "-2px" }} /> 却下</button>
-              <button style={btn} onClick={() => onSnooze(a.key)}>様子見3日</button>
+              <button style={btn} title="7日間、画面と朝の通知に出さない" onClick={() => onSnooze(a.key, 7)}>7日止める</button>
+              <button style={btn} title="30日間、画面と朝の通知に出さない" onClick={() => onSnooze(a.key, 30)}>30日止める</button>
+              <button style={btn} title="今より重くなったら（注意→悪化→重大）また出す" onClick={() => onUntilWorse(a.key, a.severity)}>悪化したら出す</button>
               <button style={btn} onClick={() => { setEditKey(a.key); setDraft(op.memo || ""); }}>メモ</button>
               {a.url && <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ ...btn, textDecoration: "none", color: platformColor(a.media), borderColor: "#c7d2fe" }}>↗ {platformLabel(a.media)}を開く</a>}
             </div>
@@ -1466,7 +1483,8 @@ function TodayActions({ items, handled, ops, approvals, onClient, onAck, onSnooz
                 const op = (ops && ops[a.key]) || {};
                 const dec = approvals && approvals["alert:" + a.key];
                 const st = dec ? ((dec.decision === "approved" ? "✅ 承認" : "🚫 却下") + (dec.reason ? `・${dec.reason}` : ""))
-                  : op.status === "ack" ? "確認済み" : op.status === "snooze" ? `様子見〜${(op.until || "").slice(0, 10)}` : "";
+                  : op.status === "ack" ? "確認済み" : op.status === "snooze" ? `止め中〜${(op.until || "").slice(0, 10)}`
+                  : op.status === "untilWorse" ? "悪化したら出す" : "";
                 const by = dec ? dec.by : op.by;
                 return (
                   <div key={a.key} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", border: "1px solid #f1f5f4", borderRadius: 8, background: "#fafbfa", opacity: 0.85 }}>
@@ -1653,6 +1671,7 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
   const [range, setRange] = useState(null);
   const [cmp, setCmp] = useState("prev");
   const [scope, setScope] = useState("");
+  const [off, setOff] = useState({}); // 手法のスイッチ（修正依頼#17）。true のものを集計から外す
   const box = { background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)" };
   if (!history) {
     return <div style={{ ...box, padding: "14px 16px", fontSize: 12.5, color: "#94a3b8", marginBottom: 22 }}>期間集計のデータ（過去13か月の日次）はまだありません。翌朝の自動取得後に表示されます。</div>;
@@ -1666,13 +1685,26 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
   if (cmp === "yoy") { cs = yearAgo(r.s); ce = yearAgo(r.e); }
   const cmpOk = !!cs && cs >= from;
 
+  // 手法：Google は手法別（検索/P-MAX/デマンドジェン等・history.json の t）、ほかの媒体は媒体ごと。
+  // 全部オンの口座は従来どおり合計（a.d）を使う＝スイッチを触らなければ数字は今までと同じ。
+  const methodsOf = (a) => (a.t && Object.keys(a.t).length
+    ? Object.keys(a.t).map((lab) => ({ k: `google:${lab}`, label: `Google ${lab}`, rows: a.t[lab] }))
+    : [{ k: a.media, label: platformLabel(a.media), rows: a.d }]);
+  const methodList = [];
+  for (const a of accs) for (const m of methodsOf(a)) if (!methodList.some((x) => x.k === m.k)) methodList.push(m);
+  methodList.sort((x, y) => x.label.localeCompare(y.label, "ja"));
+  const partsOf = (a) => { const ms = methodsOf(a); return ms.some((m) => off[m.k]) ? ms.filter((m) => !off[m.k]).map((m) => m.rows) : [a.d]; };
+  const offCount = methodList.filter((m) => off[m.k]).length;
+
   const groups = {};
   for (const a of accs) {
     const key = target ? `${a.media}|${a.acct}` : a.client;
     const g = groups[key] || (groups[key] = { key, client: a.client, acct: a.acct, medias: [], cur: zeroT(), prev: zeroT(), err: false });
     if (!g.medias.includes(a.media)) g.medias.push(a.media);
-    g.cur = addT(g.cur, sumRows(a.d, r.s, r.e));
-    if (cmpOk) g.prev = addT(g.prev, sumRows(a.d, cs, ce));
+    for (const rows of partsOf(a)) {
+      g.cur = addT(g.cur, sumRows(rows, r.s, r.e));
+      if (cmpOk) g.prev = addT(g.prev, sumRows(rows, cs, ce));
+    }
     if (a.error) g.err = true;
   }
   const all = Object.values(groups);
@@ -1684,7 +1716,7 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
 
   // 日別の費用（グラフ用）
   const dayMap = {};
-  for (const a of accs) for (const x of a.d) { if (x[0] < r.s || x[0] > r.e) continue; dayMap[x[0]] = (dayMap[x[0]] || 0) + x[1]; }
+  for (const a of accs) for (const rows of partsOf(a)) for (const x of rows) { if (x[0] < r.s || x[0] > r.e) continue; dayMap[x[0]] = (dayMap[x[0]] || 0) + x[1]; }
   const days = []; for (let i = 0; i < n && i < 800; i++) { const d = addDays(r.s, i); days.push([d, dayMap[d] || 0]); }
   const maxDay = Math.max(1, ...days.map((x) => x[1]));
 
@@ -1744,6 +1776,25 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
               border: "1px solid " + (on ? "#0891b2" : "#e2e8f0"), background: on ? "#0891b2" : "#fff", color: on ? "#fff" : "#475569" }}>{p.label}</button>;
           })}
         </div>
+        {methodList.length > 1 && (
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: "#475569" }}>手法</span>
+            {methodList.map((m) => {
+              const on = !off[m.k];
+              return (
+                <button key={m.k} role="switch" aria-checked={on} onClick={() => setOff((cur) => ({ ...cur, [m.k]: !cur[m.k] }))}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px 3px 4px", borderRadius: 999, cursor: "pointer", fontSize: 11.5, fontWeight: 600,
+                    border: "1px solid " + (on ? "#0891b2" : "#e2e8f0"), background: on ? "#e6f5f8" : "#f8fafc", color: on ? "#0e7490" : "#94a3b8" }}>
+                  <span style={{ width: 26, height: 14, borderRadius: 999, background: on ? "#0891b2" : "#cbd5e1", position: "relative", flexShrink: 0 }}>
+                    <span style={{ position: "absolute", top: 2, left: on ? 14 : 2, width: 10, height: 10, borderRadius: 999, background: "#fff" }} />
+                  </span>{m.label}
+                </button>
+              );
+            })}
+            {offCount > 0 && <button onClick={() => setOff({})} style={{ fontSize: 11, color: "#0891b2", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>すべてオン</button>}
+            {offCount > 0 && <span style={{ fontSize: 11, color: "#b45309" }}>（{offCount}件の手法を集計から外しています）</span>}
+          </div>
+        )}
         <div style={{ fontSize: 11.5, color: "#64748b", marginBottom: 12 }}>
           集計期間 <b style={{ color: "#0e3a46" }}>{r.s}〜{r.e}</b>
           {cmp !== "none" && (cmpOk ? <> ／ 比較 {cs}〜{ce}</> : <span style={{ color: "#b45309" }}> ／ 比較期間がデータ範囲（{from}〜）外のため比較なし</span>)}
@@ -1779,7 +1830,7 @@ function PeriodSummary({ history, client, clientOptions, onClient }) {
         ) : (
           <div style={{ overflowX: "auto", border: "1px solid #eef1f0", borderRadius: 10 }}>
             <div style={{ minWidth: 880 }}>
-              <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "8px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+              <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 6, padding: "8px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
                 <span>{target ? "口座（媒体）" : "クライアント"}</span>
                 {PERIOD_COLS.map((c) => <span key={c.k} style={{ textAlign: "right" }}>{c.label}</span>)}
               </div>
@@ -1822,7 +1873,7 @@ function SectionTitle({ icon, title, note }) {
 }
 function TableHead({ cols, which }) {
   const tmpl = which === "conn" ? "1.4fr 0.8fr 1fr 0.9fr 0.9fr 0.6fr 0.8fr" : "1.4fr 0.7fr 0.9fr 0.9fr 1.1fr 0.6fr 0.5fr 0.7fr";
-  return (<div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.3 }}>{cols.map((c) => <span key={c}>{c}</span>)}</div>);
+  return (<div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 14px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG, letterSpacing: 0.3 }}>{cols.map((c) => <span key={c}>{c}</span>)}</div>);
 }
 function MediaPill({ m }) {
   // ゴースト（白地＋細い同色枠）でスタイリッシュに。ベタ塗りの色ブロックを避け情報密度を上げる
@@ -1926,7 +1977,7 @@ function CreativeWeekly({ rows, weeks, media, generated }) {
         </div>
       </div>
       <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflowX: "auto", overflowY: "hidden" }}>
-        <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+        <div style={{ ...hd, background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
           <span>広告</span>
           {ws.map((w) => <span key={w.start} style={{ textAlign: "right" }} title={`${w.start}〜${w.end}`}>{md(w.start)}〜{w.partial ? "（途中）" : ""}</span>)}
           <span style={{ textAlign: "right" }}>期間計</span><span style={{ textAlign: "right" }}>傾向</span>
@@ -2031,7 +2082,7 @@ function MediaAccountsPanel({ list, clients, operator, onSave }) {
         </div>
         {list.length > 0 && (
           <div style={{ marginTop: 12, border: "1px solid #eaeeec", borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.9fr 0.9fr 50px", gap: 8, padding: "7px 12px", background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr 1fr 1fr 0.9fr 0.9fr 50px", gap: 8, padding: "7px 12px", background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
               <span>クライアント</span><span>媒体</span><span>アカウントID</span><span>顧客ID</span><span>識別子</span><span>追加</span><span />
             </div>
             {list.map((x, i) => (
@@ -2052,6 +2103,159 @@ function MediaAccountsPanel({ list, clients, operator, onSave }) {
   );
 }
 
+// 媒体別の成果の各口座に、検索語句（月別・費用上位）を開いて見られる欄（修正依頼#18「効果測定のため検索語句も見たい」）。
+// データは fetch_report_breakdowns.py の breakdowns.json（Google・直近3か月）。開くまでは閉じておく（カードを長くしない）。
+function SearchTermsPanel({ byMonth }) {
+  const months = Object.keys(byMonth || {}).filter((m) => ((byMonth[m] || {}).searchTerm || []).length).sort().reverse();
+  const [m, setM] = useState(months[0] || "");
+  if (!months.length) return null;
+  const cur = months.includes(m) ? m : months[0];
+  return (
+    <details className="no-print" style={{ marginTop: 12 }}>
+      <summary style={{ cursor: "pointer", fontSize: 12.5, fontWeight: 700, color: "#0e3a46" }}>検索語句（費用上位・{cur.replace("-", "年")}月）</summary>
+      <div style={{ display: "flex", gap: 6, margin: "8px 0" }}>
+        {months.map((x) => (
+          <button key={x} onClick={() => setM(x)} style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid " + (x === cur ? "#0891b2" : "#d7e0db"),
+            background: x === cur ? "#e6f5f8" : "#fff", color: x === cur ? "#0e7490" : "#475569", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>{x.replace("-", "年")}月</button>
+        ))}
+      </div>
+      <BreakdownTable title="" rows={byMonth[cur].searchTerm} col="検索語句" />
+    </details>
+  );
+}
+
+// 各社ページの「成果」：Report GLASS と同じレポートを、チャネルのタブ（全体/Google/Yahoo!/Microsoft/Meta）で出す（2026-11-25 秋葉さん指示）。
+// レポートは Worker の /rg/<識別名>/ 経由（Report GLASS が作ったものをそのまま読む＝数字が一致する）。同じサイトの中なので、
+// 外のタブから枠の中のタブを押して切り替える（Report GLASS の管理画面と同じ作り）。中の編集ボタンは Report GLASS 向けなので隠す。
+// 出し方は Report GLASS の管理画面に合わせる（2026-11-25 秋葉さん指示）：タブの名前・並びはレポート自身のもの、
+// 灰色の台に並べて選んだタブを紺で塗る、右上に「月」の選択。色は Report GLASS の管理画面の値。
+const RG = { ink: "#1a1d24", sub: "#5b616e", line: "#e4e7ec", bg: "#f6f7f9", brand: "#0f3d5c" };
+function RgReport({ slug }) {
+  const [months, setMonths] = useState(null);
+  const [month, setMonth] = useState("");
+  const [tabs, setTabs] = useState([]);
+  const [h, setH] = useState(640);
+  const [err, setErr] = useState("");
+  const ref = useRef(null);
+  useEffect(() => {
+    setMonths(null); setErr(""); setTabs([]);
+    if (!slug) return;
+    fetch(`./rg/${slug}/months`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : r.json().catch(() => ({})).then((j) => Promise.reject(j.error || r.status))))
+      .then((j) => { const ms = j.months || []; setMonths(ms); setMonth(ms[0] || ""); })
+      .catch((e) => setErr(String(e)));
+  }, [slug]);
+  const doc = () => { try { return ref.current && ref.current.contentDocument; } catch (e) { return null; } };
+  // 文書全体の高さは枠の高さ以上になって縮まないので、レポートの本体（body の中身）の高さで合わせる
+  const fit = () => { const d = doc(); if (d && d.body) setH(Math.max(420, Math.ceil(d.body.getBoundingClientRect().height) + 16)); };
+  const onLoad = () => {
+    const d = doc(); if (!d) return;
+    const st = d.createElement("style"); st.textContent = ".edit-tools{display:none!important}"; d.head.appendChild(st);
+    const ts = [...d.querySelectorAll("#tabs .tab")].map((t) => ({ t: t.dataset.t, label: t.textContent.trim(), active: t.classList.contains("active") }));
+    setTabs(ts);
+    setTimeout(fit, 300); setTimeout(fit, 1200);
+  };
+  const show = (t) => {
+    const d = doc(); const b = d && d.querySelector(`#tabs .tab[data-t="${t}"]`);
+    if (b) b.click();
+    setTabs((ts) => ts.map((x) => ({ ...x, active: x.t === t })));
+    setTimeout(fit, 120);
+  };
+  const box = { background: "#fff", border: `1px solid ${RG.line}`, borderRadius: 10, marginBottom: 22 };
+  const note = (t) => <div style={{ ...box, padding: "14px 16px", fontSize: 12.5, color: RG.sub }}>{t}</div>;
+  if (!slug) return note("この社は Report GLASS の識別名が未設定のため、レポートを出せません（Report GLASS の対応表に登録すると出ます）。");
+  if (err) return note(err === "rg_not_configured" ? "Report GLASS との接続が未設定です（RG_CONSOLE_TOKEN）。"
+    : err === "rg_google_login_required" ? "Report GLASS のレポートは、会社の Google アカウントでログインした人だけが読めます。"
+    : `Report GLASS のレポートを読めませんでした（${err}）。`);
+  if (!months) return note("Report GLASS のレポートを読み込み中…");
+  if (!months.length) return note("この社の Report GLASS のレポートはまだありません（Report GLASS で作成すると出ます）。");
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 0 8px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 4, background: RG.bg, padding: 3, borderRadius: 10 }}>
+          {tabs.map((x) => (
+            <button key={x.t} onClick={() => show(x.t)} style={{ fontSize: 12.5, fontWeight: 700, border: "none", borderRadius: 8, padding: "7px 18px", cursor: "pointer",
+              background: x.active ? RG.brand : "transparent", color: x.active ? "#fff" : RG.sub }}>{x.label}</button>
+          ))}
+        </div>
+        <span style={{ flex: 1 }} />
+        <label style={{ fontSize: 11.5, color: RG.sub, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>月
+          <select value={month} onChange={(e) => { setTabs([]); setMonth(e.target.value); }}
+            style={{ fontSize: 12.5, fontWeight: 700, border: `1px solid ${RG.line}`, borderRadius: 7, padding: "5px 9px", background: "#fff", color: RG.ink, cursor: "pointer" }}>
+            {months.map((m) => <option key={m} value={m}>{m.replace("-", "年")}月</option>)}
+          </select>
+        </label>
+      </div>
+      <iframe ref={ref} key={`${slug}-${month}`} title="Report GLASS" src={`./rg/${slug}/index.html?month=${month}&embed=1`} onLoad={onLoad}
+        style={{ width: "100%", height: h, border: `1px solid ${RG.line}`, borderRadius: 10, background: "#fff", display: "block" }} />
+    </div>
+  );
+}
+
+// アセット別の成果（Google）：画像・動画はサムネイル、見出し・説明文は文字で。表示・クリック・費用・CV と、キーイベントごとの CV。
+// 修正依頼 #11（サムネイルでパッと見でわかるように）・#15（アセットごと・画像や動画・キーイベント1つ1つの数値）。
+// データは fetch_asset_performance.py の assets.json（当月＝月初〜昨日・先月）。P-MAX のアセットグループの中の素材は、Google が素材ごとの数値を出していないため入らない。
+const ASSET_KINDS = [["all", "すべて"], ["img", "画像"], ["video", "動画"], ["head", "見出し"], ["desc", "説明文"], ["other", "その他"]];
+const assetKind = (a) => a.img ? "img" : a.video ? "video" : /見出し/.test(a.field) ? "head" : /説明文/.test(a.field) ? "desc" : "other";
+function AssetPerformance({ byMonth, months, generated }) {
+  const ms = (months || []).filter((m) => byMonth[m]);
+  const [m, setM] = useState(ms[0] || "");
+  const [kind, setKind] = useState("all");
+  const [sort, setSort] = useState("imp");
+  const cur = byMonth[ms.includes(m) ? m : ms[0]];
+  if (!cur) return null;
+  const rows = (cur.assets || []).filter((a) => kind === "all" || assetKind(a) === kind)
+    .slice().sort((x, y) => (y[sort] || 0) - (x[sort] || 0));
+  const evs = (cur.events || []).slice(0, 6);
+  const yen = (v) => "¥" + Math.round(v || 0).toLocaleString();
+  const n = (v) => (v || 0).toLocaleString();
+  const cvf = (v) => (v ? (Math.round(v * 100) / 100).toLocaleString() : "—");
+  const tmpl = `64px minmax(180px,2.2fr) 0.8fr 0.7fr 0.55fr 0.8fr 0.6fr 0.8fr ${evs.map(() => "0.7fr").join(" ")}`;
+  const R = (v) => <span style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{v}</span>;
+  const pill = (on) => ({ padding: "4px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+    border: "1px solid " + (on ? "#0891b2" : "#e2e8f0"), background: on ? "#e6f5f8" : "#fff", color: on ? "#0e7490" : "#475569" });
+  const head = (k, label) => <button onClick={() => setSort(k)} style={{ all: "unset", cursor: "pointer", textAlign: "right", color: sort === k ? "#0891b2" : TH_FG }}>{label}{sort === k ? " ▼" : ""}</button>;
+  return (
+    <div style={{ marginBottom: 22 }}>
+      <SectionTitle icon={<Table2 size={16} color="#0891b2" />} title="アセット別の成果（Google）"
+        note={`画像・動画・見出し・説明文ごとの数値（同じアセットでも、使われているキャンペーン・広告グループごとに分けて表示）。キーイベントごとの CV つき。P-MAX のアセットグループの中の素材は、Google が素材ごとの数値を出していないため入りません（上の Google広告のタブの P-MAX 欄を参照）。取得 ${generated || ""}`} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 8 }}>
+        {ms.map((x) => <button key={x} onClick={() => setM(x)} style={pill(x === (ms.includes(m) ? m : ms[0]))}>{x.replace("-", "年")}月{x === ms[0] && ms.length > 1 ? "（昨日まで）" : ""}</button>)}
+        <span style={{ width: 12 }} />
+        {ASSET_KINDS.map(([k, label]) => <button key={k} onClick={() => setKind(k)} style={pill(kind === k)}>{label}</button>)}
+      </div>
+      {cur.eventsError && <div style={{ fontSize: 11.5, color: "#b45309", marginBottom: 6 }}>この口座はキーイベントごとの数値を取れませんでした（アセットの数値は出ています）。</div>}
+      <div style={{ border: "1px solid #eaeeec", borderRadius: 12, overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: tmpl, gap: 8, padding: "8px 12px", background: TH_BG, color: TH_FG, fontSize: 11, fontWeight: 700, minWidth: 820 + evs.length * 80, alignItems: "center" }}>
+          <span /> <span>アセット</span>{head("imp", "表示")}{head("clk", "クリック")}<span style={{ textAlign: "right" }}>CTR</span>
+          {head("cost", "費用")}{head("cv", "CV")}<span style={{ textAlign: "right" }}>CPA</span>
+          {evs.map((e) => <span key={e} title={e} style={{ textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e}</span>)}
+        </div>
+        {!rows.length && <div style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8" }}>この種類のアセットはありません。</div>}
+        {rows.map((a) => {
+          const thumb = a.img || (a.video ? `https://i.ytimg.com/vi/${a.video}/mqdefault.jpg` : "");
+          const link = a.video ? `https://www.youtube.com/watch?v=${a.video}` : a.img || "";
+          return (
+            <div key={`${a.id}-${a.agId || ""}`} style={{ display: "grid", gridTemplateColumns: tmpl, gap: 8, padding: "7px 12px", borderTop: "1px solid #f1f5f4", fontSize: 12, alignItems: "center", minWidth: 820 + evs.length * 80 }}>
+              {thumb ? <a href={link} target="_blank" rel="noopener noreferrer"><img src={thumb} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: 64, height: 40, objectFit: "cover", borderRadius: 6, background: "#f1f5f4", display: "block" }} /></a>
+                : <span style={{ width: 64, height: 40, borderRadius: 6, background: "#f1f5f4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#94a3b8" }}>文字</span>}
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 600, color: "#0e3a46", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={a.text || a.title}>{a.text || a.title || `アセット #${a.id}`}</span>
+                <span style={{ display: "block", fontSize: 10.5, color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  title={`${a.campaign || ""} ／ ${a.adGroup || ""}`}>{a.field}{a.campaign ? `・${a.campaign}` : ""}{a.adGroup ? ` ／ ${a.adGroup}` : ""}</span>
+              </span>
+              {R(n(a.imp))}{R(n(a.clk))}{R(a.imp ? (a.clk / a.imp * 100).toFixed(1) + "%" : "—")}
+              {R(yen(a.cost))}{R(cvf(a.cv))}{R(a.cv ? yen(a.cost / a.cv) : "—")}
+              {evs.map((e) => <span key={e} style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{cvf((a.ev || {})[e])}</span>)}
+            </div>
+          );
+        })}
+      </div>
+      {(cur.events || []).length > evs.length && <div style={{ fontSize: 10.5, color: "#94a3b8", marginTop: 4 }}>キーイベントは CV の多い6種類まで表示（全{cur.events.length}種類）。</div>}
+    </div>
+  );
+}
+
 function BreakdownTable({ title, rows, col }) {
   if (!rows || !rows.length) return null;
   const t = rows.reduce((a, r) => ({ imp: a.imp + r.imp, clk: a.clk + r.clk, cost: a.cost + r.cost, cv: a.cv + r.cv }), { imp: 0, clk: 0, cost: 0, cv: 0 });
@@ -2064,7 +2268,7 @@ function BreakdownTable({ title, rows, col }) {
     <div style={{ marginBottom: 16 }}>
       <div style={{ fontSize: 12.5, fontWeight: 700, color: "#0e3a46", margin: "0 0 6px" }}>{title}</div>
       <div style={{ border: "1px solid #eaeeec", borderRadius: 12, boxShadow: "0 1px 2px rgba(16,42,31,.04)", overflowX: "auto", overflowY: "hidden" }}>
-        <div style={{ ...hd, background: "#f2f5f3", fontSize: 10.5, fontWeight: 700, color: "#64748b" }}>
+        <div style={{ ...hd, background: TH_BG, fontSize: 10.5, fontWeight: 700, color: TH_FG }}>
           <span>{col}</span>{["表示", "クリック", "CTR", "CPC", "費用", "CV", "CVR", "CPA"].map((h) => <span key={h} style={{ textAlign: "right" }}>{h}</span>)}
         </div>
         {rows.map((r, i) => (
@@ -2236,7 +2440,7 @@ function TargetEditor({ clients, targets, onSave }) {
   };
   const inp = { width: "90%", maxWidth: 120, padding: "6px 8px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12.5, textAlign: "right", fontVariantNumeric: "tabular-nums" };
   const tmpl = "1.35fr 0.6fr 0.35fr 0.8fr 0.8fr 0.8fr 0.75fr";
-  const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" };
+  const head = { display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG };
   const sel = { padding: "5px 6px", border: "1px solid #d7e0db", borderRadius: 7, fontSize: 12, background: "#fff" };
   return (
     <div>
@@ -2300,7 +2504,7 @@ function TargetHistory({ history }) {
       </div>
       {history.length > 0 && (
         <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: "#f2f5f3", fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+          <div style={{ display: "grid", gridTemplateColumns: tmpl, padding: "9px 12px", background: TH_BG, fontSize: 11, fontWeight: 700, color: TH_FG }}>
             <span>日時</span><span>クライアント</span><span>項目</span><span>変更前 → 変更後</span><span>担当</span>
           </div>
           {history.slice(0, 100).map((h, i) => (
@@ -2381,7 +2585,7 @@ function BenchmarkChecks({ c }) {
   }
 
   const cell = { padding: "7px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4", textAlign: "left" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4", textAlign: "left" };
   return (
     <div style={{ marginTop: 4, marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>
@@ -2581,7 +2785,7 @@ function AccountReport({ c, days, byType }) {
     { k: "CPA", a: d7.cpa ? yen(d7.cpa) : "—", b: lm.cpa ? yen(lm.cpa) : "—", d: chg(d7.cpa, lm.cpa, true), dir: -1 },
   ];
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div>
       {/* 予算消化（直近7日） */}
@@ -2676,7 +2880,7 @@ function WeeklyBreakdown({ days, target, bench }) {
   if (!rows.length) return null;
   const maxW = Math.max(1, ...rows.map((r) => r.cost));
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div>
       <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>週次分解（当月 {+curM.slice(5, 7)}月）</div>
@@ -2728,7 +2932,7 @@ function MonthlyReport({ c, days, byType }) {
   };
   const pct = (a, b) => (a == null || b == null || b === 0 ? null : Math.round((a / b - 1) * 100));
   const cell = { padding: "6px 10px", fontSize: 12, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11 };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11 };
   return (
     <div style={{ background: "#fff", border: "1px solid #eaeeec", borderRadius: 14, boxShadow: "0 1px 3px rgba(16,42,31,.05),0 1px 2px rgba(16,42,31,.03)", padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
@@ -2837,7 +3041,7 @@ function MethodBreakdown({ days, byType }) {
   const tot = sumSet(days, dset7), totp = sumSet(days, dsetp7);
   rows.push({ label: "合計", cost: tot.cost, cv: tot.cv, cpa: tot.cpa, cpc: tot.cpc, costD: pct(tot.cost, totp.cost), cpaD: pct(tot.cpa, totp.cpa), total: true });
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: "#0e3a46", marginBottom: 6 }}>手法別（直近7日／前7日比）</div>
@@ -2887,7 +3091,7 @@ function TrendReport({ days, byType, bench }) {
     { k: "CPA", get: (o) => o.cpa, fmt: cpafmt, dir: -1 },
   ];
   const cell = { padding: "6px 8px", fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums" };
-  const head = { ...cell, color: "#94a3b8", fontWeight: 600, fontSize: 11, borderBottom: "1px solid #eef1f4" };
+  const head = { ...cell, background: TH_BG, color: TH_FG, fontWeight: 700, fontSize: 11, borderBottom: "1px solid #eef1f4" };
   return (
     <div style={{ marginTop: 14, borderTop: "1px solid #eef1f4", paddingTop: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#0e3a46", marginBottom: 2 }}>

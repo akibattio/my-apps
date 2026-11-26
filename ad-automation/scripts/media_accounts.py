@@ -61,6 +61,29 @@ def valid_ym(s) -> bool:
 _kv_cache: list | None = None
 
 
+def kv_get_json(key: str):
+    """共有の保存場所（KV adops-state）の1区画を JSON で読む。読めない・無いときは None（呼ぶ側で続行を決める）。
+    wrangler が ad-automation/.env または環境変数の CLOUDFLARE_API_TOKEN/ACCOUNT_ID で読む。"""
+    try:
+        node_bin = str(Path(NPX).parent)
+        env = {"PATH": node_bin + ":/usr/bin:/bin", "HOME": os.environ.get("HOME", str(PROJ))}
+        for k in ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "npm_config_cache", "XDG_CONFIG_HOME"):
+            if os.environ.get(k):
+                env[k] = os.environ[k]
+        r = subprocess.run([NPX, "-y", f"wrangler@{WRANGLER_VERSION}", "kv", "key", "get", key,
+                            "--namespace-id", KV_NAMESPACE_ID, "--remote"],
+                           cwd=PROJ, capture_output=True, text=True, timeout=120, env=env)
+        out = r.stdout.strip()
+        if r.returncode == 0 and out[:1] in ("{", "["):
+            return json.loads(out)
+        if "not found" not in (r.stdout + r.stderr).lower():
+            print(f"  （共有の保存場所の {key} を読めず）終了コード {r.returncode}")
+            detail("   ", (r.stderr or r.stdout).strip()[:120])
+    except Exception as e:
+        print(f"  （共有の保存場所の {key} を読めず）", err(e))
+    return None
+
+
 def _kv_entries() -> list:
     """KV の mediaAccounts.list。wrangler が ad-automation/.env の CLOUDFLARE_API_TOKEN/ACCOUNT_ID で読む。"""
     global _kv_cache

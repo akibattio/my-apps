@@ -296,6 +296,91 @@ def pull_yahoo(bench_cfg, lm_days, start_id):
     return accounts, proposals
 
 
+def pull_microsoft(bench_cfg, lm_days, start_id):
+    """Microsoft広告の実績（直近30日・直近7日・先月）。(accounts, proposals) を返す。読み取りのみ。
+    これまで Microsoft はコンソールの基のデータに入っておらず、接続ステータス・成果・アラートに出なかった（2026-11-25 秋葉さん判断で足す）。
+    日次を1回だけ取って3つの期間に集計する（API の呼び出しを少なくする）。顧客IDは口座ごと（無ければ .env の既定）で、終わったら既定に戻す。"""
+    try:
+        import sys as _sys, os as _os
+        _sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from fetch_microsoft_insights import ms_enabled, ms_daily
+    except Exception:
+        print("fetch_microsoft_insights 読込不可のためMicrosoftはスキップ"); return [], []
+    if not ms_enabled():
+        print("Microsoft接続情報が未設定のためMicrosoftはスキップ"); return [], []
+    try:
+        from media_accounts import load as load_media_accounts  # ファイル＋コンソール追加分（形・桁・組の確かめ済み）
+        entries = load_media_accounts("microsoft")
+    except Exception as e:
+        print("microsoft_accounts 読み込み失敗:", err(e)); return [], []
+    if not entries:
+        print("Microsoftアカウントが未設定のためMicrosoftはスキップ"); return [], []
+
+    import datetime as _dt
+    today = _dt.date.today()
+    d30s = (today - _dt.timedelta(days=30)).isoformat()
+    d7s = (today - _dt.timedelta(days=7)).isoformat()
+    lm_end = today.replace(day=1) - _dt.timedelta(days=1)
+    lm_start = lm_end.replace(day=1)
+    end = today.isoformat()
+
+    def summ(days, s, e):
+        rows = [x for x in days if s <= x["date"] <= e]
+        spend = sum(x["cost"] for x in rows); imp = sum(x["imp"] for x in rows)
+        clk = sum(x["clk"] for x in rows); cv = sum(x["cv"] for x in rows)
+        return {"spend": round(spend), "imp": imp, "clk": clk,
+                "ctr": round(clk / imp * 100, 2) if imp else 0, "cpc": round(spend / clk) if clk else 0,
+                "cpm": round(spend / imp * 1000) if imp else 0, "freq": 0, "cv": round(cv, 1),
+                "cpa": round(spend / cv) if cv else None, "roas": None}
+
+    default_cid = _os.environ.get("MS_ADS_CUSTOMER_ID", "")
+    accounts, proposals = [], []
+    i = start_id
+    try:
+        for e in entries:
+            name, acct = e.get("client"), str(e.get("accountId") or "")
+            if not name or not acct:
+                continue
+            _os.environ["MS_ADS_CUSTOMER_ID"] = str(e.get("customerId") or default_cid)
+            try:
+                days = ms_daily(acct, min(lm_start.isoformat(), d30s), end)
+            except Exception as ex:
+                print(f"  Microsoft取得失敗: {err(ex)}")
+                detail(f"    {name}: {str(ex)[:60]}")
+                i += 1
+                accounts.append({"id": i, "client": name, "tier": "mid", "monthly": None, "media": "microsoft",
+                                 "acct": acct, "status": "error", "tokenDays": None, "cp": 0,
+                                 "sync": datetime.now(JST).strftime("%H:%M 取得"), "lmDays": lm_days,
+                                 "bench": dict(DEFAULT_BENCH), "error": str(ex)[:80]})
+                continue
+            d30, d7, lm = summ(days, d30s, end), summ(days, d7s, end), summ(days, lm_start.isoformat(), lm_end.isoformat())
+            bench = dict(DEFAULT_BENCH); ov = bench_cfg.get(name)
+            if ov:
+                bench.update({k: v for k, v in ov.items() if not k.startswith("_")}); bench["source"] = "個社目標"
+            i += 1
+            accounts.append({
+                "id": i, "client": name, "tier": ov.get("tier", "mid") if ov else "mid",
+                "monthly": ov.get("monthly") if ov else None, "media": "microsoft",
+                "acct": acct, "status": "ok", "tokenDays": None, "cp": 0,
+                "sync": datetime.now(JST).strftime("%H:%M 取得"),
+                "spend": d30["spend"], "cpa": d30["cpa"] or 0, "target": bench.get("targetCpa"),
+                "roas": d30["roas"], "cv": d30["cv"], "ctr": d30["ctr"], "is": None,
+                "dailyBudget": 0, "lmDays": lm_days,
+                "metrics": {"d7": d7, "lm": lm}, "bench": bench,
+            })
+            if d30["cv"] == 0 and d30["spend"] > 0:
+                proposals.append({
+                    "id": f"m-{i}", "client": name, "media": "microsoft", "kind": "計測確認/配信見直し",
+                    "cur": f"直近30日 CV0 で ¥{d30['spend']:,} 消化",
+                    "next": "CV計測(コンバージョン設定)を確認、正常なら配信/KW見直し",
+                    "reason": "コンバージョンが記録されていない。まず計測の健全性を確認（推測で断定せず計測担当へ）。",
+                    "severity": "critical", "twoStep": False,
+                })
+    finally:
+        _os.environ["MS_ADS_CUSTOMER_ID"] = default_cid  # 後の処理へ顧客IDを持ち越さない
+    return accounts, proposals
+
+
 def main():
     load_env()
     tok = os.environ.get("SOFCOM_META_SYSTEM_USER_TOKEN", "").strip()
@@ -399,11 +484,22 @@ def main():
     proposals += y_proposals
     yahoo_n = len(y_accounts)
 
+    # Microsoft広告（未接続なら自動スキップ）
+    print("Microsoft広告 を取得中…")
+    try:
+        m_accounts, m_proposals = pull_microsoft(bench_cfg, lm_days, len(accounts))
+    except Exception as e:
+        print("Microsoft 取得失敗（後続は継続）:", err(e)); m_accounts, m_proposals = [], []
+        conn_issues.append({"media": "microsoft", "detail": str(e)[:200]})
+    accounts += m_accounts
+    proposals += m_proposals
+    ms_n = len(m_accounts)
+
     # 口座の番号の桁（2026-11-21）：桁が媒体と合わずに取りに行かなかった口座と、桁の決まりの3か所のずれを知らせる。
     # どちらも取得は止めない（monitor が運用コンソールと朝の社内通知に出す）。記録に出すのは件数だけ。
     try:
         import media_accounts as _ma
-        _ma.load("microsoft")  # Microsoft は日次のデータに入らないが、名簿の件数だけ数える（Yahoo は pull_yahoo で読み済み）
+        _ma.load("microsoft")  # 桁・組の確かめの件数を数える（Yahoo は pull_yahoo、Microsoft は pull_microsoft で読み済み）
         for m in ("yahoo", "microsoft"):
             if _ma.SHAPE_SKIPPED.get(m):
                 conn_issues.append({"media": m, "kind": "id_shape", "detail": f"{_ma.SHAPE_SKIPPED[m]}件"})
@@ -423,7 +519,7 @@ def main():
         conn_issues.append({"media": "console", "kind": "id_shape_rules", "detail": "確かめられず"})
 
     out = {
-        "label": "Meta＋Google＋Yahoo 実データ" if yahoo_n else "Meta＋Google 実データ",
+        "label": "Meta＋Google" + ("＋Yahoo" if yahoo_n else "") + ("＋Microsoft" if ms_n else "") + " 実データ",
         "period": "直近30日",
         "generatedAt": datetime.now(JST).strftime("%Y-%m-%d %H:%M JST"),
         "googleMcc": re.sub(r"\D", "", os.environ.get("GOOGLE_LOGIN_CUSTOMER_ID", "") or ""),  # 媒体ページへのリンク用
@@ -453,7 +549,7 @@ def main():
             pass
     Path("console").mkdir(exist_ok=True)
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {google_n} / Yahoo {yahoo_n}） / 提案{len(proposals)}件")
+    print(f"console/data.json を出力: {len(accounts)}アカウント（Meta {meta_n} / Google {google_n} / Yahoo {yahoo_n} / Microsoft {ms_n}） / 提案{len(proposals)}件")
     print(f"  うち取得失敗 {sum(1 for a in accounts if 'spend' not in a)}件")
     for a in accounts:
         if "spend" not in a:  # 取得失敗の行（数値なし）。一覧表示だけ飛ばす
